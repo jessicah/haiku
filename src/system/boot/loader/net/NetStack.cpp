@@ -117,6 +117,19 @@ NetStack::Default()
 	return sNetStack;
 }
 
+
+status_t
+NetStack::ShutDown()
+{
+	if (sNetStack != NULL) {
+		delete sNetStack;
+		sNetStack = NULL;
+	}
+
+	return B_OK;
+}
+
+
 // AddEthernetInterface
 status_t
 NetStack::AddEthernetInterface(EthernetInterface *interface)
@@ -152,3 +165,9 @@ net_stack_init()
 	return platform_net_stack_init();
 }
 
+
+status_t
+net_stack_cleanup()
+{
+	return NetStack::ShutDown();
+}
