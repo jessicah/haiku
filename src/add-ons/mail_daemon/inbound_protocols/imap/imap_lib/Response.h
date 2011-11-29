@@ -91,7 +91,7 @@ protected:
 };
 
 
-class ExpectedParseException : ParseException {
+class ExpectedParseException : public ParseException {
 public:
 								ExpectedParseException(char expected,
 									char instead);
