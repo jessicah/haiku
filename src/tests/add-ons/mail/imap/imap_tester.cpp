@@ -4,6 +4,8 @@
  */
 
 
+#include <stdlib.h>
+
 //#include "IMAPStorage.h"
 #include "Protocol.h"
 #include "Response.h"
@@ -12,9 +14,9 @@
 
 
 struct cmd_entry {
-	char*	name;
-	void	(*func)(int argc, char **argv);
-	char*	help;
+	const char*	name;
+	void		(*func)(int argc, char **argv);
+	const char*	help;
 };
 
 

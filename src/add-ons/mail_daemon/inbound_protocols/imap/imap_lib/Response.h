@@ -83,7 +83,6 @@ class ParseException : public std::exception {
 public:
 								ParseException();
 								ParseException(const char* message);
-	virtual						~ParseException();
 
 			const char*			Message() const { return fMessage; }
 

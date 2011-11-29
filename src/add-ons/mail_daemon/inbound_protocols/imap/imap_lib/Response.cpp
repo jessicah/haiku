@@ -6,6 +6,8 @@
 
 #include "Response.h"
 
+#include <stdlib.h>
+
 #include "Protocol.h"
 	// TODO: remove again once the ConnectionReader is out
 
@@ -93,11 +95,8 @@ ArgumentList::ListAt(int32 index) const
 bool
 ArgumentList::IsListAt(int32 index) const
 {
-	if (index >= 0 && index < CountItems()) {
-		if (ListArgument* argument = dynamic_cast<ListArgument*>(ItemAt(index)))
-			return true;
-	}
-	return false;
+	return index >= 0 && index < CountItems()
+		&& dynamic_cast<ListArgument*>(ItemAt(index)) != NULL;
 }
 
 
@@ -216,11 +215,6 @@ ParseException::ParseException()
 ParseException::ParseException(const char* message)
 	:
 	fMessage(message)
-{
-}
-
-
-ParseException::~ParseException()
 {
 }
 
