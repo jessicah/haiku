@@ -42,8 +42,8 @@ Addon IMAP
 	:
 	$(sources)
 	:
-	be libmail.so $(HAIKU_LOCALE_LIBS) $(TARGET_NETWORK_LIBS) libalm.so
-		libshared.a $(TARGET_LIBSUPC++) $(TARGET_LIBSTDC++)
+	be libmail.so $(HAIKU_LOCALE_LIBS) $(TARGET_NETWORK_LIBS) libbnetapi.so
+	libalm.so libshared.a $(TARGET_LIBSUPC++) $(TARGET_LIBSTDC++)
 ;
 
 SEARCH on [ FGristFiles Commands.cpp Protocol.cpp Response.cpp ]
