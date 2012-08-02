@@ -33,7 +33,10 @@ holders.
 All rights reserved.
 */
 
-#include <Debug.h>
+
+#include "BarApp.h"
+
+#include <locale.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,6 +44,7 @@ All rights reserved.
 #include <Autolock.h>
 #include <Bitmap.h>
 #include <Catalog.h>
+#include <Debug.h>
 #include <Directory.h>
 #include <Dragger.h>
 #include <File.h>
@@ -53,13 +57,14 @@ All rights reserved.
 
 #include "icons.h"
 #include "tracker_private.h"
-#include "BarApp.h"
 #include "BarView.h"
 #include "BarWindow.h"
+#include "PreferencesWindow.h"
 #include "DeskbarUtils.h"
 #include "FSUtils.h"
 #include "PublicCommands.h"
 #include "ResourceSet.h"
+#include "StatusView.h"
 #include "Switcher.h"
 #include "Utilities.h"
 
@@ -73,13 +78,13 @@ const uint32 kShowDeskbarMenu = 'BeMn';
 const uint32 kShowTeamMenu = 'TmMn';
 
 
-const BRect kIconRect(0.0f, 0.0f, 15.0f, 15.0f);
-static const color_space kIconFormat = B_RGBA32;
+static const color_space kIconColorSpace = B_RGBA32;
 
 
 int
 main()
 {
+	setlocale(LC_ALL, "");
 	TBarApp app;
 	app.Run();
 
@@ -96,6 +101,7 @@ TBarApp::TBarApp()
 	InitIconPreloader();
 
 	fBarWindow = new TBarWindow();
+	fBarView = fBarWindow->BarView();
 
 	be_roster->StartWatching(this);
 
@@ -126,7 +132,7 @@ TBarApp::TBarApp()
 	// Call UpdatePlacement() after the window is shown because expanded apps
 	// need to resize the window.
 	if (fBarWindow->Lock()) {
-		BarView()->UpdatePlacement();
+		fBarView->UpdatePlacement();
 		fBarWindow->Unlock();
 	}
 
@@ -195,11 +201,12 @@ TBarApp::SaveSettings()
 		storedSettings.AddBool("vertical", fSettings.vertical);
 		storedSettings.AddBool("left", fSettings.left);
 		storedSettings.AddBool("top", fSettings.top);
-		storedSettings.AddBool("ampmMode", fSettings.ampmMode);
-
 		storedSettings.AddInt32("state", fSettings.state);
 		storedSettings.AddFloat("width", fSettings.width);
-		storedSettings.AddBool("showTime", fSettings.showTime);
+
+		storedSettings.AddBool("showSeconds", fSettings.showSeconds);
+		storedSettings.AddBool("showDayOfWeek", fSettings.showDayOfWeek);
+
 		storedSettings.AddPoint("switcherLoc", fSettings.switcherLoc);
 		storedSettings.AddInt32("recentAppsCount", fSettings.recentAppsCount);
 		storedSettings.AddInt32("recentDocsCount", fSettings.recentDocsCount);
@@ -213,6 +220,8 @@ TBarApp::SaveSettings()
 		storedSettings.AddBool("sortRunningApps", fSettings.sortRunningApps);
 		storedSettings.AddBool("superExpando", fSettings.superExpando);
 		storedSettings.AddBool("expandNewTeams", fSettings.expandNewTeams);
+		storedSettings.AddBool("hideLabels", fSettings.hideLabels);
+		storedSettings.AddInt32("iconSize", fSettings.iconSize);
 		storedSettings.AddBool("autoRaise", fSettings.autoRaise);
 		storedSettings.AddBool("autoHide", fSettings.autoHide);
 		storedSettings.AddBool("recentAppsEnabled",
@@ -234,8 +243,8 @@ TBarApp::InitSettings()
 	settings.vertical = true;
 	settings.left = false;
 	settings.top = true;
-	settings.ampmMode = true;
-	settings.showTime = true;
+	settings.showSeconds = false;
+	settings.showDayOfWeek = false;
 	settings.state = kExpandoState;
 	settings.width = 0;
 	settings.switcherLoc = BPoint(5000, 5000);
@@ -249,6 +258,8 @@ TBarApp::InitSettings()
 	settings.sortRunningApps = false;
 	settings.superExpando = false;
 	settings.expandNewTeams = false;
+	settings.hideLabels = false;
+	settings.iconSize = kMinimumIconSize;
 	settings.autoRaise = false;
 	settings.autoHide = false;
 	settings.recentAppsEnabled = true;
@@ -259,7 +270,7 @@ TBarApp::InitSettings()
 	const char* settingsFileName = "Deskbar_settings";
 
 	find_directory(B_USER_DESKBAR_DIRECTORY, &dirPath, true);
-	// just make it
+		// just make it
 
 	if (find_directory (B_USER_SETTINGS_DIRECTORY, &dirPath, true) == B_OK) {
 		BPath filePath = dirPath;
@@ -274,39 +285,98 @@ TBarApp::InitSettings()
 		BMessage storedSettings;
 		if (fSettingsFile->InitCheck() == B_OK
 			&& storedSettings.Unflatten(fSettingsFile) == B_OK) {
-			storedSettings.FindBool("vertical", &settings.vertical);
-			storedSettings.FindBool("left", &settings.left);
-			storedSettings.FindBool("top", &settings.top);
-			storedSettings.FindBool("ampmMode", &settings.ampmMode);
-
-			storedSettings.FindInt32("state", (int32*)&settings.state);
-			storedSettings.FindFloat("width", &settings.width);
-			storedSettings.FindBool("showTime", &settings.showTime);
-			storedSettings.FindPoint("switcherLoc", &settings.switcherLoc);
-			storedSettings.FindInt32("recentAppsCount",
-				&settings.recentAppsCount);
-			storedSettings.FindInt32("recentDocsCount",
-				&settings.recentDocsCount);
-			storedSettings.FindBool("timeShowSeconds",
-				&settings.timeShowSeconds);
-			storedSettings.FindInt32("recentFoldersCount",
-				&settings.recentFoldersCount);
-			storedSettings.FindBool("alwaysOnTop", &settings.alwaysOnTop);
-			storedSettings.FindBool("timeFullDate", &settings.timeFullDate);
-			storedSettings.FindBool("trackerAlwaysFirst",
-				&settings.trackerAlwaysFirst);
-			storedSettings.FindBool("sortRunningApps",
-				&settings.sortRunningApps);
-			storedSettings.FindBool("superExpando", &settings.superExpando);
-			storedSettings.FindBool("expandNewTeams", &settings.expandNewTeams);
-			storedSettings.FindBool("autoRaise", &settings.autoRaise);
-			storedSettings.FindBool("autoHide", &settings.autoHide);
-			storedSettings.FindBool("recentAppsEnabled",
-				&settings.recentAppsEnabled);
-			storedSettings.FindBool("recentDocsEnabled",
-				&settings.recentDocsEnabled);
-			storedSettings.FindBool("recentFoldersEnabled",
-				&settings.recentFoldersEnabled);
+			if (storedSettings.FindBool("vertical", &settings.vertical)
+					!= B_OK) {
+				settings.vertical = true;
+			}
+			if (storedSettings.FindBool("left", &settings.left) != B_OK)
+				settings.left = false;
+			if (storedSettings.FindBool("top", &settings.top) != B_OK)
+				settings.top = true;
+			if (storedSettings.FindInt32("state", (int32*)&settings.state)
+					!= B_OK) {
+				settings.state = kExpandoState;
+			}
+			if (storedSettings.FindFloat("width", &settings.width) != B_OK)
+				settings.width = 0;
+			if (storedSettings.FindBool("showSeconds", &settings.showSeconds)
+					!= B_OK) {
+				settings.showSeconds = false;
+			}
+			if (storedSettings.FindBool("showDayOfWeek", &settings.showDayOfWeek)
+					!= B_OK) {
+				settings.showDayOfWeek = false;
+			}
+			if (storedSettings.FindPoint("switcherLoc", &settings.switcherLoc)
+					!= B_OK) {
+				settings.switcherLoc = BPoint(5000, 5000);
+			}
+			if (storedSettings.FindInt32("recentAppsCount",
+					&settings.recentAppsCount) != B_OK) {
+				settings.recentAppsCount = 10;
+			}
+			if (storedSettings.FindInt32("recentDocsCount",
+					&settings.recentDocsCount) != B_OK) {
+				settings.recentDocsCount = 10;
+			}
+			if (storedSettings.FindBool("timeShowSeconds",
+					&settings.timeShowSeconds) != B_OK) {
+				settings.timeShowSeconds = false;
+			}
+			if (storedSettings.FindInt32("recentFoldersCount",
+					&settings.recentFoldersCount) != B_OK) {
+				settings.recentFoldersCount = 10;
+			}
+			if (storedSettings.FindBool("alwaysOnTop", &settings.alwaysOnTop)
+					!= B_OK) {
+				settings.alwaysOnTop = false;
+			}
+			if (storedSettings.FindBool("timeFullDate", &settings.timeFullDate)
+					!= B_OK) {
+				settings.timeFullDate = false;
+			}
+			if (storedSettings.FindBool("trackerAlwaysFirst",
+					&settings.trackerAlwaysFirst) != B_OK) {
+				settings.trackerAlwaysFirst = false;
+			}
+			if (storedSettings.FindBool("sortRunningApps",
+					&settings.sortRunningApps) != B_OK) {
+				settings.sortRunningApps = false;
+			}
+			if (storedSettings.FindBool("superExpando", &settings.superExpando)
+					!= B_OK) {
+				settings.superExpando = false;
+			}
+			if (storedSettings.FindBool("expandNewTeams",
+					&settings.expandNewTeams) != B_OK) {
+				settings.expandNewTeams = false;
+			}
+			if (storedSettings.FindBool("hideLabels", &settings.hideLabels)
+					!= B_OK) {
+				settings.hideLabels = false;
+			}
+			if (storedSettings.FindInt32("iconSize", (int32*)&settings.iconSize)
+					!= B_OK) {
+				settings.iconSize = kMinimumIconSize;
+			}
+			if (storedSettings.FindBool("autoRaise", &settings.autoRaise)
+					!= B_OK) {
+				settings.autoRaise = false;
+			}
+			if (storedSettings.FindBool("autoHide", &settings.autoHide) != B_OK)
+				settings.autoHide = false;
+			if (storedSettings.FindBool("recentAppsEnabled",
+					&settings.recentAppsEnabled) != B_OK) {
+				settings.recentAppsEnabled = true;
+			}
+			if (storedSettings.FindBool("recentDocsEnabled",
+					&settings.recentDocsEnabled) != B_OK) {
+				settings.recentDocsEnabled = true;
+			}
+			if (storedSettings.FindBool("recentFoldersEnabled",
+					&settings.recentFoldersEnabled) != B_OK) {
+				settings.recentFoldersEnabled = true;
+			}
 		}
 	}
 
@@ -427,26 +497,21 @@ TBarApp::MessageReceived(BMessage* message)
 		case kAutoRaise:
 			fSettings.autoRaise = fSettings.alwaysOnTop ? false :
 				!fSettings.autoRaise;
-
-			fBarWindow->Lock();
-			BarView()->UpdateEventMask();
-			fBarWindow->Unlock();
 			break;
 
 		case kAutoHide:
 			fSettings.autoHide = !fSettings.autoHide;
 
 			fBarWindow->Lock();
-			BarView()->UpdateEventMask();
-			BarView()->HideDeskbar(fSettings.autoHide);
+			fBarView->HideDeskbar(fSettings.autoHide);
 			fBarWindow->Unlock();
 			break;
-			
+
 		case kTrackerFirst:
 			fSettings.trackerAlwaysFirst = !fSettings.trackerAlwaysFirst;
 
 			fBarWindow->Lock();
-			BarView()->UpdatePlacement();
+			fBarView->PlaceApplicationBar();
 			fBarWindow->Unlock();
 			break;
 
@@ -454,7 +519,7 @@ TBarApp::MessageReceived(BMessage* message)
 			fSettings.sortRunningApps = !fSettings.sortRunningApps;
 
 			fBarWindow->Lock();
-			BarView()->UpdatePlacement();
+			fBarView->PlaceApplicationBar();
 			fBarWindow->Unlock();
 			break;
 
@@ -470,7 +535,7 @@ TBarApp::MessageReceived(BMessage* message)
 			fSettings.superExpando = !fSettings.superExpando;
 
 			fBarWindow->Lock();
-			BarView()->UpdatePlacement();
+			fBarView->PlaceApplicationBar();
 			fBarWindow->Unlock();
 			break;
 
@@ -478,9 +543,46 @@ TBarApp::MessageReceived(BMessage* message)
 			fSettings.expandNewTeams = !fSettings.expandNewTeams;
 
 			fBarWindow->Lock();
-			BarView()->UpdatePlacement();
+			fBarView->PlaceApplicationBar();
 			fBarWindow->Unlock();
 			break;
+
+		case kHideLabels:
+			fSettings.hideLabels = !fSettings.hideLabels;
+
+			fBarWindow->Lock();
+			fBarView->PlaceApplicationBar();
+			fBarWindow->Unlock();
+			break;
+
+		case kResizeTeamIcons:
+		{
+			int32 iconSize;
+
+			if (message->FindInt32("be:value", &iconSize) != B_OK)
+				break;
+
+			fSettings.iconSize = iconSize * kIconSizeInterval;
+
+			if (fSettings.iconSize < kMinimumIconSize)
+				fSettings.iconSize = kMinimumIconSize;
+			else if (fSettings.iconSize > kMaximumIconSize)
+				fSettings.iconSize = kMaximumIconSize;
+
+			ResizeTeamIcons();
+
+			if (fBarView->MiniState())
+				break;
+
+			fBarWindow->Lock();
+			if (fBarView->Vertical())
+				fBarView->PlaceApplicationBar();
+			else
+				fBarView->UpdatePlacement();
+
+			fBarWindow->Unlock();
+			break;
+		}
 
 		case 'TASK':
 			fSwitcherMessenger.SendMessage(message);
@@ -525,10 +627,10 @@ TBarApp::MessageReceived(BMessage* message)
 			if (message->FindBool("filesys", &localize) == B_OK)
 				gLocalizedNamePreferred = localize;
 
-			BMessenger(fBarWindow->FindView("_deskbar_tv_")).SendMessage(
-				message);
-				// Notify the TimeView that the format has changed and it should
-				// recompute its size
+			fStatusViewMessenger.SendMessage(message);
+				// Notify the replicant tray (through BarView) that the time
+				// interval has changed and it should update the time view
+				// and reflow the tray icons.
 			break;
 		}
 
@@ -641,20 +743,25 @@ TBarApp::AddTeam(team_id team, uint32 flags, const char* sig, entry_ref* ref)
 
 	BString name;
 	if (!gLocalizedNamePreferred
-		|| BLocaleRoster::Default()->GetLocalizedFileName(name, *ref) != B_OK)
+		|| BLocaleRoster::Default()->GetLocalizedFileName(name, *ref)
+			!= B_OK) {
 		name = ref->name;
+	}
 
 	BarTeamInfo* barInfo = new BarTeamInfo(new BList(), flags, strdup(sig),
-		new BBitmap(kIconRect, kIconFormat), strdup(name.String()));
+		new BBitmap(IconRect(), kIconColorSpace), strdup(ref->name));
+
+	if ((barInfo->flags & B_BACKGROUND_APP) == 0
+		&& strcasecmp(barInfo->sig, kDeskbarSignature) != 0) {
+		FetchAppIcon(barInfo->sig, barInfo->icon);
+	}
 
 	barInfo->teams->AddItem((void*)team);
-	if (appMime.GetIcon(barInfo->icon, B_MINI_ICON) != B_OK)
-		appMime.GetTrackerIcon(barInfo->icon, B_MINI_ICON);
 
 	sBarTeamInfoList.AddItem(barInfo);
 
 	if (fSettings.expandNewTeams)
-		BarView()->AddExpandedItem(sig);
+		fBarView->AddExpandedItem(sig);
 
 	int32 subsCount = sSubscribers.CountItems();
 	if (subsCount > 0) {
@@ -693,8 +800,8 @@ TBarApp::RemoveTeam(team_id team)
 		if (barInfo->teams->HasItem((void*)team)) {
 			int32 subsCount = sSubscribers.CountItems();
 			if (subsCount > 0) {
-				BMessage message((barInfo->teams->CountItems() == 1) ?
-					B_SOME_APP_QUIT : kRemoveTeam);
+				BMessage message((barInfo->teams->CountItems() == 1)
+					? B_SOME_APP_QUIT : kRemoveTeam);
 
 				message.AddInt32("team", team);
 				for (int32 i = 0; i < subsCount; i++) {
@@ -714,6 +821,28 @@ TBarApp::RemoveTeam(team_id team)
 
 
 void
+TBarApp::ResizeTeamIcons()
+{
+	for (int32 i = 0; i < sBarTeamInfoList.CountItems(); i++) {
+		BarTeamInfo* barInfo = (BarTeamInfo*)sBarTeamInfoList.ItemAt(i);
+		if ((barInfo->flags & B_BACKGROUND_APP) == 0
+			&& strcasecmp(barInfo->sig, kDeskbarSignature) != 0) {
+			delete barInfo->icon;
+			barInfo->icon = new BBitmap(IconRect(), kIconColorSpace);
+			FetchAppIcon(barInfo->sig, barInfo->icon);
+		}
+	}
+}
+
+
+int32
+TBarApp::IconSize()
+{
+	return fSettings.iconSize;
+}
+
+
+void
 TBarApp::ShowPreferencesWindow()
 {
 	if (fPreferencesWindow)
@@ -722,6 +851,55 @@ TBarApp::ShowPreferencesWindow()
 		fPreferencesWindow = new PreferencesWindow(BRect(0, 0, 320, 240));
 		fPreferencesWindow->Show();
 	}
+}
+
+
+void
+TBarApp::FetchAppIcon(const char* signature, BBitmap* icon)
+{
+	app_info appInfo;
+	icon_size size = icon->Bounds().IntegerHeight() >= 31
+		? B_LARGE_ICON : B_MINI_ICON;
+
+	if (be_roster->GetAppInfo(signature, &appInfo) == B_OK) {
+		// fetch the app icon
+		BFile file(&appInfo.ref, B_READ_ONLY);
+		BAppFileInfo appMime(&file);
+		if (appMime.GetIcon(icon, size) == B_OK)
+			return;
+	}
+
+	// couldn't find the app icon
+	// fetch the generic 3 boxes icon
+	BMimeType defaultAppMime;
+	defaultAppMime.SetTo(B_APP_MIME_TYPE);
+	if (defaultAppMime.GetIcon(icon, size) == B_OK)
+		return;
+
+	// couldn't find generic 3 boxes icon
+	// fill with transparent
+	uint8* iconBits = (uint8*)icon->Bits();
+	if (icon->ColorSpace() == B_RGBA32) {
+		int32 i = 0;
+		while (i < icon->BitsLength()) {
+			iconBits[i++] = B_TRANSPARENT_32_BIT.red;
+			iconBits[i++] = B_TRANSPARENT_32_BIT.green;
+			iconBits[i++] = B_TRANSPARENT_32_BIT.blue;
+			iconBits[i++] = B_TRANSPARENT_32_BIT.alpha;
+		}
+	} else {
+		// Assume B_CMAP8
+		for (int32 i = 0; i < icon->BitsLength(); i++)
+			iconBits[i] = B_TRANSPARENT_MAGIC_CMAP8;
+	}
+}
+
+
+BRect
+TBarApp::IconRect()
+{
+	int32 iconSize = IconSize();
+	return BRect(0, 0, iconSize - 1, iconSize - 1);
 }
 
 
@@ -756,4 +934,3 @@ BarTeamInfo::~BarTeamInfo()
 	delete icon;
 	free(name);
 }
-

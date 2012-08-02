@@ -32,6 +32,7 @@ names are registered trademarks or trademarks of their respective holders.
 All rights reserved.
 */
 
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -55,13 +56,13 @@ All rights reserved.
 #include "WidgetAttributeText.h"
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "TextWidget"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "TextWidget"
 
 const float kWidthMargin = 20;
 
 
-BTextWidget::BTextWidget(Model *model, BColumn *column, BPoseView *view)
+BTextWidget::BTextWidget(Model* model, BColumn* column, BPoseView* view)
 	:
 	fText(WidgetAttributeText::NewWidgetText(model, column, view)),
 	fAttrHash(column->AttrHash()),
@@ -81,16 +82,17 @@ BTextWidget::~BTextWidget()
 
 
 int
-BTextWidget::Compare(const BTextWidget &with, BPoseView *view) const
+BTextWidget::Compare(const BTextWidget& with, BPoseView* view) const
 {
 	return fText->Compare(*with.fText, view);
 }
 
 
-const char *
-BTextWidget::Text(const BPoseView *view) const
+const char*
+BTextWidget::Text(const BPoseView* view) const
 {
-	StringAttributeText *textAttribute = dynamic_cast<StringAttributeText *>(fText);
+	StringAttributeText* textAttribute
+		= dynamic_cast<StringAttributeText*>(fText);
 	if (textAttribute == NULL)
 		return NULL;
 
@@ -99,22 +101,22 @@ BTextWidget::Text(const BPoseView *view) const
 
 
 float
-BTextWidget::TextWidth(const BPoseView *pose) const
+BTextWidget::TextWidth(const BPoseView* pose) const
 {
 	return fText->Width(pose);
 }
 
 
 float
-BTextWidget::PreferredWidth(const BPoseView *pose) const
+BTextWidget::PreferredWidth(const BPoseView* pose) const
 {
 	return fText->PreferredWidth(pose) + 1;
 }
 
 
 BRect
-BTextWidget::ColumnRect(BPoint poseLoc, const BColumn *column,
-	const BPoseView *view)
+BTextWidget::ColumnRect(BPoint poseLoc, const BColumn* column,
+	const BPoseView* view)
 {
 	if (view->ViewMode() != kListMode) {
 		// ColumnRect only makes sense in list view, return
@@ -131,8 +133,8 @@ BTextWidget::ColumnRect(BPoint poseLoc, const BColumn *column,
 
 
 BRect
-BTextWidget::CalcRectCommon(BPoint poseLoc, const BColumn *column,
-	const BPoseView *view, float textWidth)
+BTextWidget::CalcRectCommon(BPoint poseLoc, const BColumn* column,
+	const BPoseView* view, float textWidth)
 {
 	BRect result;
 	if (view->ViewMode() == kListMode) {
@@ -145,7 +147,8 @@ BTextWidget::CalcRectCommon(BPoint poseLoc, const BColumn *column,
 				break;
 
 			case B_ALIGN_CENTER:
-				result.left = poseLoc.x + (column->Width() / 2) - (textWidth / 2);
+				result.left = poseLoc.x + (column->Width() / 2)
+					- (textWidth / 2);
 				if (result.left < 0)
 					result.left = 0;
 				result.right = result.left + textWidth + 1;
@@ -182,23 +185,23 @@ BTextWidget::CalcRectCommon(BPoint poseLoc, const BColumn *column,
 
 
 BRect
-BTextWidget::CalcRect(BPoint poseLoc, const BColumn *column,
-	const BPoseView *view)
+BTextWidget::CalcRect(BPoint poseLoc, const BColumn* column,
+	const BPoseView* view)
 {
 	return CalcRectCommon(poseLoc, column, view, fText->Width(view));
 }
 
 
 BRect
-BTextWidget::CalcOldRect(BPoint poseLoc, const BColumn *column,
-	const BPoseView *view)
+BTextWidget::CalcOldRect(BPoint poseLoc, const BColumn* column,
+	const BPoseView* view)
 {
 	return CalcRectCommon(poseLoc, column, view, fText->CurrentWidth());
 }
 
 
 BRect
-BTextWidget::CalcClickRect(BPoint poseLoc, const BColumn *column,
+BTextWidget::CalcClickRect(BPoint poseLoc, const BColumn* column,
 	const BPoseView* view)
 {
 	BRect result = CalcRect(poseLoc, column, view);
@@ -215,7 +218,7 @@ BTextWidget::CalcClickRect(BPoint poseLoc, const BColumn *column,
 
 
 void
-BTextWidget::MouseUp(BRect bounds, BPoseView *view, BPose *pose, BPoint)
+BTextWidget::MouseUp(BRect bounds, BPoseView* view, BPose* pose, BPoint)
 {
 	// Start editing without delay if the pose was selected recently and this
 	// click is not the second click of a doubleclick.
@@ -270,14 +273,14 @@ BTextWidget::MouseUp(BRect bounds, BPoseView *view, BPose *pose, BPoint)
 
 
 static filter_result
-TextViewFilter(BMessage *message, BHandler **, BMessageFilter *filter)
+TextViewFilter(BMessage* message, BHandler**, BMessageFilter* filter)
 {
 	uchar key;
-	if (message->FindInt8("byte", (int8 *)&key) != B_OK)
+	if (message->FindInt8("byte", (int8*)&key) != B_OK)
 		return B_DISPATCH_MESSAGE;
 
-	BPoseView *poseView = dynamic_cast<BContainerWindow*>(filter->Looper())->
-		PoseView();
+	BPoseView* poseView = dynamic_cast<BContainerWindow*>(
+		filter->Looper())->PoseView();
 
 	if (key == B_RETURN || key == B_ESCAPE) {
 		poseView->CommitActivePose(key == B_RETURN);
@@ -299,9 +302,10 @@ TextViewFilter(BMessage *message, BHandler **, BMessageFilter *filter)
 	// we try to work-around this "bug" here.
 
 	// find the text editing view
-	BView *scrollView = poseView->FindView("BorderView");
+	BView* scrollView = poseView->FindView("BorderView");
 	if (scrollView != NULL) {
-		BTextView *textView = dynamic_cast<BTextView *>(scrollView->FindView("WidgetTextView"));
+		BTextView* textView = dynamic_cast<BTextView*>(
+			scrollView->FindView("WidgetTextView"));
 		if (textView != NULL) {
 			BRect rect = scrollView->Frame();
 
@@ -316,7 +320,7 @@ TextViewFilter(BMessage *message, BHandler **, BMessageFilter *filter)
 
 
 void
-BTextWidget::StartEdit(BRect bounds, BPoseView *view, BPose *pose)
+BTextWidget::StartEdit(BRect bounds, BPoseView* view, BPose* pose)
 {
 	if (!IsEditable())
 		return;
@@ -342,8 +346,8 @@ BTextWidget::StartEdit(BRect bounds, BPoseView *view, BPose *pose)
 
 	BFont font;
 	view->GetFont(&font);
-	BTextView *textView = new BTextView(rect, "WidgetTextView", textRect, &font, 0,
-		B_FOLLOW_ALL, B_WILL_DRAW);
+	BTextView* textView = new BTextView(rect, "WidgetTextView", textRect,
+		&font, 0, B_FOLLOW_ALL, B_WILL_DRAW);
 
 	textView->SetWordWrap(false);
 	DisallowMetaKeys(textView);
@@ -374,8 +378,8 @@ BTextWidget::StartEdit(BRect bounds, BPoseView *view, BPose *pose)
 	textView->MoveTo(rect.LeftTop());
 	textView->ResizeTo(rect.Width(), rect.Height());
 
-	BScrollView *scrollView = new BScrollView("BorderView", textView, 0, 0, false,
-		false, B_PLAIN_BORDER);
+	BScrollView* scrollView = new BScrollView("BorderView", textView, 0, 0,
+		false, false, B_PLAIN_BORDER);
 	view->AddChild(scrollView);
 
 	// configure text view
@@ -405,28 +409,30 @@ BTextWidget::StartEdit(BRect bounds, BPoseView *view, BPose *pose)
 
 	ASSERT(view->Window());	// how can I not have a Window here???
 
-	if (view->Window())
+	if (view->Window()) {
 		// force immediate redraw so TextView appears instantly
 		view->Window()->UpdateIfNeeded();
+	}
 }
 
 
 void
-BTextWidget::StopEdit(bool saveChanges, BPoint poseLoc, BPoseView *view,
-	BPose *pose, int32 poseIndex)
+BTextWidget::StopEdit(bool saveChanges, BPoint poseLoc, BPoseView* view,
+	BPose* pose, int32 poseIndex)
 {
 	// find the text editing view
-	BView *scrollView = view->FindView("BorderView");
+	BView* scrollView = view->FindView("BorderView");
 	ASSERT(scrollView);
 	if (!scrollView)
 		return;
 
-	BTextView *textView = dynamic_cast<BTextView *>(scrollView->FindView("WidgetTextView"));
+	BTextView* textView = dynamic_cast<BTextView*>(
+		scrollView->FindView("WidgetTextView"));
 	ASSERT(textView);
 	if (!textView)
 		return;
 
-	BColumn *column = view->ColumnFor(fAttrHash);
+	BColumn* column = view->ColumnFor(fAttrHash);
 	ASSERT(column);
 	if (!column)
 		return;
@@ -453,8 +459,8 @@ BTextWidget::StopEdit(bool saveChanges, BPoint poseLoc, BPoseView *view,
 
 
 void
-BTextWidget::CheckAndUpdate(BPoint loc, const BColumn *column, BPoseView *view,
-	bool visible)
+BTextWidget::CheckAndUpdate(BPoint loc, const BColumn* column,
+	BPoseView* view, bool visible)
 {
 	BRect oldRect;
 	if (view->ViewMode() != kListMode)
@@ -471,17 +477,19 @@ BTextWidget::CheckAndUpdate(BPoint loc, const BColumn *column, BPoseView *view,
 
 
 void
-BTextWidget::SelectAll(BPoseView *view)
+BTextWidget::SelectAll(BPoseView* view)
 {
-	BTextView *text = dynamic_cast<BTextView *>(view->FindView("WidgetTextView"));
+	BTextView* text = dynamic_cast<BTextView*>(
+		view->FindView("WidgetTextView"));
 	if (text)
 		text->SelectAll();
 }
 
 
 void
-BTextWidget::Draw(BRect eraseRect, BRect textRect, float, BPoseView *view,
-	BView *drawView, bool selected, uint32 clipboardMode, BPoint offset, bool direct)
+BTextWidget::Draw(BRect eraseRect, BRect textRect, float, BPoseView* view,
+	BView* drawView, bool selected, uint32 clipboardMode, BPoint offset,
+	bool direct)
 {
 	textRect.OffsetBy(offset);
 

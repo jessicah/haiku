@@ -793,10 +793,8 @@ create_thread_user_stack(Team* team, Thread* thread, void* _stackBase,
 		if (stackSize < MIN_USER_STACK_SIZE)
 			return B_BAD_VALUE;
 
-		stackBase -= TLS_SIZE;
-	}
-
-	if (stackBase == NULL) {
+		stackSize -= TLS_SIZE;
+	} else {
 		// No user-defined stack -- allocate one. For non-main threads the stack
 		// will be between USER_STACK_REGION and the main thread stack area. For
 		// a main thread the position is fixed.
@@ -1880,7 +1878,6 @@ thread_exit(void)
 	Thread* thread = thread_get_current_thread();
 	Team* team = thread->team;
 	Team* kernelTeam = team_get_kernel_team();
-	thread_id parentID = -1;
 	status_t status;
 	struct thread_debug_info debugInfo;
 	team_id teamID = team->id;
@@ -1999,9 +1996,6 @@ thread_exit(void)
 
 		if (deleteTeam) {
 			Team* parent = team->parent;
-
-			// remember who our parent was so we can send a signal
-			parentID = parent->id;
 
 			// Set the team job control state to "dead" and detach the job
 			// control entry from our team struct.

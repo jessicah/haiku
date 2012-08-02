@@ -25,8 +25,8 @@
 #include "MessageConstants.h"
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "MediaConverter"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "MediaConverter"
 
 
 const char APP_SIGNATURE[] = "application/x-vnd.Haiku-MediaConverter";
@@ -359,8 +359,6 @@ MediaConverterApp::_ConvertFile(BMediaFile* inFile, BMediaFile* outFile,
 	int32 width = -1;
 	int32 height = -1;
 
-	short audioFrameSize = 1;
-
 	uint8* videoBuffer = NULL;
 	uint8* audioBuffer = NULL;
 
@@ -384,7 +382,7 @@ MediaConverterApp::_ConvertFile(BMediaFile* inFile, BMediaFile* outFile,
 
 			audioBuffer = new uint8[raf->buffer_size];
 //			audioFrameSize = (raf->format & media_raw_audio_format::B_AUDIO_SIZE_MASK)
-			audioFrameSize = (raf->format & 0xf) * raf->channel_count;
+//			audioFrameSize = (raf->format & 0xf) * raf->channel_count;
 			outAudTrack = outFile->CreateTrack(&outAudFormat, audioCodec);
 
 			if (outAudTrack != NULL) {

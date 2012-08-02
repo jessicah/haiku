@@ -333,11 +333,11 @@ BSlider::Perform(perform_code code, void* _data)
 			BSlider::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BSlider::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BSlider::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
@@ -1736,16 +1736,6 @@ BSlider::MaxUpdateTextWidth()
 // #pragma mark - layout related
 
 
-void
-BSlider::InvalidateLayout(bool descendants)
-{
-	// invalidate cached preferred size
-	fMinSize.Set(-1, -1);
-
-	BControl::InvalidateLayout(descendants);
-}
-
-
 BSize
 BSlider::MinSize()
 {
@@ -1775,6 +1765,14 @@ BSlider::PreferredSize()
 	else
 		preferredSize.height = max_c(100.0, preferredSize.height);
 	return BLayoutUtils::ComposeSize(ExplicitPreferredSize(), preferredSize);
+}
+
+
+void
+BSlider::LayoutInvalidated(bool descendants)
+{
+	// invalidate cached preferred size
+	fMinSize.Set(-1, -1);
 }
 
 
@@ -2231,4 +2229,17 @@ _ReservedSlider3__7BSlider(BSlider* slider, const BFont* font,
 	slider->BSlider::SetFont(font, properties);
 }
 
+
 #endif	// __GNUC__ < 3
+
+
+extern "C" void
+B_IF_GCC_2(InvalidateLayout__7BSliderb, _ZN7BSlider16InvalidateLayoutEb)(
+	BView* view, bool descendants)
+{
+	perform_data_layout_invalidated data;
+	data.descendants = descendants;
+
+	view->Perform(PERFORM_CODE_LAYOUT_INVALIDATED, &data);
+}
+

@@ -15,6 +15,7 @@
 #include <AppServerLink.h>
 #include <MessagePrivate.h>
 #include <ObjectListPrivate.h>
+#include <RosterPrivate.h>
 
 #include <Autolock.h>
 #include <Deskbar.h>
@@ -271,7 +272,7 @@ InputServer::_LoadKeymap()
 	if (file.Read(&fKeys, sizeof(fKeys)) < (ssize_t)sizeof(fKeys))
 		return B_BAD_VALUE;
 
-	for (uint32 i = 0; i < sizeof(fKeys)/4; i++)
+	for (uint32 i = 0; i < sizeof(fKeys) / 4; i++)
 		((uint32*)&fKeys)[i] = B_BENDIAN_TO_HOST_INT32(((uint32*)&fKeys)[i]);
 
 	if (file.Read(&fCharsSize, sizeof(uint32)) < (ssize_t)sizeof(uint32))
@@ -599,6 +600,15 @@ InputServer::MessageReceived(BMessage* message)
 
 				}
 			}
+			return;
+		}
+
+		case kMsgAppServerRestarted:
+		{
+			BApplication::MessageReceived(message);
+			BPrivate::AppServerLink link;
+			link.StartMessage(AS_REGISTER_INPUT_SERVER);
+			link.Flush();
 			return;
 		}
 

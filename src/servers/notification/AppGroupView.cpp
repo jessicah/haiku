@@ -45,27 +45,18 @@ AppGroupView::Draw(BRect updateRect)
 	rgb_color menuColor = ViewColor();
 	BRect bounds = Bounds();
 	rgb_color hilite = tint_color(menuColor, B_DARKEN_1_TINT);
-	rgb_color dark = tint_color(menuColor, B_DARKEN_2_TINT);
 	rgb_color vlight = tint_color(menuColor, B_LIGHTEN_2_TINT);
 	bounds.bottom = bounds.top + kHeaderSize;
 
 	// Draw the header background
-	if (be_control_look != NULL) {
-		SetHighColor(tint_color(menuColor, 1.22));
-		StrokeLine(bounds.LeftTop(), bounds.LeftBottom());
-		uint32 borders = BControlLook::B_TOP_BORDER
-			| BControlLook::B_BOTTOM_BORDER | BControlLook::B_RIGHT_BORDER;
+	SetHighColor(tint_color(menuColor, 1.22));
+	SetLowColor(ui_color(B_PANEL_BACKGROUND_COLOR));
+	StrokeLine(bounds.LeftTop(), bounds.LeftBottom());
+	uint32 borders = BControlLook::B_TOP_BORDER
+		| BControlLook::B_BOTTOM_BORDER | BControlLook::B_RIGHT_BORDER;
 
-		be_control_look->DrawButtonBackground(this, bounds, bounds, menuColor,
-			0, borders);
-	} else {
-		SetHighColor(vlight);
-		StrokeLine(bounds.LeftTop(), bounds.RightTop());
-		StrokeLine(BPoint(bounds.left, bounds.top + 1), bounds.LeftBottom());
-		SetHighColor(hilite);
-		StrokeLine(BPoint(bounds.left + 1, bounds.bottom),
-			bounds.RightBottom());
-	}
+	be_control_look->DrawButtonBackground(this, bounds, bounds, menuColor,
+		0, borders);
 
 	// Draw the buttons
 	fCollapseRect.top = (kHeaderSize - kExpandSize) / 2;
@@ -79,54 +70,10 @@ AppGroupView::Draw(BRect updateRect)
 	fCloseRect.left = fCloseRect.right - kCloseSize;
 	fCloseRect.bottom = fCloseRect.top + kCloseSize;
 
-	if (be_control_look != NULL) {
-		uint32 arrowDirection = fCollapsed
-			? BControlLook::B_DOWN_ARROW : BControlLook::B_UP_ARROW;
-		be_control_look->DrawArrowShape(this, fCollapseRect, fCollapseRect,
-			LowColor(), arrowDirection, 0, B_DARKEN_3_TINT);
-	} else {
-		rgb_color outlineColor = {80, 80, 80, 255};
-		rgb_color middleColor = {200, 200, 200, 255};
-
-		SetDrawingMode(B_OP_OVER);
-
-		if (fCollapsed) {
-			BeginLineArray(6);
-
-			AddLine(BPoint(fCollapseRect.left + 3, fCollapseRect.top + 1),
-					BPoint(fCollapseRect.left + 3, fCollapseRect.bottom - 1), outlineColor);
-			AddLine(BPoint(fCollapseRect.left + 3, fCollapseRect.top + 1),
-					BPoint(fCollapseRect.left + 7, fCollapseRect.top + 5), outlineColor);
-			AddLine(BPoint(fCollapseRect.left + 7, fCollapseRect.top + 5),
-					BPoint(fCollapseRect.left + 3, fCollapseRect.bottom - 1), outlineColor);
-
-			AddLine(BPoint(fCollapseRect.left + 4, fCollapseRect.top + 3),
-					BPoint(fCollapseRect.left + 4, fCollapseRect.bottom - 3), middleColor);
-			AddLine(BPoint(fCollapseRect.left + 5, fCollapseRect.top + 4),
-					BPoint(fCollapseRect.left + 5, fCollapseRect.bottom - 4), middleColor);
-			AddLine(BPoint(fCollapseRect.left + 5, fCollapseRect.top + 5),
-					BPoint(fCollapseRect.left + 6, fCollapseRect.top + 5), middleColor);
-			EndLineArray();
-		} else {
-			// expanded state
-
-			BeginLineArray(6);
-			AddLine(BPoint(fCollapseRect.left + 1, fCollapseRect.top + 3),
-					BPoint(fCollapseRect.right - 3, fCollapseRect.top + 3), outlineColor);
-			AddLine(BPoint(fCollapseRect.left + 1, fCollapseRect.top + 3),
-					BPoint(fCollapseRect.left + 5, fCollapseRect.top + 7), outlineColor);
-			AddLine(BPoint(fCollapseRect.left + 5, fCollapseRect.top + 7),
-					BPoint(fCollapseRect.right - 3, fCollapseRect.top + 3), outlineColor);
-
-			AddLine(BPoint(fCollapseRect.left + 3, fCollapseRect.top + 4),
-					BPoint(fCollapseRect.right - 5, fCollapseRect.top + 4), middleColor);
-			AddLine(BPoint(fCollapseRect.left + 4, fCollapseRect.top + 5),
-					BPoint(fCollapseRect.right - 6, fCollapseRect.top + 5), middleColor);
-			AddLine(BPoint(fCollapseRect.left + 5, fCollapseRect.top + 5),
-					BPoint(fCollapseRect.left + 5, fCollapseRect.top + 6), middleColor);
-			EndLineArray();
-		}
-	}
+	uint32 arrowDirection = fCollapsed
+		? BControlLook::B_DOWN_ARROW : BControlLook::B_UP_ARROW;
+	be_control_look->DrawArrowShape(this, fCollapseRect, fCollapseRect,
+		LowColor(), arrowDirection, 0, B_DARKEN_3_TINT);
 
 	SetPenSize(kPenSize);
 
@@ -153,13 +100,10 @@ AppGroupView::Draw(BRect updateRect)
 }
 
 
-	void
+void
 AppGroupView::MouseDown(BPoint point)
 {
-	bool changed = false;
-	if (fCloseRect.Contains(point)) {
-		changed = true;
-
+	if (BRect(fCloseRect).InsetBySelf(-5, -5).Contains(point)) {
 		int32 children = fInfo.size();
 		for (int32 i = 0; i < children; i++) {
 			GetLayout()->RemoveView(fInfo[i]);
@@ -169,12 +113,10 @@ AppGroupView::MouseDown(BPoint point)
 		fInfo.clear();
 
 		// Remove ourselves from the parent view
-		BMessage message(kRemoveView);
+		BMessage message(kRemoveGroupView);
 		message.AddPointer("view", this);
 		fParent->PostMessage(&message);
-	}
-
-	if (fCollapseRect.Contains(point)) {
+	} else if (BRect(fCollapseRect).InsetBySelf(-5, -5).Contains(point)) {
 		fCollapsed = !fCollapsed;
 		int32 children = fInfo.size();
 		if (fCollapsed) {
@@ -182,22 +124,17 @@ AppGroupView::MouseDown(BPoint point)
 				if (!fInfo[i]->IsHidden())
 					fInfo[i]->Hide();
 			}
+			GetLayout()->SetExplicitMaxSize(GetLayout()->MinSize());
 		} else {
 			for (int32 i = 0; i < children; i++) {
 				if (fInfo[i]->IsHidden())
 					fInfo[i]->Show();
 			}
+			GetLayout()->SetExplicitMaxSize(BSize(B_SIZE_UNSET, B_SIZE_UNSET));
 		}
-		changed = true;
+
+		InvalidateLayout();
 		Invalidate(); // Need to redraw the collapse indicator and title
-
-		BMessage message(kRemoveView);
-			// Do not actually remive anything, but update size
-		fParent->PostMessage(&message);
-	}
-
-	if (changed) {
-		_ResizeViews();
 	}
 }
 
@@ -213,17 +150,22 @@ AppGroupView::MessageReceived(BMessage* msg)
 				return;
 
 			infoview_t::iterator vIt = find(fInfo.begin(), fInfo.end(), view);
+			if (vIt == fInfo.end())
+				break;
 
-			if (vIt != fInfo.end()) {
-				fInfo.erase(vIt);
-				GetLayout()->RemoveView(view);
-				delete view;
+			fInfo.erase(vIt);
+			GetLayout()->RemoveView(view);
+			delete view;
+
+			fParent->PostMessage(msg);
+
+			if (!this->HasChildren()) {
+				Hide();
+				BMessage removeSelfMessage(kRemoveGroupView);
+				removeSelfMessage.AddPointer("view", this);
+				fParent->PostMessage(&removeSelfMessage);
 			}
-
-			_ResizeViews();
-
-			if (Window() != NULL)
-				Window()->PostMessage(msg);
+			
 			break;
 		}
 		default:
@@ -243,8 +185,10 @@ AppGroupView::AddInfo(NotificationView* view)
 
 		for (int32 i = 0; i < children; i++) {
 			if (id == fInfo[i]->MessageID()) {
-				GetLayout()->RemoveView(fInfo[i]);
-				delete fInfo[i];
+				NotificationView* oldView = fInfo[i];
+				fParent->NotificationViewSwapped(oldView, view);
+				GetLayout()->RemoveView(oldView);
+				delete oldView;
 				
 				fInfo[i] = view;
 				found = true;
@@ -261,30 +205,15 @@ AppGroupView::AddInfo(NotificationView* view)
 
 	if (IsHidden())
 		Show();
-	if (view->IsHidden() && !fCollapsed)
+	if (view->IsHidden(view) && !fCollapsed)
 		view->Show();
 }
 
 
-void
-AppGroupView::_ResizeViews()
+const BString&
+AppGroupView::Group() const
 {
-	int32 children = fInfo.size();
-
-	if (!fCollapsed) {
-		for (int32 i = 0; i < children; i++) {
-			if (fInfo[i]->IsHidden())
-				fInfo[i]->Show();
-		}
-	} else {
-		for (int32 i = 0; i < children; i++)
-			if (!fInfo[i]->IsHidden())
-				fInfo[i]->Hide();
-	}
-
-	if (!IsHidden() && !HasChildren())
-		Hide();
-	fParent->Layout(true);
+	return fLabel;
 }
 
 

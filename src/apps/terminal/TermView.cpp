@@ -340,8 +340,8 @@ enum {
 	SELECT_LINES
 };
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Terminal TermView"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Terminal TermView"
 
 static property_info sPropList[] = {
 	{ "encoding",
@@ -615,7 +615,7 @@ TermView::_InitObject(const ShellParameters& shellParameters)
 	
 	const BCharacterSet* charset
 		= BCharacterSetRoster::GetCharacterSetByConversionID(fEncoding);
-	modifiedShellParameters.SetEncoding(!charset ? charset->GetName() : "UTF-8");
+	modifiedShellParameters.SetEncoding(charset ? charset->GetName() : "UTF-8");
 
 	error = fShell->Open(fRows, fColumns, modifiedShellParameters);
 
@@ -1858,8 +1858,8 @@ TermView::MessageReceived(BMessage *msg)
 			int32 i;
 			int32 encodingID;
 			BMessage specifier;
-			msg->GetCurrentSpecifier(&i, &specifier);
-			if (!strcmp("encoding", specifier.FindString("property", i))){
+			if (msg->GetCurrentSpecifier(&i, &specifier) == B_OK
+				&& !strcmp("encoding", specifier.FindString("property", i))) {
 				msg->FindInt32 ("data", &encodingID);
 				SetEncoding(encodingID);
 				msg->SendReply(B_REPLY);
@@ -1873,8 +1873,8 @@ TermView::MessageReceived(BMessage *msg)
 		{
 			int32 i;
 			BMessage specifier;
-			msg->GetCurrentSpecifier(&i, &specifier);
-			if (!strcmp("encoding", specifier.FindString("property", i))){
+			if (msg->GetCurrentSpecifier(&i, &specifier) == B_OK
+				&& !strcmp("encoding", specifier.FindString("property", i))) {
 				BMessage reply(B_REPLY);
 				reply.AddInt32("result", Encoding());
 				msg->SendReply(&reply);

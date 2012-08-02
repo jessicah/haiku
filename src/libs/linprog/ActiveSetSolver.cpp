@@ -15,7 +15,7 @@
 #include "LayoutOptimizer.h"
 
 
-//#define DEBUG_ACTIVE_SOLVER
+// #define DEBUG_ACTIVE_SOLVER
 
 #ifdef DEBUG_ACTIVE_SOLVER
 #include <stdio.h>
@@ -149,7 +149,7 @@ EquationSystem::GaussianElimination()
 				break;
 			}
 			if (swapColumn == -1) {
-				printf("can't solve column %i\n", i);
+				TRACE("can't solve column %i\n", i);
 				return false;
 			}
 			SwapColumn(i, swapColumn);
@@ -293,6 +293,26 @@ EquationSystem::_EliminateColumn(int32 column, int32 startRow, int32 endRow)
 }
 
 
+namespace {
+
+
+Constraint*
+AddMinConstraint(LinearSpec* spec, Variable* var)
+{
+	return spec->AddConstraint(1, var, kEQ, 0, 5, 5);
+}
+
+
+Constraint*
+AddMaxConstraint(LinearSpec* spec, Variable* var)
+{
+	static const double kHugeValue = 32000;
+	return spec->AddConstraint(1, var, kEQ, kHugeValue, 5, 5);
+}
+
+};
+
+
 ActiveSetSolver::ActiveSetSolver(LinearSpec* linearSpec)
 	:
 	QPSolverInterface(linearSpec),
@@ -350,7 +370,7 @@ solve(EquationSystem& system)
 			break;
 		}
 		if (negValueCol == -1) {
-			printf("can't solve\n");
+			TRACE("can't solve\n");
 			return false;
 		}
 
@@ -371,7 +391,7 @@ ActiveSetSolver::Solve()
 	int32 nVariables = fVariables.CountItems();
 
 	if (nVariables > nConstraints) {
-		printf("More variables then constraints! vars: %i, constraints: %i\n",
+		TRACE("More variables then constraints! vars: %i, constraints: %i\n",
 			(int)nVariables, (int)nConstraints);
 		return kInfeasible;
 	}
@@ -433,9 +453,14 @@ ActiveSetSolver::Solve()
 bool
 ActiveSetSolver::VariableAdded(Variable* variable)
 {
-	// TODO: error checks
-	fVariableGEConstraints.AddItem(NULL);
-	fVariableLEConstraints.AddItem(NULL);
+	if (fVariableGEConstraints.AddItem(NULL) == false)
+		return false;
+	if (fVariableLEConstraints.AddItem(NULL) == false) {
+		// clean up
+		int32 count = fVariableGEConstraints.CountItems();
+		fVariableGEConstraints.RemoveItemAt(count - 1);
+		return false;	
+	}
 	return true;
 }
 
@@ -443,8 +468,8 @@ ActiveSetSolver::VariableAdded(Variable* variable)
 bool
 ActiveSetSolver::VariableRemoved(Variable* variable)
 {
-	fVariableGEConstraints.RemoveItemAt(variable->Index());
-	fVariableLEConstraints.RemoveItemAt(variable->Index());
+	fVariableGEConstraints.RemoveItemAt(variable->GlobalIndex());
+	fVariableLEConstraints.RemoveItemAt(variable->GlobalIndex());
 	return true;
 }
 
@@ -454,7 +479,7 @@ ActiveSetSolver::VariableRangeChanged(Variable* variable)
 {
 	double min = variable->Min();
 	double max = variable->Max();
-	int32 variableIndex = variable->Index();
+	int32 variableIndex = variable->GlobalIndex();
 
 	Constraint* constraintGE = fVariableGEConstraints.ItemAt(variableIndex);
 	Constraint* constraintLE = fVariableLEConstraints.ItemAt(variableIndex);
@@ -542,7 +567,7 @@ ActiveSetSolver::MinSize(Variable* width, Variable* height)
 	if (result == kUnbounded)
 		return kMinSize;
 	if (result != kOptimal)
-		printf("Could not solve the layout specification (%d). ", result);
+		TRACE("Could not solve the layout specification (%d). ", result);
 
 	return BSize(width->Value(), height->Value());
 }
@@ -568,9 +593,36 @@ ActiveSetSolver::MaxSize(Variable* width, Variable* height)
 	if (result == kUnbounded)
 		return kMaxSize;
 	if (result != kOptimal)
-		printf("Could not solve the layout specification (%d). ", result);
+		TRACE("Could not solve the layout specification (%d). ", result);
 
 	return BSize(width->Value(), height->Value());
+}
+
+
+ResultType
+ActiveSetSolver::FindMaxs(const VariableList* variables)
+{
+	return _FindWithConstraintsNoSoft(variables, AddMaxConstraint);
+}
+
+
+ResultType
+ActiveSetSolver::FindMins(const VariableList* variables)
+{
+	return _FindWithConstraintsNoSoft(variables, AddMinConstraint);
+}
+
+
+void
+ActiveSetSolver::GetRangeConstraints(const Variable* var,
+	const Constraint** _min, const Constraint** _max) const
+{
+	int32 variableIndex = var->GlobalIndex();
+
+	if (_min)
+		*_min = fVariableGEConstraints.ItemAt(variableIndex);
+	if (_max)
+		*_max = fVariableLEConstraints.ItemAt(variableIndex);
 }
 
 
@@ -600,3 +652,28 @@ ActiveSetSolver::_AddSoftConstraint(const ConstraintList& list)
 	}
 }
 
+
+ResultType
+ActiveSetSolver::_FindWithConstraintsNoSoft(const VariableList* variables,
+	AddConstraintFunc constraintFunc)
+{
+	ConstraintList softConstraints;
+	_RemoveSoftConstraint(softConstraints);
+
+	ConstraintList constraints;
+	for (int32 i = variables->CountItems() - 1; i >= 0; i--) {
+		constraints.AddItem(constraintFunc(fLinearSpec, variables->ItemAt(i)));
+	}
+
+	ResultType result = Solve();
+
+	for (int32 i = constraints.CountItems() - 1; i >= 0; i--)
+		fLinearSpec->RemoveConstraint(constraints.ItemAt(i));
+
+	_AddSoftConstraint(softConstraints);
+
+	if (result != kOptimal)
+		TRACE("Could not solve the layout specification (%d). ", result);
+
+	return result;
+}

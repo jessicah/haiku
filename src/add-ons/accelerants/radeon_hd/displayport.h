@@ -13,7 +13,13 @@
 #include <stdint.h>
 #include <SupportDefs.h>
 
-#include "displayport_reg.h"
+#include "accelerant.h"
+#include "dp.h"
+
+
+// Radeon HD specific DisplayPort Configuration Data
+#define DP_TRAINING_AUX_RD_INTERVAL 0x000e
+#define DP_TPS3_SUPPORTED (1 << 6) // Stored within MAX_LANE_COUNT
 
 
 int dp_aux_write(uint32 hwPin, uint16 address, uint8* send,
@@ -26,11 +32,11 @@ status_t dp_aux_get_i2c_byte(uint32 hwPin, uint16 address,
 	uint8* data, bool end);
 
 uint32 dp_get_link_clock(uint32 connectorIndex);
-uint32 dp_get_link_clock_encode(uint32 dpLinkClock);
-uint32 dp_get_link_clock_decode(uint32 dpLinkClock);
 
 void dp_setup_connectors();
+
 status_t dp_link_train(uint8 crtcID, display_mode* mode);
+status_t dp_link_train_cr(uint32 connectorIndex);
 
 
 #endif /* RADEON_HD_DISPLAYPORT_H */

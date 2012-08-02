@@ -1,0 +1,37 @@
+1	english	x-vnd.Be-TSKB	2668239541
+Power off	DeskbarMenu		关闭电源
+Edit menu…	PreferencesWindow		编辑菜单
+Applications	PreferencesWindow		应用程序
+Recent documents:	PreferencesWindow		最近文档：
+Recent applications	DeskbarMenu		最近程序
+Sort running applications	PreferencesWindow		运行程序排序
+Applications	B_USER_DESKBAR_DIRECTORY/Applications		应用程序
+Find…	DeskbarMenu		查找...
+Window	PreferencesWindow		窗口
+Menu	PreferencesWindow		菜单
+Auto-hide	PreferencesWindow		自动隐藏
+Always on top	PreferencesWindow		置顶
+<Deskbar folder is empty>	DeskbarMenu		<桌面栏目录为空>
+Show all	WindowMenu		显示所有
+No windows	WindowMenu		无窗口
+Deskbar	System name		桌面栏
+Restart system	DeskbarMenu		重启系统
+Auto-raise	PreferencesWindow		自动
+Hide time	TimeView		隐藏时间
+Recent folders:	PreferencesWindow		最近文件夹：
+Show application expander	PreferencesWindow		显示程序扩展
+Restart Tracker	DeskbarMenu		重启Tracker
+Close all	WindowMenu		关闭所有
+Deskbar preferences	PreferencesWindow		桌面栏首选项
+Mount	DeskbarMenu		挂载
+Recent applications:	PreferencesWindow		最近程序：
+Shutdown…	DeskbarMenu		关机...
+Tracker always first	PreferencesWindow		文件浏览器置顶
+Preferences	B_USER_DESKBAR_DIRECTORY/Preferences		系统设置
+Show calendar…	TimeView		显示日历...
+Expand new applications	PreferencesWindow		展开新程序
+Clock	PreferencesWindow		时钟
+Demos	B_USER_DESKBAR_DIRECTORY/Demos		演示程序
+Desktop applets	B_USER_DESKBAR_DIRECTORY/Desktop applets		桌面插件
+Hide all	WindowMenu		隐藏所有
+Quit application	WindowMenu		退出程序

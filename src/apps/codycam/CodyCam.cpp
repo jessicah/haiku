@@ -7,6 +7,7 @@
 #include <Alert.h>
 #include <Button.h>
 #include <Catalog.h>
+#include <FindDirectory.h>
 #include <LayoutBuilder.h>
 #include <MediaDefs.h>
 #include <MediaNode.h>
@@ -15,6 +16,7 @@
 #include <Menu.h>
 #include <MenuBar.h>
 #include <MenuItem.h>
+#include <Path.h>
 #include <PopUpMenu.h>
 #include <scheduler.h>
 #include <TabView.h>
@@ -22,9 +24,8 @@
 #include <TimeSource.h>
 #include <TranslationKit.h>
 
-
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "CodyCam"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "CodyCam"
 
 #define VIDEO_SIZE_X 320
 #define VIDEO_SIZE_Y 240
@@ -64,7 +65,6 @@ ErrorAlert(const char* message, status_t err, BWindow *window = NULL)
 	alert->Go();
 
 	printf("%s\n%s [%lx]", message, strerror(err), err);
-//	be_app->PostMessage(B_QUIT_REQUESTED);
 }
 
 
@@ -121,13 +121,15 @@ AddTranslationItems(BMenu* intoMenu, uint32 fromType)
 
 // functions for EnumeratedStringValueSettings
 
-const char* CaptureRateAt(int32 i)
+const char*
+CaptureRateAt(int32 i)
 {
 	return (i >= 0 && i < kCaptureRatesCount) ? kCaptureRates[i].name : NULL;
 }
 
 
-const char* UploadClientAt(int32 i)
+const char*
+UploadClientAt(int32 i)
 {
 	return (i >= 0 && i < kUploadClientsCount) ? kUploadClients[i] : NULL;
 }
@@ -169,7 +171,11 @@ CodyCam::CodyCam()
 	kUploadClients[index++] = B_TRANSLATE("SFTP");
 	kUploadClients[index++] = B_TRANSLATE("Local");
 
-	chdir("/boot/home");
+	BPath homeDir;
+	if (find_directory(B_USER_DIRECTORY, &homeDir) != B_OK)
+		homeDir.SetTo("/boot/home");
+
+	chdir(homeDir.Path());
 }
 
 
@@ -195,7 +201,8 @@ CodyCam::ReadyToRun()
 		(const char*) B_TRANSLATE_SYSTEM_NAME("CodyCam"), B_TITLED_WINDOW,
 		B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS, &fPort);
 
-	_SetUpNodes();
+	if(_SetUpNodes() != B_OK)
+		fWindow->ToggleMenuOnOff();
 
 	((VideoWindow*)fWindow)->ApplyControls();
 }
@@ -485,33 +492,33 @@ VideoWindow::VideoWindow(BRect frame, const char* title, window_type type,
 	BMenuBar* menuBar = new BMenuBar(BRect(0, 0, 0, 0), "menu bar");
 
 	BMenuItem* menuItem;
-	BMenu* menu = new BMenu(B_TRANSLATE("File"));
+	fMenu = new BMenu(B_TRANSLATE("File"));
 
 	menuItem = new BMenuItem(B_TRANSLATE("Video settings"),
 		new BMessage(msg_video), 'P');
 	menuItem->SetTarget(be_app);
-	menu->AddItem(menuItem);
+	fMenu->AddItem(menuItem);
 
-	menu->AddSeparatorItem();
+	fMenu->AddSeparatorItem();
 
 	menuItem = new BMenuItem(B_TRANSLATE("Start video"),
 		new BMessage(msg_start), 'A');
 	menuItem->SetTarget(be_app);
-	menu->AddItem(menuItem);
+	fMenu->AddItem(menuItem);
 
 	menuItem = new BMenuItem(B_TRANSLATE("Stop video"),
 		new BMessage(msg_stop), 'O');
 	menuItem->SetTarget(be_app);
-	menu->AddItem(menuItem);
+	fMenu->AddItem(menuItem);
 
-	menu->AddSeparatorItem();
+	fMenu->AddSeparatorItem();
 
 	menuItem = new BMenuItem(B_TRANSLATE("Quit"),
 		new BMessage(B_QUIT_REQUESTED), 'Q');
 	menuItem->SetTarget(be_app);
-	menu->AddItem(menuItem);
+	fMenu->AddItem(menuItem);
 
-	menuBar->AddItem(menu);
+	menuBar->AddItem(fMenu);
 
 	/* add some controls */
 	_BuildCaptureControls();
@@ -712,6 +719,7 @@ VideoWindow::_BuildCaptureControls()
 
 	// FTP setup box
 	fFtpSetupBox = new BBox("FTP Setup", B_WILL_DRAW);
+	fFtpSetupBox->SetLabel(B_TRANSLATE("Output"));
 
 	fUploadClientMenu = new BPopUpMenu(B_TRANSLATE("Send to" B_UTF8_ELLIPSIS));
 	for (int i = 0; i < kUploadClientsCount; i++) {
@@ -719,14 +727,12 @@ VideoWindow::_BuildCaptureControls()
 		m->AddInt32("client", i);
 		fUploadClientMenu->AddItem(new BMenuItem(kUploadClients[i], m));
 	}
+	
 	fUploadClientMenu->SetTargetForItems(this);
 	fUploadClientMenu->FindItem(fUploadClientSetting->Value())->SetMarked(true);
 	fUploadClientSelector = new BMenuField("UploadClient", NULL,
 		fUploadClientMenu);
 
-	fFtpSetupBox->SetLabel(B_TRANSLATE("Output"));
-	// this doesn't work with the layout manager
-	// fFtpSetupBox->SetLabel(fUploadClientSelector);
 	fUploadClientSelector->SetLabel(B_TRANSLATE("Type:"));
 
 	BGridLayout *ftpLayout = new BGridLayout(kXBuffer, 0);
@@ -867,6 +873,20 @@ VideoWindow::_QuitSettings()
 
 	fSettings->SaveSettings();
 	delete fSettings;
+}
+
+
+void
+VideoWindow::ToggleMenuOnOff()
+{
+	BMenuItem* item = fMenu->FindItem(msg_video);
+	item->SetEnabled(!item->IsEnabled());
+	
+	item = fMenu->FindItem(msg_start);
+	item->SetEnabled(!item->IsEnabled());
+	
+	item = fMenu->FindItem(msg_stop);
+	item->SetEnabled(!item->IsEnabled());
 }
 
 

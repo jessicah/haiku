@@ -14,10 +14,12 @@
 #include <edid.h>
 
 #include "atom.h"
+#include "dp.h"
 #include "encoder.h"
 #include "mode.h"
 #include "pll.h"
 #include "radeon_hd.h"
+#include "ringqueue.h"
 
 
 #define MAX_DISPLAY 2
@@ -70,8 +72,7 @@ struct accelerant_info {
 
 	volatile uint32	dpms_mode;		// current driver dpms mode
 
-	// LVDS panel mode passed from the bios/startup.
-	display_mode	lvds_panel_mode;
+	RingQueue*		ringQueue[RADEON_QUEUE_MAX]; // Ring buffer command processor
 };
 
 
@@ -127,17 +128,6 @@ typedef struct {
 } gpio_info;
 
 
-typedef struct {
-	bool	valid;
-
-	uint8	config[8]; // DP configuration data
-	uint8	sinkType;
-	uint8	clock;
-	int		laneCount;
-	bool	eDPOn;
-} dp_info;
-
-
 struct encoder_info {
 	bool		valid;
 	uint16		objectID;
@@ -146,8 +136,6 @@ struct encoder_info {
 	uint32		linkEnumeration; // ex. linkb == GRAPH_OBJECT_ENUM_ID2
 	bool		isExternal;
 	bool		isDPBridge;
-	bool		isHDMI;
-	bool		isTV;
 	struct pll_info	pll;
 };
 
@@ -157,22 +145,27 @@ typedef struct {
 	uint16		objectID;
 	uint32		type;
 	uint32		flags;
+	uint32		lvdsFlags;
 	uint16		gpioID;
 	struct encoder_info encoder;
+	struct encoder_info encoderExternal;
 	// TODO struct radeon_hpd hpd;
+	dp_info		dpInfo;
 } connector_info;
 
 
 typedef struct {
-	bool			active;
+	bool			attached;
+	bool			powered;
 	uint32			connectorIndex; // matches connector id in connector_info
 	register_info*	regs;
-	bool			found_ranges;
-	uint32			vfreq_max;
-	uint32			vfreq_min;
-	uint32			hfreq_max;
-	uint32			hfreq_min;
-	edid1_info		edid_info;
+	bool			foundRanges;
+	uint32			vfreqMax;
+	uint32			vfreqMin;
+	uint32			hfreqMax;
+	uint32			hfreqMin;
+	edid1_info		edidData;
+	display_mode	preferredMode;
 } display_info;
 
 
@@ -189,7 +182,6 @@ extern atom_context* gAtomContext;
 extern display_info* gDisplay[MAX_DISPLAY];
 extern connector_info* gConnector[ATOM_MAX_SUPPORTED_DEVICE];
 extern gpio_info* gGPIOInfo[ATOM_MAX_SUPPORTED_DEVICE];
-extern dp_info* gDPInfo[ATOM_MAX_SUPPORTED_DEVICE];
 
 
 // register access

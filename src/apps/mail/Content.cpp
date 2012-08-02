@@ -79,7 +79,7 @@ of their respective holders. All rights reserved.
 #endif
 
 
-#define B_TRANSLATE_CONTEXT "Mail"
+#define B_TRANSLATION_CONTEXT "Mail"
 
 
 const rgb_color kNormalTextColor = {0, 0, 0, 255};
@@ -680,7 +680,7 @@ TContentView::MessageReceived(BMessage *msg)
 		{
 			BFont *font;
 			msg->FindPointer("font", (void **)&font);
-			fTextView->SetFontAndColor(0, LONG_MAX, font);
+			fTextView->UpdateFont(font);
 			fTextView->Invalidate(Bounds());
 			break;
 		}
@@ -702,6 +702,13 @@ TContentView::MessageReceived(BMessage *msg)
 
 		case M_SIGNATURE:
 		{
+			if (fTextView->IsReaderThreadRunning()) {
+				// Do not add the signature until the reader thread
+				// is finished. Resubmit the message for later processing
+				Window()->PostMessage(msg);
+				break;
+			}
+
 			entry_ref ref;
 			msg->FindRef("ref", &ref);
 
@@ -716,6 +723,8 @@ TContentView::MessageReceived(BMessage *msg)
 					break;
 
 				char *signature = (char *)malloc(size);
+				if (signature == NULL)
+					break;
 				ssize_t bytesRead = file.Read(signature, size);
 				if (bytesRead < B_OK) {
 					free (signature);
@@ -725,21 +734,23 @@ TContentView::MessageReceived(BMessage *msg)
 				const char *text = fTextView->Text();
 				int32 length = fTextView->TextLength();
 
-				if (length && text[length - 1] != '\n') {
-					fTextView->Select(length, length);
+				// reserve some empty lines before the signature
+				const char* newLines = "\n\n\n\n";
+				if (length && text[length - 1] == '\n')
+					newLines++;
 
-					char newLine = '\n';
-					fTextView->Insert(&newLine, 1);
+				fTextView->Select(length, length);
+				fTextView->Insert(newLines, strlen(newLines));
+				length += strlen(newLines);
 
-					length++;
-				}
-
+				// append the signature
 				fTextView->Select(length, length);
 				fTextView->Insert(signature, bytesRead);
 				fTextView->Select(length, length + bytesRead);
 				fTextView->ScrollToSelection();
 
-				fTextView->Select(start, finish);
+				// set the editing cursor position
+				fTextView->Select(length - 2 , length - 2);
 				fTextView->ScrollToSelection();
 				free (signature);
 			} else {
@@ -916,6 +927,21 @@ TTextView::~TTextView()
 		free(fYankBuffer);
 
 	delete_sem(fStopSem);
+}
+
+
+void
+TTextView::UpdateFont(const BFont* newFont)
+{
+	fFont = *newFont;
+
+	// update the text run array safely with new font
+	text_run_array *runArray = RunArray(0, LONG_MAX);
+	for (int i = 0; i < runArray->count; i++)
+		runArray->runs[i].font = *newFont;
+
+	SetRunArray(0, LONG_MAX, runArray);
+	FreeRunArray(runArray);
 }
 
 
@@ -1524,9 +1550,8 @@ TTextView::MouseDown(BPoint where)
 				BMenuItem *menuItem;
 				BPopUpMenu menu("Words", false, false);
 
-				int32 matchCount;
 				for (int32 i = 0; i < gDictCount; i++)
-					matchCount = gWords[i]->FindBestMatches(&matches,
+					gWords[i]->FindBestMatches(&matches,
 						srcWord.String());
 
 				if (matches.CountItems()) {
@@ -2069,6 +2094,20 @@ TTextView::StopLoad()
 }
 
 
+bool
+TTextView::IsReaderThreadRunning()
+{
+	if (fThread == 0)
+		return false;
+
+	thread_info info;
+	for (int i = 5; i > 0; i--, usleep(100000))
+		if (get_thread_info(fThread, &info) != B_OK)
+			return false;
+	return true;
+}
+
+
 void
 TTextView::AddAsContent(BEmailMessage *mail, bool wrap, uint32 charset, mail_encoding encoding)
 {
@@ -2282,6 +2321,9 @@ TTextView::Reader::ParseMail(BMailContainer *container,
 				return false;
 
 			hyper_text *enclosure = (hyper_text *)malloc(sizeof(hyper_text));
+			if (enclosure == NULL)
+				return false;
+
 			memset(enclosure, 0, sizeof(hyper_text));
 
 			enclosure->type = TYPE_ENCLOSURE;
@@ -2309,6 +2351,9 @@ TTextView::Reader::ParseMail(BMailContainer *container,
 				count--;
 		} else if (fIncoming) {
 			hyper_text *enclosure = (hyper_text *)malloc(sizeof(hyper_text));
+			if (enclosure == NULL)
+				return false;
+
 			memset(enclosure, 0, sizeof(hyper_text));
 
 			enclosure->type = TYPE_ENCLOSURE;
@@ -2382,13 +2427,18 @@ TTextView::Reader::Process(const char *data, int32 data_len, bool isHeader)
 				count = 0;
 
 				hyper_text *enclosure = (hyper_text *)malloc(sizeof(hyper_text));
+				if (enclosure == NULL)
+					return false;
+
 				memset(enclosure, 0, sizeof(hyper_text));
 				fView->GetSelection(&enclosure->text_start,
 									&enclosure->text_end);
 				enclosure->type = type;
 				enclosure->name = strdup(url.String());
-				if (enclosure->name == NULL)
+				if (enclosure->name == NULL) {
+					free(enclosure);
 					return false;
+				}
 
 				Insert(&data[loop], urlLength, true, isHeader);
 				enclosure->text_end += urlLength;
@@ -2594,6 +2644,9 @@ TTextView::Reader::Run(void *_this)
 	}
 
 done:
+	// restore the reading position if available
+	view->Window()->PostMessage(M_READ_POS);
+
 	reader->Unlock();
 
 	delete reader;

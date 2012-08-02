@@ -801,17 +801,6 @@ BMenuField::PreferredSize()
 }
 
 
-void
-BMenuField::InvalidateLayout(bool descendants)
-{
-	CALLED();
-
-	fLayoutData->valid = false;
-
-	BView::InvalidateLayout(descendants);
-}
-
-
 BLayoutItem*
 BMenuField::CreateLabelLayoutItem()
 {
@@ -872,11 +861,11 @@ BMenuField::Perform(perform_code code, void* _data)
 			BMenuField::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BMenuField::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BMenuField::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
@@ -903,6 +892,15 @@ BMenuField::Perform(perform_code code, void* _data)
 	}
 
 	return BView::Perform(code, _data);
+}
+
+
+void
+BMenuField::LayoutInvalidated(bool descendants)
+{
+	CALLED();
+
+	fLayoutData->valid = false;
 }
 
 
@@ -1510,5 +1508,16 @@ BMenuField::MenuBarLayoutItem::Instantiate(BMessage* from)
 	if (validate_instantiation(from, "BMenuField::MenuBarLayoutItem"))
 		return new MenuBarLayoutItem(from);
 	return NULL;
+}
+
+
+extern "C" void
+B_IF_GCC_2(InvalidateLayout__10BMenuFieldb, _ZN10BMenuField16InvalidateLayoutEb)(
+	BMenuField* field, bool descendants)
+{
+	perform_data_layout_invalidated data;
+	data.descendants = descendants;
+
+	field->Perform(PERFORM_CODE_LAYOUT_INVALIDATED, &data);
 }
 

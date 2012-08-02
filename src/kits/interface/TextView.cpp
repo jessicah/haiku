@@ -42,6 +42,7 @@
 #include <PropertyInfo.h>
 #include <Region.h>
 #include <ScrollBar.h>
+#include <SystemCatalog.h>
 #include <TextView.h>
 #include <Window.h>
 
@@ -54,21 +55,17 @@
 #include "UndoBuffer.h"
 #include "WidthBuffer.h"
 
-#include <Catalog.h>
-#include <LocaleBackend.h>
-
 
 using namespace std;
-using BPrivate::gLocaleBackend;
-using BPrivate::LocaleBackend;
+using BPrivate::gSystemCatalog;
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "TextView"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "TextView"
 
 
-#define TRANSLATE(str) gLocaleBackend->GetString(B_TRANSLATE_MARK(str), \
-		"TextView")
+#define TRANSLATE(str) \
+	gSystemCatalog.GetString(B_TRANSLATE_MARK(str), "TextView")
 
 #undef TRACE
 #undef CALLED
@@ -574,7 +571,7 @@ BTextView::MouseDown(BPoint where)
 	_StopMouseTracking();
 
 	int32 modifiers = 0;
-	uint32 buttons;
+	uint32 buttons = 0;
 	BMessage *currentMessage = Window()->CurrentMessage();
 	if (currentMessage != NULL) {
 		currentMessage->FindInt32("modifiers", &modifiers);
@@ -858,7 +855,7 @@ BTextView::FrameResized(float width, float height)
 
 
 /*! \brief Highlight/unhighlight the selection when the view gets
-		or looses the focus.
+		or loses the focus.
 	\param focusState The focus state: true, if the view is getting the focus,
 		false otherwise.
 */
@@ -1122,11 +1119,11 @@ BTextView::Perform(perform_code code, void* _data)
 			BTextView::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BTextView::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BTextView::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
@@ -1435,28 +1432,36 @@ BTextView::Paste(BClipboard *clipboard)
 	BMessage *clip = clipboard->Data();
 	if (clip != NULL) {
 		const char *text = NULL;
-		ssize_t len = 0;
+		ssize_t length = 0;
 
 		if (clip->FindData("text/plain", B_MIME_TYPE,
-				(const void **)&text, &len) == B_OK) {
+				(const void **)&text, &length) == B_OK) {
 			text_run_array *runArray = NULL;
-			ssize_t runLen = 0;
+			ssize_t runLength = 0;
 
 			if (fStylable) {
 				clip->FindData("application/x-vnd.Be-text_run_array",
-					B_MIME_TYPE, (const void **)&runArray, &runLen);
+					B_MIME_TYPE, (const void **)&runArray, &runLength);
+			}
+
+			_FilterDisallowedChars((char*)text, length, runArray);
+
+			if (length < 1) {
+				beep();
+				clipboard->Unlock();
+				return;
 			}
 
 			if (fUndo) {
 				delete fUndo;
-				fUndo = new PasteUndoBuffer(this, text, len, runArray,
-					runLen);
+				fUndo = new PasteUndoBuffer(this, text, length, runArray,
+					runLength);
 			}
 
 			if (fSelStart != fSelEnd)
 				Delete();
 
-			Insert(text, len, runArray);
+			Insert(text, length, runArray);
 			ScrollToOffset(fSelEnd);
 		}
 	}
@@ -2782,13 +2787,11 @@ BTextView::GetHeightForWidth(float width, float* min, float* max,
 
 
 void
-BTextView::InvalidateLayout(bool descendants)
+BTextView::LayoutInvalidated(bool descendants)
 {
 	CALLED();
 
 	fLayoutData->valid = false;
-
-	BView::InvalidateLayout(descendants);
 }
 
 
@@ -3258,11 +3261,6 @@ BTextView::_InitObject(BRect textRect, const BFont *initialFont,
 	fLastClickOffset = -1;
 
 	SetDoesUndo(true);
-
-	// We need to translate some strings, and in order to do so, we need
-	// to use the LocaleBackend to reach liblocale.so
-	if (gLocaleBackend == NULL)
-		LocaleBackend::LoadBackend();
 }
 
 
@@ -3663,12 +3661,9 @@ BTextView::_HandleAlphaKey(const char *bytes, int32 numBytes)
 		undoBuffer->InputCharacter(numBytes);
 	}
 
-	bool erase = fSelStart != fText->Length();
-
 	if (fSelStart != fSelEnd) {
 		Highlight(fSelStart, fSelEnd);
 		DeleteText(fSelStart, fSelEnd);
-		erase = true;
 	}
 
 	if (fAutoindent && numBytes == 1 && *bytes == B_ENTER) {
@@ -3708,7 +3703,6 @@ BTextView::_Refresh(int32 fromOffset, int32 toOffset, bool scroll)
 	int32 toLine = _LineAt(toOffset);
 	int32 saveFromLine = fromLine;
 	int32 saveToLine = toLine;
-	float saveLineHeight = LineHeight(fromLine);
 
 	_RecalculateLineBreaks(&fromLine, &toLine);
 
@@ -3738,12 +3732,6 @@ BTextView::_Refresh(int32 fromOffset, int32 toOffset, bool scroll)
 	int32 toVisible = _LineAt(BPoint(0.0f, bounds.bottom));
 	fromLine = max_c(fromVisible, fromLine);
 	toLine = min_c(toLine, toVisible);
-
-	int32 drawOffset = fromOffset;
-	if (LineHeight(fromLine) != saveLineHeight
-		|| newHeight < saveHeight || fromLine < saveFromLine
-		|| fAlignment != B_ALIGN_LEFT)
-		drawOffset = (*fLines)[fromLine]->offset;
 
 	_AutoResize(false);
 
@@ -4794,30 +4782,38 @@ BTextView::_MessageDropped(BMessage *inMessage, BPoint where, BPoint offset)
 			return true;
 	}
 
-	ssize_t dataLen = 0;
+	ssize_t dataLength = 0;
 	const char *text = NULL;
 	entry_ref ref;
 	if (inMessage->FindData("text/plain", B_MIME_TYPE, (const void **)&text,
-			&dataLen) == B_OK) {
+			&dataLength) == B_OK) {
 		text_run_array *runArray = NULL;
-		ssize_t runLen = 0;
-		if (fStylable)
+		ssize_t runLength = 0;
+		if (fStylable) {
 			inMessage->FindData("application/x-vnd.Be-text_run_array",
-				B_MIME_TYPE, (const void **)&runArray, &runLen);
+				B_MIME_TYPE, (const void **)&runArray, &runLength);
+		}
+
+		_FilterDisallowedChars((char*)text, dataLength, runArray);
+
+		if (dataLength < 1) {
+			beep();
+			return true;
+		}
 
 		if (fUndo) {
 			delete fUndo;
-			fUndo = new DropUndoBuffer(this, text, dataLen, runArray,
-				runLen, dropOffset, internalDrop);
+			fUndo = new DropUndoBuffer(this, text, dataLength, runArray,
+				runLength, dropOffset, internalDrop);
 		}
 
 		if (internalDrop) {
 			if (dropOffset > fSelEnd)
-				dropOffset -= dataLen;
+				dropOffset -= dataLength;
 			Delete();
 		}
 
-		Insert(dropOffset, text, dataLen, runArray);
+		Insert(dropOffset, text, dataLength, runArray);
 	}
 
 	return true;
@@ -5574,7 +5570,7 @@ BTextView::_ShowContextMenu(BPoint where)
 	int32 start;
 	int32 finish;
 	GetSelection(&start, &finish);
-	
+
 	bool canEdit = IsEditable();
 	int32 length = TextLength();
 
@@ -5600,6 +5596,49 @@ BTextView::_ShowContextMenu(BPoint where)
 	menu->SetTargetForItems(this);
 	ConvertToScreen(&where);
 	menu->Go(where, true, true,	true);
+}
+
+
+void
+BTextView::_FilterDisallowedChars(char* text, int32& length,
+	text_run_array* runArray)
+{
+	if (!fDisallowedChars)
+		return;
+
+	if (fDisallowedChars->IsEmpty() || !text)
+		return;
+
+	int32 stringIndex = 0;
+	if (runArray) {
+		int32 remNext = 0;
+
+		for (int i = 0; i < runArray->count; i++) {
+			runArray->runs[i].offset -= remNext;
+			while (stringIndex < runArray->runs[i].offset
+				&& stringIndex < length) {
+				if (fDisallowedChars->HasItem(
+					reinterpret_cast<void *>(text[stringIndex]))) {
+					memmove(text + stringIndex, text + stringIndex + 1,
+						length - stringIndex - 1);
+					length--;
+					runArray->runs[i].offset--;
+					remNext++;
+				} else
+					stringIndex++;
+			}
+		}
+	}
+
+	while (stringIndex < length) {
+		if (fDisallowedChars->HasItem(
+			reinterpret_cast<void *>(text[stringIndex]))) {
+			memmove(text + stringIndex, text + stringIndex + 1,
+				length - stringIndex - 1);
+			length--;
+		} else
+			stringIndex++;
+	}
 }
 
 // #pragma mark - BTextView::TextTrackState
@@ -5637,3 +5676,15 @@ BTextView::TextTrackState::SimulateMouseMovement(BTextView *textView)
 	textView->GetMouse(&where, &buttons);
 	textView->_PerformMouseMoved(where, B_INSIDE_VIEW);
 }
+
+
+extern "C" void
+B_IF_GCC_2(InvalidateLayout__9BTextViewb,  _ZN9BTextView16InvalidateLayoutEb)(
+	BTextView* view, bool descendants)
+{
+	perform_data_layout_invalidated data;
+	data.descendants = descendants;
+
+	view->Perform(PERFORM_CODE_LAYOUT_INVALIDATED, &data);
+}
+

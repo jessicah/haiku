@@ -6,53 +6,35 @@
 #define	AREA_H
 
 
-#include <vector>
-
-#include <Alignment.h>
-#include <List.h>
+#include <Referenceable.h>
+#include <Rect.h>
 #include <Size.h>
-#include <SupportDefs.h>
-#include <View.h>
-
-#include "Column.h"
-#include "LinearSpec.h"
-#include "Row.h"
-#include "Tab.h"
+#include <String.h>
 
 
-class Constraint;
+class BLayoutItem;
+class BView;
+
+
+namespace LinearProgramming {
+	class LinearSpec;
+	class Constraint;
+};
+
+namespace BPrivate {
+	class SharedSolver;
+};
 
 
 namespace BALM {
 
 
-class GroupItem {
-public:
-								GroupItem(BLayoutItem* item);
-								GroupItem(BView* view);
+class Column;
+class Row;
+class XTab;
+class YTab;
 
-			BLayoutItem*		LayoutItem();
-			BView*				View();
 
-	const	std::vector<GroupItem>&	GroupItems();
-			enum orientation	Orientation();
-
-			GroupItem& 			operator|(const GroupItem& right);
-			GroupItem& 			operator/(const GroupItem& bottom);
-private:
-								GroupItem();
-
-			void				_Init(BLayoutItem* item, BView* view,
-									  enum orientation orien = B_HORIZONTAL);
-			GroupItem& 			_AddItem(const GroupItem& item,
-									enum orientation orien);
-
-			BLayoutItem*		fLayoutItem;
-			BView*				fView;
-
-			std::vector<GroupItem>	fGroupItems;
-			enum orientation	fOrientation;
-};
 
 
 class RowColumnManager;
@@ -64,6 +46,9 @@ class RowColumnManager;
 class Area {
 public:
 								~Area();
+
+			int32				ID() const;
+			void				SetID(int32 id);
 
 			BLayoutItem*		Item();
 
@@ -87,10 +72,17 @@ public:
 			void				SetShrinkPenalties(BSize shrink);
 			void				SetGrowPenalties(BSize grow);
 
+			void				GetInsets(float* left, float* top, float* right,
+									float* bottom) const;
 			float				LeftInset() const;
 			float				TopInset() const;
 			float				RightInset() const;
 			float				BottomInset() const;
+
+			void				SetInsets(float insets);
+			void				SetInsets(float horizontal, float vertical);
+			void				SetInsets(float left, float top, float right,
+									float bottom);
 			void				SetLeftInset(float left);
 			void				SetTopInset(float top);
 			void				SetRightInset(float right);
@@ -98,31 +90,39 @@ public:
 
 			BString				ToString() const;
 
-			Constraint*			SetWidthAs(Area* area, float factor = 1.0f);
-			Constraint*			SetHeightAs(Area* area, float factor = 1.0f);
+			LinearProgramming::Constraint*
+								SetWidthAs(Area* area, float factor = 1.0f);
+
+			LinearProgramming::Constraint*
+								SetHeightAs(Area* area, float factor = 1.0f);
 
 			void				InvalidateSizeConstraints();
 
 			BRect				Frame() const;
-			BRect				ItemFrame() const;
 
 private:
 								Area(BLayoutItem* item);
 
-			void				_Init(LinearSpec* ls, XTab* left, YTab* top,
-									XTab* right, YTab* bottom,
-									RowColumnManager* manager);
-			void				_Init(LinearSpec* ls, Row* row, Column* column,
+			void				_Init(LinearProgramming::LinearSpec* ls,
+									XTab* left, YTab* top, XTab* right,
+									YTab* bottom, RowColumnManager* manager);
+			void				_Init(LinearProgramming::LinearSpec* ls,
+									Row* row, Column* column,
 									RowColumnManager* manager);
 
-			void				_DoLayout();
+			void				_DoLayout(const BPoint& offset);
 
 			void				_UpdateMinSizeConstraint(BSize min);
 			void				_UpdateMaxSizeConstraint(BSize max);
 private:
-			BLayoutItem*		fLayoutItem;
+	friend class BALMLayout;
+	friend class RowColumnManager;
+	friend class BPrivate::SharedSolver;
 
-			LinearSpec*			fLS;
+			BLayoutItem*		fLayoutItem;
+			int32				fID;
+
+			LinearProgramming::LinearSpec* fLS;
 
 			BReference<XTab>	fLeft;
 			BReference<XTab>	fRight;
@@ -135,28 +135,24 @@ private:
 			BSize				fShrinkPenalties;
 			BSize				fGrowPenalties;
 
-			BSize				fTopLeftInset;
+			BSize				fLeftTopInset;
 			BSize				fRightBottomInset;
 
-			BObjectList<Constraint>	fConstraints;
-			Constraint*			fMinContentWidth;
-			Constraint*			fMaxContentWidth;
-			Constraint*			fMinContentHeight;
-			Constraint*			fMaxContentHeight;
 			double				fContentAspectRatio;
-			Constraint*			fContentAspectRatioC;
-
 			RowColumnManager*	fRowColumnManager;
-public:
-	friend class BALMLayout;
-	friend class RowColumnManager;
 
+			LinearProgramming::Constraint* fMinContentWidth;
+			LinearProgramming::Constraint* fMaxContentWidth;
+			LinearProgramming::Constraint* fMinContentHeight;
+			LinearProgramming::Constraint* fMaxContentHeight;
+			LinearProgramming::Constraint* fContentAspectRatioC;
+
+			uint32				_reserved[2];
 };
 
 }	// namespace BALM
 
 using BALM::Area;
-using BALM::GroupItem;
 
 #endif	// AREA_H
 

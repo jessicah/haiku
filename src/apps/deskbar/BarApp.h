@@ -37,11 +37,6 @@ All rights reserved.
 
 
 #include <Application.h>
-#include <Catalog.h>
-#include <List.h>
-#include "BarWindow.h"
-#include "PreferencesWindow.h"
-
 
 /* ------------------------------------ */
 // Private app_server defines that I need to use
@@ -49,6 +44,67 @@ All rights reserved.
 #define _DESKTOP_W_TYPE_ 1024
 #define _FLOATER_W_TYPE_ 4
 #define _STD_W_TYPE_ 0
+
+
+const uint32 kWin95 = 'Bill';
+const uint32 kAmiga = 'Ncro';
+const uint32 kMac = 'WcOS';
+const uint32 kBe = 'Tabs';
+const uint32 kAlwaysTop = 'TTop';
+const uint32 kToggleDraggers = 'TDra';
+const uint32 kUnsubscribe = 'Unsb';
+const uint32 kAddTeam = 'AdTm';
+const uint32 kRemoveTeam = 'RmTm';
+const uint32 kRestart = 'Rtrt';
+const uint32 kShutDown = 'ShDn';
+const uint32 kRestartTracker = 'Trak';
+
+// from roster_private.h
+const uint32 kShutdownSystem = 301;
+const uint32 kRebootSystem = 302;
+const uint32 kSuspendSystem = 304;
+
+// icon size constants
+const int32 kMinimumIconSize = 16;
+const int32 kMaximumIconSize = 96;
+const int32 kIconSizeInterval = 8;
+
+/* --------------------------------------------- */
+
+struct desk_settings {
+	bool vertical;
+	bool left;
+	bool top;
+	bool showSeconds;
+	bool showDayOfWeek;
+	uint32 state;
+	float width;
+	BPoint switcherLoc;
+	int32 recentAppsCount;
+	int32 recentDocsCount;
+	bool timeShowSeconds;
+	int32 recentFoldersCount;
+	bool alwaysOnTop;
+	bool timeFullDate;
+	bool trackerAlwaysFirst;
+	bool sortRunningApps;
+	bool superExpando;
+	bool expandNewTeams;
+	bool hideLabels;
+	int32 iconSize;
+	bool autoRaise;
+	bool autoHide;
+	bool recentAppsEnabled;
+	bool recentDocsEnabled;
+	bool recentFoldersEnabled;
+};
+
+class BFile;
+class BList;
+class BBitmap;
+class PreferencesWindow;
+class TBarView;
+class TBarWindow;
 
 
 class BarTeamInfo {
@@ -65,82 +121,23 @@ public:
 	char* name;
 };
 
-const uint32 kWin95 = 'Bill';
-const uint32 kAmiga = 'Ncro';
-const uint32 kMac = 'WcOS';
-const uint32 kBe = 'Tabs';
-const uint32 kAlwaysTop = 'TTop';
-const uint32 kToggleDraggers = 'TDra';
-const uint32 kUnsubscribe = 'Unsb';
-const uint32 kAddTeam = 'AdTm';
-const uint32 kRemoveTeam = 'RmTm';
-const uint32 kRestart = 'Rtrt';
-const uint32 kShutDown = 'ShDn';
-const uint32 kTrackerFirst = 'TkFt';
-const uint32 kSortRunningApps = 'SAps';
-const uint32 kSuperExpando = 'SprE';
-const uint32 kExpandNewTeams = 'ExTm';
-const uint32 kAutoRaise = 'AtRs';
-const uint32 kAutoHide = 'AtHd';
-const uint32 kRestartTracker = 'Trak';
-
-// from roster_private.h
-const uint32 kShutdownSystem = 301;
-const uint32 kRebootSystem = 302;
-const uint32 kSuspendSystem = 304;
-
-/* --------------------------------------------- */
-
-struct desk_settings {
-	bool vertical;
-	bool left;
-	bool top;
-	bool ampmMode;
-	bool showTime;
-	uint32 state;
-	float width;
-	BPoint switcherLoc;
-	int32 recentAppsCount;
-	int32 recentDocsCount;
-	bool timeShowSeconds;
-	int32 recentFoldersCount;
-	bool alwaysOnTop;
-	bool timeFullDate;
-	bool trackerAlwaysFirst;
-	bool sortRunningApps;
-	bool superExpando;
-	bool expandNewTeams;
-	bool autoRaise;
-	bool autoHide;
-	bool recentAppsEnabled;
-	bool recentDocsEnabled;
-	bool recentFoldersEnabled;
-};
-
-
-class TBarView;
-class BFile;
-
-using namespace BPrivate;
 
 class TBarApp : public BApplication {
 	public:
 		TBarApp();
 		virtual ~TBarApp();
 
-		virtual	bool QuitRequested();
+		virtual bool QuitRequested();
 		virtual void MessageReceived(BMessage* message);
 		virtual void RefsReceived(BMessage* refs);
 
-		desk_settings* Settings()
-			{ return &fSettings; }
-		TBarView* BarView() const
-			{ return fBarWindow->BarView(); }
-		TBarWindow* BarWindow() const
-			{ return fBarWindow; }
+		desk_settings* Settings() { return &fSettings; }
+		TBarView* BarView() const { return fBarView; }
+		TBarWindow* BarWindow() const { return fBarWindow; }
 
 		static void Subscribe(const BMessenger &subscriber, BList*);
 		static void Unsubscribe(const BMessenger &subscriber);
+		int32 IconSize();
 
 	private:
 		void AddTeam(team_id team, uint32 flags, const char* sig, entry_ref*);
@@ -150,8 +147,12 @@ class TBarApp : public BApplication {
 		void SaveSettings();
 
 		void ShowPreferencesWindow();
+		void ResizeTeamIcons();
+		void FetchAppIcon(const char* signature, BBitmap* icon);
+		BRect IconRect();
 
 		TBarWindow* fBarWindow;
+		TBarView*	fBarView;
 		BMessenger fSwitcherMessenger;
 		BMessenger fStatusViewMessenger;
 		BFile* fSettingsFile;
@@ -164,5 +165,5 @@ class TBarApp : public BApplication {
 		static BList sSubscribers;
 };
 
-#endif	// BAR_APP_H
 
+#endif	/* BAR_APP_H */

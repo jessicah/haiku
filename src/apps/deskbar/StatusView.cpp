@@ -33,7 +33,8 @@ holders.
 All rights reserved.
 */
 
-#include <Debug.h>
+
+#include "StatusView.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -50,6 +51,7 @@ All rights reserved.
 #include <Bitmap.h>
 #include <Catalog.h>
 #include <ControlLook.h>
+#include <Debug.h>
 #include <Directory.h>
 #include <FindDirectory.h>
 #include <Locale.h>
@@ -64,13 +66,14 @@ All rights reserved.
 #include <VolumeRoster.h>
 #include <Window.h>
 
-#include "icons_logo.h"
+#include "icons.h"
+
 #include "BarApp.h"
 #include "DeskbarUtils.h"
 #include "ResourceSet.h"
-#include "StatusView.h"
 #include "StatusViewShelf.h"
 #include "TimeView.h"
+
 
 using std::max;
 
@@ -107,7 +110,7 @@ DumpList(BList* itemlist)
 		printf("no items in list\n");
 		return;
 	}
-	for (int32 i = count ; i >= 0 ; i--) {
+	for (int32 i = count; i >= 0; i--) {
 		DeskbarItemInfo* item = (DeskbarItemInfo*)itemlist->ItemAt(i);
 		if (!item)
 			continue;
@@ -118,15 +121,16 @@ DumpList(BList* itemlist)
 #endif	/* DB_ADDONS */
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Tray"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Tray"
 
 // don't change the name of this view to anything other than "Status"!
 
 TReplicantTray::TReplicantTray(TBarView* parent, bool vertical)
-	: BView(BRect(0, 0, 1, 1), "Status", B_FOLLOW_LEFT | B_FOLLOW_TOP,
-			B_WILL_DRAW | B_FRAME_EVENTS),
-	fClock(NULL),
+	:
+	BView(BRect(0, 0, 1, 1), "Status", B_FOLLOW_LEFT | B_FOLLOW_TOP,
+		B_WILL_DRAW | B_FRAME_EVENTS),
+	fTime(NULL),
 	fBarView(parent),
 	fShelf(new TReplicantShelf(this)),
 	fMultiRowMode(vertical),
@@ -141,12 +145,22 @@ TReplicantTray::TReplicantTray(TBarView* parent, bool vertical)
 			2 * (logoBitmap->Bounds().Width() + 8));
 		fMinimumTrayWidth = sMinimumWindowWidth - kGutter - kDragRegionWidth;
 	}
+
+	BFormattingConventions conventions;
+	BLocale::Default()->GetFormattingConventions(&conventions);
+	bool use24HourClock = conventions.Use24HourClock();
+	desk_settings* settings = ((TBarApp*)be_app)->Settings();
+
+	// Create the time view
+	fTime = new TTimeView(fMinimumTrayWidth, kMaxReplicantHeight - 1.0,
+		use24HourClock, settings->showSeconds, settings->showDayOfWeek);
 }
 
 
 TReplicantTray::~TReplicantTray()
 {
 	delete fShelf;
+	delete fTime;
 }
 
 
@@ -164,8 +178,9 @@ TReplicantTray::AttachedToWindow()
 	SetDrawingMode(B_OP_COPY);
 
 	Window()->SetPulseRate(1000000);
-	DealWithClock(fBarView->ShowingClock());
 
+	AddChild(fTime);
+	fTime->MoveTo(Bounds().right - fTime->Bounds().Width() - 1, 2);
 
 #ifdef DB_ADDONS
 	// load addons and rehydrate archives
@@ -190,58 +205,9 @@ TReplicantTray::DetachedFromWindow()
 }
 
 
-void
-TReplicantTray::RememberClockSettings()
-{
-	if (fClock)	{
-		desk_settings* settings = ((TBarApp*)be_app)->Settings();
-
-		settings->timeShowSeconds = fClock->ShowingSeconds();
-	}
-}
-
-
-bool
-TReplicantTray::ShowingSeconds()
-{
-	if (fClock)
-		return fClock->ShowingSeconds();
-	return false;
-}
-
-
-void
-TReplicantTray::DealWithClock(bool showClock)
-{
-	fBarView->ShowClock(showClock);
-
-	if (showClock) {
-		if (!fClock) {
-			desk_settings* settings = ((TBarApp*)be_app)->Settings();
-
-			fClock = new TTimeView(fMinimumTrayWidth, kMaxReplicantHeight - 1.0,
-				settings->timeShowSeconds,
-				false);
-			AddChild(fClock);
-
-			fClock->MoveTo(Bounds().right - fClock->Bounds().Width() - 1, 2);
-		}
-	} else {
-		if (fClock) {
-			RememberClockSettings();
-
-			fClock->RemoveSelf();
-			delete fClock;
-			fClock = NULL;
-		}
-	}
-}
-
-
 /*! Width is set to a minimum of kMinimumReplicantCount by kMaxReplicantWidth
 	if not in multirowmode and greater than kMinimumReplicantCount
-	the width should be calculated based on the actual
-	replicant widths
+	the width should be calculated based on the actual replicant widths
 */
 void
 TReplicantTray::GetPreferredSize(float* preferredWidth, float* preferredHeight)
@@ -262,16 +228,17 @@ TReplicantTray::GetPreferredSize(float* preferredWidth, float* preferredHeight)
 	} else {
 		// if last replicant overruns clock then resize to accomodate
 		if (fShelf->CountReplicants() > 0) {
-			if (fBarView->ShowingClock()
-				&& fRightBottomReplicant.right + 6 >= fClock->Frame().left) {
+			if (!fTime->IsHidden() && fTime->Frame().left
+				< fRightBottomReplicant.right + 6) {
 				width = fRightBottomReplicant.right + 6
-					+ fClock->Frame().Width();
+					+ fTime->Frame().Width();
 			} else
 				width = fRightBottomReplicant.right + 3;
 		}
 
 		// this view has a fixed minimum width
 		width = max(fMinimumTrayWidth, width);
+		height = kGutter + static_cast<TBarApp*>(be_app)->IconSize() + kGutter;
 	}
 
 	*preferredWidth = width;
@@ -306,24 +273,47 @@ void
 TReplicantTray::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
-		case 'time':
-			// from context menu in clock and in this view
-			DealWithClock(!fBarView->ShowingClock());
+		case B_LOCALE_CHANGED:
+		{
+			if (fTime == NULL)
+				return;
+
+			// Locale may have updated 12/24 hour clock
+			BFormattingConventions conventions;
+			BLocale::Default()->GetFormattingConventions(&conventions);
+			fTime->SetUse24HourClock(conventions.Use24HourClock());
+
+			// time string reformat -> realign
 			RealignReplicants();
 			AdjustPlacement();
 			break;
+		}
 
-		case 'Trfm':
-			// time string reformat -> realign
-			DealWithClock(fBarView->ShowingClock());
-			RealignReplicants();
-			AdjustPlacement();
+		case kShowHideTime:
+			// from context menu in clock and in this view
+			ShowHideTime();
 			break;
 
 		case kShowSeconds:
-		case kFullDate:
-			if (fClock != NULL)
-				Window()->PostMessage(message, fClock);
+			if (fTime == NULL)
+				return;
+
+			fTime->SetShowSeconds(!fTime->ShowSeconds());
+
+			// time string reformat -> realign
+			RealignReplicants();
+			AdjustPlacement();
+			break;
+
+		case kShowDayOfWeek:
+			if (fTime == NULL)
+				return;
+
+			fTime->SetShowDayOfWeek(!fTime->ShowDayOfWeek());
+
+			// time string reformat -> realign
+			RealignReplicants();
+			AdjustPlacement();
 			break;
 
 #ifdef DB_ADDONS
@@ -335,28 +325,6 @@ TReplicantTray::MessageReceived(BMessage* message)
 		default:
 			BView::MessageReceived(message);
 			break;
-	}
-}
-
-
-void
-TReplicantTray::ShowReplicantMenu(BPoint point)
-{
-	BPopUpMenu* menu = new BPopUpMenu("", false, false);
-	menu->SetFont(be_plain_font);
-
-	// If clock is visible show the extended menu, otherwise show "Show Time"
-
-	if (fBarView->ShowingClock())
-		fClock->ShowClockOptions(ConvertToScreen(point));
-	else {
-		BMenuItem* item = new BMenuItem(B_TRANSLATE("Show Time"),
-			new BMessage('time'));
-		menu->AddItem(item);
-		menu->SetTargetForItems(this);
-		BPoint where = ConvertToScreen(point);
-		menu->Go(where, true, true, BRect(where - BPoint(4, 4),
-			where + BPoint(4, 4)), true);
 	}
 }
 
@@ -399,7 +367,54 @@ TReplicantTray::MouseDown(BPoint where)
 	BView::MouseDown(where);
 }
 
+
+void
+TReplicantTray::ShowReplicantMenu(BPoint point)
+{
+	BPopUpMenu* menu = new BPopUpMenu("", false, false);
+	menu->SetFont(be_plain_font);
+
+	// If clock is visible show the extended menu, otherwise show "Show time"
+
+	if (!fTime->IsHidden())
+		fTime->ShowTimeOptions(ConvertToScreen(point));
+	else {
+		BMenuItem* item = new BMenuItem(B_TRANSLATE("Show time"),
+			new BMessage(kShowHideTime));
+		menu->AddItem(item);
+		menu->SetTargetForItems(this);
+		BPoint where = ConvertToScreen(point);
+		menu->Go(where, true, true, BRect(where - BPoint(4, 4),
+			where + BPoint(4, 4)), true);
+	}
+}
+
+
+void
+TReplicantTray::SetMultiRow(bool state)
+{
+	fMultiRowMode = state;
+}
+
+
+void
+TReplicantTray::ShowHideTime()
+{
+	if (fTime == NULL)
+		return;
+
+	if (fTime->IsHidden())
+		fTime->Show();
+	else
+		fTime->Hide();
+
+	RealignReplicants();
+	AdjustPlacement();
+}
+
+
 #ifdef DB_ADDONS
+
 
 void
 TReplicantTray::InitAddOnSupport()
@@ -418,13 +433,13 @@ TReplicantTray::InitAddOnSupport()
 			int32 id;
 			BString path;
 			if (fAddOnSettings.Unflatten(&file) == B_OK) {
-				for (int32 i = 0; fAddOnSettings.FindString(kReplicantPathField, 
+				for (int32 i = 0; fAddOnSettings.FindString(kReplicantPathField,
 					i, &path) == B_OK; i++) {
 					if (entry.SetTo(path.String()) == B_OK && entry.Exists()) {
 						result = LoadAddOn(&entry, &id, false);
-					} else 
+					} else
 						result = B_ENTRY_NOT_FOUND;
-					
+
 					if (result != B_OK) {
 						fAddOnSettings.RemoveData(kReplicantPathField, i);
 						--i;
@@ -440,7 +455,7 @@ void
 TReplicantTray::DeleteAddOnSupport()
 {
 	_SaveSettings();
-	
+
 	for (int32 i = fItemList->CountItems(); i-- > 0 ;) {
 		DeskbarItemInfo* item = (DeskbarItemInfo*)fItemList->RemoveItem(i);
 		if (item) {
@@ -621,7 +636,7 @@ TReplicantTray::LoadAddOn(BEntry* entry, int32* id, bool addToSettings)
 		fAddOnSettings.AddString(kReplicantPathField, path.Path());
 		_SaveSettings();
 	}
-	
+
 	return B_OK;
 }
 
@@ -691,7 +706,7 @@ TReplicantTray::RemoveItem(int32 id)
 	if (item->isAddOn) {
 		BPath path(&item->entryRef);
 		BString storedPath;
-		for (int32 i = 0; 
+		for (int32 i = 0;
 			fAddOnSettings.FindString(kReplicantPathField, i, &storedPath)
 				== B_OK; i++) {
 			if (storedPath == path.Path()) {
@@ -700,7 +715,7 @@ TReplicantTray::RemoveItem(int32 id)
 			}
 		}
 		_SaveSettings();
-				
+
 		BNode node(&item->entryRef);
 		watch_node(&item->nodeRef, B_STOP_WATCHING, this, Window());
 	}
@@ -1095,10 +1110,10 @@ TReplicantTray::LocationForReplicant(int32 index, float width)
 		// try to find free space in every row
 		for (int32 row = 0; ; loc.y += kMaxReplicantHeight + kIconGap, row++) {
 			// determine free space in this row
-			BRect rect(loc.x, loc.y, loc.x + fMinimumTrayWidth - kIconGap - 2.0,
-				loc.y + kMaxReplicantHeight);
-			if (row == 0 && fBarView->ShowingClock())
-				rect.right -= fClock->Frame().Width() + kIconGap;
+			BRect rect(loc.x, loc.y, loc.x + fMinimumTrayWidth - kIconGap
+				- 2.0, loc.y + kMaxReplicantHeight);
+			if (row == 0 && !fTime->IsHidden())
+				rect.right -= fTime->Frame().Width() + kIconGap;
 
 			for (int32 i = 0; i < index; i++) {
 				BView* view = NULL;
@@ -1195,13 +1210,6 @@ TReplicantTray::RealignReplicants(int32 startIndex)
 }
 
 
-void
-TReplicantTray::SetMultiRow(bool state)
-{
-	fMultiRowMode = state;
-}
-
-
 status_t
 TReplicantTray::_SaveSettings()
 {
@@ -1212,11 +1220,23 @@ TReplicantTray::_SaveSettings()
 		path.Append(kReplicantSettingsFile);
 
 		BFile file(path.Path(), B_READ_WRITE | B_CREATE_FILE | B_ERASE_FILE);
-		if ((result = file.InitCheck()) == B_OK) 
+		if ((result = file.InitCheck()) == B_OK)
 			result = fAddOnSettings.Flatten(&file);
 	}
-	
+
 	return result;
+}
+
+
+void
+TReplicantTray::SaveTimeSettings()
+{
+	if (fTime == NULL)
+		return;
+
+	desk_settings* settings = ((TBarApp*)be_app)->Settings();
+	settings->showSeconds = fTime->ShowSeconds();
+	settings->showDayOfWeek = fTime->ShowDayOfWeek();
 }
 
 
@@ -1283,7 +1303,6 @@ TDragRegion::Draw(BRect)
 	rgb_color hilite = tint_color(menuColor, B_DARKEN_1_TINT);
 	rgb_color ldark = tint_color(menuColor, 1.02);
 	rgb_color dark = tint_color(menuColor, B_DARKEN_2_TINT);
-	rgb_color vdark = tint_color(menuColor, B_DARKEN_3_TINT);
 	rgb_color vvdark = tint_color(menuColor, B_DARKEN_4_TINT);
 	rgb_color light = tint_color(menuColor, B_LIGHTEN_2_TINT);
 
@@ -1464,7 +1483,7 @@ TDragRegion::SwitchModeForRect(BPoint mouse, BRect rect,
 		return true;
 	}
 
-	fBarView->ChangeState(newState, newVertical, newLeft, newTop);
+	fBarView->ChangeState(newState, newVertical, newLeft, newTop, true);
 	return true;
 }
 
@@ -1564,4 +1583,3 @@ TDragRegion::SetDragRegionLocation(int32 location)
 	fDragLocation = location;
 	Invalidate();
 }
-

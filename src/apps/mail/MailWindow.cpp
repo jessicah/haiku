@@ -87,7 +87,7 @@ of their respective holders. All rights reserved.
 #include "Utilities.h"
 
 
-#define B_TRANSLATE_CONTEXT "Mail"
+#define B_TRANSLATION_CONTEXT "Mail"
 
 
 using namespace BPrivate;
@@ -157,6 +157,7 @@ TMailWindow::TMailWindow(BRect rect, const char* title, TMailApp* app,
 	fRef(NULL),
 	fFieldState(0),
 	fPanel(NULL),
+	fLeaveStatusMenu(NULL),
 	fSendButton(NULL),
 	fSaveButton(NULL),
 	fPrintButton(NULL),
@@ -171,7 +172,6 @@ TMailWindow::TMailWindow(BRect rect, const char* title, TMailApp* app,
 	fSent(false),
 	fDraft(false),
 	fChanged(false),
-	fStartingText(NULL),
 	fOriginatingWindow(NULL),
 	fReadButton(NULL),
 	fNextButton(NULL),
@@ -244,7 +244,9 @@ TMailWindow::TMailWindow(BRect rect, const char* title, TMailApp* app,
 		read_read_attr(file, flag);
 
 		if (flag == B_UNREAD) {
-			subMenu->AddItem(item = new BMenuItem(B_TRANSLATE("Leave as New"),
+			subMenu->AddItem(item = new BMenuItem(
+				B_TRANSLATE_COMMENT("Leave as 'New'",
+				"Do not translate New - this is non-localizable e-mail status"),
 				new BMessage(kMsgQuitAndKeepAllStatus), 'W', B_SHIFT_KEY));
 		} else {
 			BString status;
@@ -287,6 +289,8 @@ TMailWindow::TMailWindow(BRect rect, const char* title, TMailApp* app,
 			new BMessage(M_CLOSE_CUSTOM)));
 #endif
 		menu->AddItem(subMenu);
+
+		fLeaveStatusMenu = subMenu;
 	} else {
 		menu->AddSeparatorItem();
 		menu->AddItem(new BMenuItem(B_TRANSLATE("Close"),
@@ -529,22 +533,15 @@ TMailWindow::TMailWindow(BRect rect, const char* title, TMailApp* app,
 			// If we find the named query, add it to the text.
 			BEntry entry;
 			if (query.GetNextEntry(&entry) == B_NO_ERROR) {
-				off_t size;
 				BFile file;
 				file.SetTo(&entry, O_RDWR);
 				if (file.InitCheck() == B_NO_ERROR) {
-					file.GetSize(&size);
-					char *str = (char *)malloc(size);
-					size = file.Read(str, size);
+					entry_ref ref;
+					entry.GetRef(&ref);
 
-					fContentView->fTextView->Insert(str, size);
-					fContentView->fTextView->GoToLine(0);
-					fContentView->fTextView->ScrollToSelection();
-
-					fStartingText = (char *)malloc(size
-						= strlen(fContentView->fTextView->Text()) + 1);
-					if (fStartingText != NULL)
-						strcpy(fStartingText, fContentView->fTextView->Text());
+					BMessage msg(M_SIGNATURE);
+					msg.AddRef("ref", &ref);
+					PostMessage(&msg);
 				}
 			} else {
 				char tempString [2048];
@@ -790,6 +787,30 @@ TMailWindow::SetTrackerSelectionToCurrent()
 
 
 void
+TMailWindow::PreserveReadingPos(bool save)
+{
+	BScrollBar *scroll = fContentView->fTextView->ScrollBar(B_VERTICAL);
+	if (scroll == NULL || fRef == NULL)
+		return;
+
+	BNode node(fRef);
+	float pos = scroll->Value();
+
+	const char* name = "MAIL:read_pos";
+	if (save) {
+		node.WriteAttr(name, B_FLOAT_TYPE, 0, &pos, sizeof(pos));
+		return;
+	}
+
+	if (node.ReadAttr(name, B_FLOAT_TYPE, 0, &pos, sizeof(pos)) == sizeof(pos)) {
+		Lock();
+		scroll->SetValue(pos);
+		Unlock();
+	}
+}
+
+
+void
 TMailWindow::MarkMessageRead(entry_ref* message, read_flags flag)
 {
 	BNode node(message);
@@ -804,6 +825,9 @@ TMailWindow::MarkMessageRead(entry_ref* message, read_flags flag)
 
 	// don't wait for the server write the attribute directly
 	write_read_attr(node, flag);
+
+	// preserve the read position in the node attribute
+	PreserveReadingPos(true);
 
 	BMailDaemon::MarkAsRead(account, *message, flag);
 }
@@ -906,6 +930,22 @@ TMailWindow::MenusBeginning()
 //	fUndo->SetLabel((isRedo)
 //	? kRedoStrings[undoState] : kUndoStrings[undoState]);
 	fUndo->SetEnabled(undoState != B_UNDO_UNAVAILABLE);
+
+	if (fLeaveStatusMenu != NULL && fRef != NULL) {
+		BFile file(fRef, B_READ_ONLY);
+		BString status;
+		file.ReadAttrString(B_MAIL_ATTR_STATUS, &status);
+
+		BMenuItem* LeaveStatus = fLeaveStatusMenu->FindItem(B_QUIT_REQUESTED);
+		if (LeaveStatus == NULL)
+			LeaveStatus = fLeaveStatusMenu->FindItem(kMsgQuitAndKeepAllStatus);
+
+		if (LeaveStatus != NULL && status.Length() > 0) {
+			BString label;
+			label.SetToFormat(B_TRANSLATE("Leave as '%s'"), status.String());
+			LeaveStatus->SetLabel(label.String());
+		}
+	}
 }
 
 
@@ -1316,6 +1356,10 @@ TMailWindow::MessageReceived(BMessage *msg)
 			break;
 		}
 
+		case M_READ_POS:
+			PreserveReadingPos(false);
+			break;
+
 		case M_PRINT_SETUP:
 			PrintSetup();
 			break;
@@ -1457,6 +1501,7 @@ TMailWindow::MessageReceived(BMessage *msg)
 		case M_UNREAD:
 			MarkMessageRead(fRef, B_SEEN);
 			_UpdateReadButton();
+			PostMessage(M_NEXTMSG);
 			break;
 		case M_READ:
 			wasReadMsg = true;
@@ -1641,9 +1686,6 @@ TMailWindow::QuitRequested()
 			|| strlen(fHeaderView->fSubject->Text())
 			|| (fHeaderView->fCc && strlen(fHeaderView->fCc->Text()))
 			|| (fHeaderView->fBcc && strlen(fHeaderView->fBcc->Text()))
-			|| (strlen(fContentView->fTextView->Text()) && (!fStartingText
-				|| (fStartingText
-					&& strcmp(fContentView->fTextView->Text(), fStartingText))))
 			|| (fEnclosuresView != NULL
 				&& fEnclosuresView->fList->CountItems()))) {
 		if (fResending) {
@@ -2745,10 +2787,6 @@ TMailWindow::OpenMessage(const entry_ref *ref, uint32 characterSetForDecoding)
 	delete fRef;
 	fRef = new entry_ref(*ref);
 
-	if (fStartingText) {
-		free(fStartingText);
-		fStartingText = NULL;
-	}
 	fPrevTrackerPositionSaved = false;
 	fNextTrackerPositionSaved = false;
 
@@ -2826,6 +2864,10 @@ TMailWindow::OpenMessage(const entry_ref *ref, uint32 characterSetForDecoding)
 			}
 			AddEnclosure(&msg);
 		}
+		
+		// restore the reading position if available
+		PostMessage(M_READ_POS);
+
 		PostMessage(RESET_BUTTONS);
 		fIncoming = false;
 		fDraft = true;
@@ -3169,7 +3211,7 @@ TMailWindow::_UpdateReadButton()
 	if (fApp->ShowButtonBar()) {
 		fButtonBar->RemoveButton(fReadButton);
 		fReadButton = NULL;
-		if (!fAutoMarkRead)
+		if (!fAutoMarkRead && fIncoming)
 			_AddReadButton();
 	}
 	UpdateViews();

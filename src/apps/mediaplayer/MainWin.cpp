@@ -61,8 +61,8 @@
 #include "Settings.h"
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "MediaPlayer-Main"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "MediaPlayer-Main"
 #define MIN_WIDTH 250
 
 
@@ -155,6 +155,10 @@ static property_info sPropertyInfo[] = {
 		{ B_DIRECT_SPECIFIER, 0 },
 		B_TRANSLATE("Gets the URI of the currently playing item."), 0,
 		{ B_STRING_TYPE }
+	},
+	{ B_TRANSLATE("ToggleFullscreen"), { B_EXECUTE_PROPERTY },
+		{ B_DIRECT_SPECIFIER, 0 },
+		B_TRANSLATE("Toggle fullscreen."), 0
 	},
 	{ 0, { 0 }, { 0 }, 0, 0 }
 };
@@ -532,6 +536,10 @@ MainWin::MessageReceived(BMessage* msg)
 					break;
 				}
 
+				case 9:
+					PostMessage(M_TOGGLE_FULLSCREEN);
+					break;
+
 				default:
 					return BWindow::MessageReceived(msg);
 			}
@@ -605,6 +613,10 @@ MainWin::MessageReceived(BMessage* msg)
 			BAutolock _(fPlaylist);
 
 			int32 index;
+			// if false, the message was meant to only update the GUI
+			bool play;
+			if (msg->FindBool("play", &play) < B_OK || !play)
+				break;
 			if (msg->FindInt32("index", &index) < B_OK
 				|| index != fPlaylist->CurrentItemIndex())
 				break;
@@ -971,7 +983,8 @@ MainWin::MessageReceived(BMessage* msg)
 			if (fIsFullscreen) {
 				BPoint videoViewWhere;
 				if (msg->FindPoint("where", &videoViewWhere) == B_OK) {
-					if (!fControls->Frame().Contains(videoViewWhere)) {
+					if (msg->FindBool("force")
+						|| !fControls->Frame().Contains(videoViewWhere)) {
 						_ShowFullscreenControls(false);
 						// hide the mouse cursor until the user moves it
 						be_app->ObscureCursor();
@@ -1238,6 +1251,7 @@ MainWin::ResolveSpecifier(BMessage* message, int32 index, BMessage* specifier,
 		case 6:
 		case 7:
 		case 8:
+		case 9:
 			return this;
 	}
 
@@ -1310,7 +1324,7 @@ MainWin::_PlaylistItemOpened(const PlaylistItemRef& item, status_t result)
 		if (allItemsFailed) {
 			// Display error if all files failed to play.
 			BString message(B_TRANSLATE(
-				"The file'%filename' could not be opened.\n\n"));;
+				"The file '%filename' could not be opened.\n\n"));;
 			message.ReplaceAll("%filename", item->Name());
 
 			if (result == B_MEDIA_NO_HANDLER) {
@@ -1410,9 +1424,9 @@ MainWin::_CreateMenu()
 	fAudioMenu = new BMenu(B_TRANSLATE("Audio"));
 	fVideoMenu = new BMenu(B_TRANSLATE("Video"));
 	fVideoAspectMenu = new BMenu(B_TRANSLATE("Aspect ratio"));
-	fAudioTrackMenu = new BMenu(B_TRANSLATE_WITH_CONTEXT("Track",
+	fAudioTrackMenu = new BMenu(B_TRANSLATE_CONTEXT("Track",
 		"Audio Track Menu"));
-	fVideoTrackMenu = new BMenu(B_TRANSLATE_WITH_CONTEXT("Track",
+	fVideoTrackMenu = new BMenu(B_TRANSLATE_CONTEXT("Track",
 		"Video Track Menu"));
 	fSubTitleTrackMenu = new BMenu(B_TRANSLATE("Subtitles"));
 	fAttributesMenu = new BMenu(B_TRANSLATE("Attributes"));
@@ -1602,7 +1616,7 @@ MainWin::_SetupTrackMenus(BMenu* audioTrackMenu, BMenu* videoTrackMenu,
 		audioTrackMenu->AddItem(item);
 	}
 	if (count == 0) {
-		audioTrackMenu->AddItem(new BMenuItem(B_TRANSLATE_WITH_CONTEXT("none",
+		audioTrackMenu->AddItem(new BMenuItem(B_TRANSLATE_CONTEXT("none",
 			"Audio track menu"), new BMessage(M_DUMMY)));
 		audioTrackMenu->ItemAt(0)->SetMarked(true);
 	}
@@ -1626,7 +1640,7 @@ MainWin::_SetupTrackMenus(BMenu* audioTrackMenu, BMenu* videoTrackMenu,
 	if (count > 0) {
 		current = fController->CurrentSubTitleTrack();
 		BMenuItem* item = new BMenuItem(
-			B_TRANSLATE_WITH_CONTEXT("Off", "Subtitles menu"),
+			B_TRANSLATE_CONTEXT("Off", "Subtitles menu"),
 			new BMessage(M_SELECT_SUB_TITLE_TRACK - 1));
 		subTitleTrackMenu->AddItem(item);
 		item->SetMarked(current == -1);
@@ -1646,7 +1660,7 @@ MainWin::_SetupTrackMenus(BMenu* audioTrackMenu, BMenu* videoTrackMenu,
 		}
 	} else {
 		subTitleTrackMenu->AddItem(new BMenuItem(
-			B_TRANSLATE_WITH_CONTEXT("none", "Subtitles menu"),
+			B_TRANSLATE_CONTEXT("none", "Subtitles menu"),
 			new BMessage(M_DUMMY)));
 		subTitleTrackMenu->ItemAt(0)->SetMarked(true);
 	}
@@ -2329,6 +2343,7 @@ MainWin::_ShowFullscreenControls(bool show, bool animate)
 		return;
 
 	fShowsFullscreenControls = show;
+	fVideoView->SetFullscreenControlsVisible(show);
 
 	if (show) {
 		fControls->RemoveSelf();
@@ -2337,6 +2352,7 @@ MainWin::_ShowFullscreenControls(bool show, bool animate)
 		fVideoView->AddChild(fControls);
 		if (fScaleFullscreenControls)
 			fControls->SetSymbolScale(1.5f);
+
 		while (fControls->IsHidden())
 			fControls->Show();
 	}
@@ -2360,16 +2376,15 @@ MainWin::_ShowFullscreenControls(bool show, bool animate)
 		finalMessage.AddFloat("offset", originalY + moveDist);
 		finalMessage.AddBool("show", show);
 		PostMessage(&finalMessage, this);
-	} else {
-		if (!show) {
-			fControls->RemoveSelf();
-			fControls->MoveTo(fVideoView->Frame().left,
-				fVideoView->Frame().bottom + 1);
-			fBackground->AddChild(fControls);
-			fControls->SetSymbolScale(1.0f);
-			while (!fControls->IsHidden())
-				fControls->Hide();
-		}
+	} else if (!show) {
+		fControls->RemoveSelf();
+		fControls->MoveTo(fVideoView->Frame().left,
+			fVideoView->Frame().bottom + 1);
+		fBackground->AddChild(fControls);
+		fControls->SetSymbolScale(1.0f);
+
+		while (!fControls->IsHidden())
+			fControls->Hide();
 	}
 }
 

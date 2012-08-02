@@ -33,10 +33,9 @@
 #	define TRACE(x) ;
 #endif
 
+
 static uint32 sCPUAPICIds[B_MAX_CPU_COUNT];
 static uint32 sAPICVersions[B_MAX_CPU_COUNT];
-
-extern "C" void init_sse(void);
 
 
 static int32
@@ -74,10 +73,11 @@ i386_smp_error_interrupt(void *data)
 status_t
 arch_smp_init(kernel_args *args)
 {
-	TRACE(("arch_smp_init: entry\n"));
+	TRACE(("%s: entry\n", __func__));
 
 	if (!apic_available()) {
 		// if we don't have an apic we can't do smp
+		TRACE(("%s: apic not available for smp\n", __func__));
 		return B_OK;
 	}
 
@@ -107,7 +107,8 @@ arch_smp_per_cpu_init(kernel_args *args, int32 cpu)
 	TRACE(("arch_smp_init_percpu: setting up the apic on cpu %ld\n", cpu));
 	apic_per_cpu_init(args, cpu);
 
-	init_sse();
+	// setup FPU and SSE if supported
+	x86_init_fpu();
 
 	return B_OK;
 }

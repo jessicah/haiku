@@ -2,7 +2,7 @@
 SMTP server:	ConfigView		SMTP server:
 STARTTLS	ConfigView		STARTTLS
 Error while logging in to %serv	smtp		Fout bij het inloggen in %serv
-Unencrypted	ConfigView		Niet-versleuteld
+Unencrypted	ConfigView		Onversleuteld
 . The server says:\n	smtp		. De server zegt:\n
 ESMTP	ConfigView		ESMTP
 Connecting to server…	smtp		Verbinden met de server...

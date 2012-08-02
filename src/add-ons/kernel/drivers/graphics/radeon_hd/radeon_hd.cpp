@@ -38,6 +38,7 @@
 #define ERROR(x...) dprintf("radeon_hd: " x)
 
 
+// Must match chipset families in radeon_hd.h
 static const char radeon_chip_name[][16] = {
 	"R420",
 	"R423",
@@ -79,7 +80,8 @@ static const char radeon_chip_name[][16] = {
 	"Cayman",
 	"Antilles",
 	"Lombok",
-	"Thames",
+	"Cape Verde",
+	"Pitcairn",
 	"Tahiti",
 	"New Zealand"
 };
@@ -99,7 +101,7 @@ mapAtomBIOS(radeon_info &info, uint32 romBase, uint32 romSize)
 	// attempt to access area specified
 	area_id testArea = map_physical_memory("radeon hd rom probe",
 		romBase, romSize, B_ANY_KERNEL_ADDRESS, B_READ_AREA,
-		(void **)&rom);
+		(void**)&rom);
 
 	if (testArea < 0) {
 		ERROR("%s: couldn't map potential rom @ 0x%" B_PRIX32
@@ -131,7 +133,7 @@ mapAtomBIOS(radeon_info &info, uint32 romBase, uint32 romSize)
 	}
 
 	info.rom_area = create_area("radeon hd AtomBIOS",
-		(void **)&info.atom_buffer, B_ANY_KERNEL_ADDRESS,
+		(void**)&info.atom_buffer, B_ANY_KERNEL_ADDRESS,
 		romSize, B_NO_LOCK, B_READ_AREA | B_WRITE_AREA);
 
 	if (info.rom_area < 0) {
@@ -258,7 +260,7 @@ radeon_hd_getbios_ni(radeon_info &info)
 	write32(info.registers + AVIVO_D1VGA_CONTROL, (d1vga_control
 		& ~(AVIVO_DVGA_CONTROL_MODE_ENABLE
 			| AVIVO_DVGA_CONTROL_TIMING_SELECT)));
-	write32(info.registers + D2VGA_CONTROL, (d2vga_control
+	write32(info.registers + AVIVO_D2VGA_CONTROL, (d2vga_control
 		& ~(AVIVO_DVGA_CONTROL_MODE_ENABLE
 			| AVIVO_DVGA_CONTROL_TIMING_SELECT)));
 	write32(info.registers + AVIVO_VGA_RENDER_CONTROL,
@@ -330,7 +332,7 @@ radeon_hd_getbios_r700(radeon_info &info)
 	write32(info.registers + AVIVO_D1VGA_CONTROL, (d1vga_control
 		& ~(AVIVO_DVGA_CONTROL_MODE_ENABLE
 			| AVIVO_DVGA_CONTROL_TIMING_SELECT)));
-	write32(info.registers + D2VGA_CONTROL, (d2vga_control
+	write32(info.registers + AVIVO_D2VGA_CONTROL, (d2vga_control
 		& ~(AVIVO_DVGA_CONTROL_MODE_ENABLE
 			| AVIVO_DVGA_CONTROL_TIMING_SELECT)));
 	write32(info.registers + AVIVO_VGA_RENDER_CONTROL,
@@ -414,7 +416,7 @@ radeon_hd_getbios_r600(radeon_info &info)
 	write32(info.registers + AVIVO_D1VGA_CONTROL, (d1vga_control
 		& ~(AVIVO_DVGA_CONTROL_MODE_ENABLE
 			| AVIVO_DVGA_CONTROL_TIMING_SELECT)));
-	write32(info.registers + D2VGA_CONTROL, (d2vga_control
+	write32(info.registers + AVIVO_D2VGA_CONTROL, (d2vga_control
 		& ~(AVIVO_DVGA_CONTROL_MODE_ENABLE
 			| AVIVO_DVGA_CONTROL_TIMING_SELECT)));
 	write32(info.registers + AVIVO_VGA_RENDER_CONTROL,
@@ -576,7 +578,7 @@ radeon_hd_init(radeon_info &info)
 	// *** Map shared info
 	AreaKeeper sharedCreator;
 	info.shared_area = sharedCreator.Create("radeon hd shared info",
-		(void **)&info.shared_info, B_ANY_KERNEL_ADDRESS,
+		(void**)&info.shared_info, B_ANY_KERNEL_ADDRESS,
 		ROUND_TO_PAGE_SIZE(sizeof(radeon_shared_info)), B_FULL_LOCK, 0);
 	if (info.shared_area < B_OK) {
 		ERROR("%s: card (%ld): couldn't map shared area!\n",
@@ -584,16 +586,16 @@ radeon_hd_init(radeon_info &info)
 		return info.shared_area;
 	}
 
-	memset((void *)info.shared_info, 0, sizeof(radeon_shared_info));
+	memset((void*)info.shared_info, 0, sizeof(radeon_shared_info));
 	sharedCreator.Detach();
 
 	// *** Map Memory mapped IO
 	AreaKeeper mmioMapper;
 	info.registers_area = mmioMapper.Map("radeon hd mmio",
-		(void *)info.pci->u.h0.base_registers[PCI_BAR_MMIO],
+		(void*)info.pci->u.h0.base_registers[PCI_BAR_MMIO],
 		info.pci->u.h0.base_register_sizes[PCI_BAR_MMIO],
 		B_ANY_KERNEL_ADDRESS, B_KERNEL_READ_AREA | B_KERNEL_WRITE_AREA,
-		(void **)&info.registers);
+		(void**)&info.registers);
 	if (mmioMapper.InitCheck() < B_OK) {
 		ERROR("%s: card (%ld): couldn't map memory I/O!\n",
 			__func__, info.id);
@@ -663,10 +665,10 @@ radeon_hd_init(radeon_info &info)
 	// *** Framebuffer mapping
 	AreaKeeper frambufferMapper;
 	info.framebuffer_area = frambufferMapper.Map("radeon hd frame buffer",
-		(void *)info.pci->u.h0.base_registers[PCI_BAR_FB],
+		(void*)info.pci->u.h0.base_registers[PCI_BAR_FB],
 		info.shared_info->frame_buffer_size * 1024,
 		B_ANY_KERNEL_ADDRESS, B_READ_AREA | B_WRITE_AREA,
-		(void **)&info.shared_info->frame_buffer);
+		(void**)&info.shared_info->frame_buffer);
 	if (frambufferMapper.InitCheck() < B_OK) {
 		ERROR("%s: card(%ld): couldn't map frame buffer!\n",
 			__func__, info.id);

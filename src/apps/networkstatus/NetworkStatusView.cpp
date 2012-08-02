@@ -1,11 +1,12 @@
 /*
- * Copyright 2006-2009, Haiku, Inc. All rights reserved.
+ * Copyright 2006-2012, Haiku, Inc. All rights reserved.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
- *		Axel Dörfler, axeld@pinc-software.de
- *		Hugo Santos, hugosantos@gmail.com
  *		Dario Casalinuovo
+ *		Axel Dörfler, axeld@pinc-software.de
+ *		Rene Gollent, rene@gollent.com
+ *		Hugo Santos, hugosantos@gmail.com
  */
 
 
@@ -48,8 +49,8 @@
 #include "WirelessNetworkMenuItem.h"
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "NetworkStatusView"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "NetworkStatusView"
 
 
 static const char *kStatusDescriptions[] = {
@@ -105,8 +106,7 @@ NetworkStatusView::NetworkStatusView(BRect frame, int32 resizingMode,
 		bool inDeskbar)
 	: BView(frame, kDeskbarItemName, resizingMode,
 		B_WILL_DRAW | B_FRAME_EVENTS),
-	fInDeskbar(inDeskbar),
-	fStatus(kStatusUnknown)
+	fInDeskbar(inDeskbar)
 {
 	_Init();
 
@@ -145,7 +145,8 @@ void
 NetworkStatusView::_Init()
 {
 	for (int i = 0; i < kStatusCount; i++) {
-		fBitmaps[i] = NULL;
+		fTrayIcons[i] = NULL;
+		fNotifyIcons[i] = NULL;
 	}
 
 	_UpdateBitmaps();
@@ -156,8 +157,10 @@ void
 NetworkStatusView::_UpdateBitmaps()
 {
 	for (int i = 0; i < kStatusCount; i++) {
-		delete fBitmaps[i];
-		fBitmaps[i] = NULL;
+		delete fTrayIcons[i];
+		delete fNotifyIcons[i];
+		fTrayIcons[i] = NULL;
+		fNotifyIcons[i] = NULL;
 	}
 
 	image_info info;
@@ -180,13 +183,23 @@ NetworkStatusView::_UpdateBitmaps()
 		data = resources.LoadResource(B_VECTOR_ICON_TYPE,
 			kNetworkStatusNoDevice + i, &size);
 		if (data != NULL) {
-			BBitmap* icon = new BBitmap(Bounds(), B_RGBA32);
-			if (icon->InitCheck() == B_OK
+			// Scale main tray icon
+			BBitmap* trayIcon = new BBitmap(Bounds(), B_RGBA32);
+			if (trayIcon->InitCheck() == B_OK
 				&& BIconUtils::GetVectorIcon((const uint8 *)data,
-					size, icon) == B_OK) {
-				fBitmaps[i] = icon;
+					size, trayIcon) == B_OK) {
+				fTrayIcons[i] = trayIcon;
 			} else
-				delete icon;
+				delete trayIcon;
+
+			// Scale notification icon
+			BBitmap* notifyIcon = new BBitmap(BRect(0, 0, 31, 31), B_RGBA32);
+			if (notifyIcon->InitCheck() == B_OK
+				&& BIconUtils::GetVectorIcon((const uint8 *)data,
+					size, notifyIcon) == B_OK) {
+				fNotifyIcons[i] = notifyIcon;
+			} else
+				delete notifyIcon;
 		}
 	}
 }
@@ -230,9 +243,12 @@ void
 NetworkStatusView::AttachedToWindow()
 {
 	BView::AttachedToWindow();
-	if (Parent())
-		SetViewColor(Parent()->ViewColor());
-	else
+	if (Parent() != NULL) {
+		if ((Parent()->Flags() & B_DRAW_ON_CHILDREN) != 0)
+			SetViewColor(B_TRANSPARENT_COLOR);
+		else
+			SetViewColor(Parent()->ViewColor());
+	} else
 		SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
 
 	SetLowColor(ViewColor());
@@ -313,11 +329,18 @@ NetworkStatusView::FrameResized(float width, float height)
 void
 NetworkStatusView::Draw(BRect updateRect)
 {
-	if (fBitmaps[fStatus] == NULL)
+	int32 status = kStatusUnknown;
+	for (std::map<BString, int32>::const_iterator it
+		= fInterfaceStatuses.begin(); it != fInterfaceStatuses.end(); ++it) {
+		if (it->second > status)
+			status = it->second;
+	}
+
+	if (fTrayIcons[status] == NULL)
 		return;
 
 	SetDrawingMode(B_OP_ALPHA);
-	DrawBitmap(fBitmaps[fStatus]);
+	DrawBitmap(fTrayIcons[status]);
 	SetDrawingMode(B_OP_COPY);
 }
 
@@ -396,11 +419,14 @@ NetworkStatusView::MouseDown(BPoint point)
 	BPopUpMenu* menu = new BPopUpMenu(B_EMPTY_STRING, false, false);
 	menu->SetAsyncAutoDestruct(true);
 	menu->SetFont(be_plain_font);
+	BString wifiInterface;
+	BNetworkDevice wifiDevice;
 
 	// Add interfaces
 
-	for (int32 i = 0; i < fInterfaces.CountItems(); i++) {
-		BString& name = *fInterfaces.ItemAt(i);
+	for (std::map<BString, int32>::const_iterator it
+		= fInterfaceStatuses.begin(); it != fInterfaceStatuses.end(); ++it) {
+		const BString& name = it->first;
 
 		BString label = name;
 		label += ": ";
@@ -410,30 +436,33 @@ NetworkStatusView::MouseDown(BPoint point)
 		BMessage* info = new BMessage(kMsgShowConfiguration);
 		info->AddString("interface", name.String());
 		menu->AddItem(new BMenuItem(label.String(), info));
+
+		// We only show the networks of the first wireless device we find.
+		if (wifiInterface.IsEmpty()) {
+			wifiDevice.SetTo(name);
+			if (wifiDevice.IsWireless())
+				wifiInterface = name;
+		}
 	}
 
-	if (!fInterfaces.IsEmpty())
+	if (!fInterfaceStatuses.empty())
 		menu->AddSeparatorItem();
 
 	// Add wireless networks, if any
 
-	for (int32 i = 0; i < fInterfaces.CountItems(); i++) {
-		BNetworkDevice device(fInterfaces.ItemAt(i)->String());
-		if (!device.IsWireless())
-			continue;
-
+	if (!wifiInterface.IsEmpty()) {
 		std::set<BNetworkAddress> associated;
 		BNetworkAddress address;
 		uint32 cookie = 0;
-		while (device.GetNextAssociatedNetwork(cookie, address) == B_OK)
+		while (wifiDevice.GetNextAssociatedNetwork(cookie, address) == B_OK)
 			associated.insert(address);
 
 		wireless_network network;
 		int32 count = 0;
 		cookie = 0;
-		while (device.GetNextNetwork(cookie, network) == B_OK) {
+		while (wifiDevice.GetNextNetwork(cookie, network) == B_OK) {
 			BMessage* message = new BMessage(kMsgJoinNetwork);
-			message->AddString("device", device.Name());
+			message->AddString("device", wifiInterface);
 			message->AddString("name", network.name);
 
 			BMenuItem* item = new WirelessNetworkMenuItem(network.name,
@@ -452,9 +481,6 @@ NetworkStatusView::MouseDown(BPoint point)
 			menu->AddItem(item);
 		}
 		menu->AddSeparatorItem();
-
-		// We only show the networks of the first wireless device we find.
-		break;
 	}
 
 	menu->AddItem(new BMenuItem(B_TRANSLATE(
@@ -509,9 +535,9 @@ NetworkStatusView::_PrepareRequest(struct ifreq& request, const char* name)
 
 
 int32
-NetworkStatusView::_DetermineInterfaceStatus(const char* name)
+NetworkStatusView::_DetermineInterfaceStatus(
+	const BNetworkInterface& interface)
 {
-	BNetworkInterface interface(name);
 	uint32 flags = interface.Flags();
 	int32 status = kStatusNoLink;
 
@@ -529,25 +555,40 @@ NetworkStatusView::_DetermineInterfaceStatus(const char* name)
 void
 NetworkStatusView::_Update(bool force)
 {
-	int32 oldStatus = fStatus;
-	fStatus = kStatusUnknown;
-	fInterfaces.MakeEmpty();
-
 	BNetworkRoster& roster = BNetworkRoster::Default();
 	BNetworkInterface interface;
 	uint32 cookie = 0;
 
 	while (roster.GetNextInterface(&cookie, interface) == B_OK) {
 		if ((interface.Flags() & IFF_LOOPBACK) == 0) {
-			fInterfaces.AddItem(new BString(interface.Name()));
-			int32 status = _DetermineInterfaceStatus(interface.Name());
-			if (status > fStatus)
-				fStatus = status;
+			int32 oldStatus = kStatusUnknown;
+			if (fInterfaceStatuses.find(interface.Name())
+				!= fInterfaceStatuses.end()) {
+				oldStatus = fInterfaceStatuses[interface.Name()];
+			}
+			int32 status = _DetermineInterfaceStatus(interface);
+			if (oldStatus != status) {
+				BNotification notification(B_INFORMATION_NOTIFICATION);
+				notification.SetGroup(B_TRANSLATE("Network Status"));
+				notification.SetTitle(interface.Name());
+				notification.SetMessageID(interface.Name());
+				notification.SetIcon(fNotifyIcons[status]);
+				if (status == kStatusConnecting
+					|| (status == kStatusReady
+						&& oldStatus == kStatusConnecting)
+					|| (status == kStatusNoLink
+						&& oldStatus == kStatusReady)
+					|| (status == kStatusNoLink
+						&& oldStatus == kStatusConnecting)) {
+					// A significant state change, raise notification.
+					notification.SetContent(kStatusDescriptions[status]);
+					notification.Send();
+				}
+				Invalidate();
+			}
+			fInterfaceStatuses[interface.Name()] = status;
 		}
 	}
-
-	if (fStatus != oldStatus)
-		Invalidate();
 }
 
 

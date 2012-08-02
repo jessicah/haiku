@@ -1,10 +1,11 @@
-1	russian	x-vnd.Be-MAIL	1350013868
+1	russian	x-vnd.Be-MAIL	2834665561
 View	Mail		Вид
 %d - Date	Mail		%d - Дата
 Attach attributes:	Mail		Прикрепление атрибутов:
 Inconsistency occurred in the undo/redo buffer.	Mail		Произошло несоответствие в буфере отмены/повтора.
 An error occurred trying to save the attachment.	Mail		Произошла ошибка при попытке сохранить вложение.
 Copy to new	Mail		Копировать в новое
+Leave as 'New'	Mail	Do not translate New - this is non-localizable e-mail status	Оставить как 'New'
 Edit	Mail		Изменить
 Print	Mail		Печать
 <none>	Mail		<пусто>
@@ -15,6 +16,7 @@ helpful message	Mail		полезное сообщение
 Colored quotes:	Mail		Цветные кавычки:
 Subject:	Mail		Тема:
 Reply to all	Mail		Ответить всем
+Enclosure: %name% (Type: %type%)	Mail	Don't translate the variables %name% and %type%.	Вложение: %name% (Tип: %type%)
 Show icons & labels	Mail		Отображать иконки и надписи
 Remove attachment	Mail		Удалить вложение
 Button bar:	Mail		Панель кнопок:
@@ -39,7 +41,6 @@ Find	Mail		Найти
 Preferences…	Mail		Настройки…
 Undo	Mail		Отменить
 Date:	Mail		Дата:
-Leave as New	Mail		Оставить как новое
 An error occurred trying to open this signature.	Mail		Возникла ошибка при попытке открытия этой подписи.
 No file attributes, just plain data	Mail		Без атрибутов, только данные
 Edit queries…	Mail		Изменить запросы…
@@ -62,14 +63,17 @@ Print…	Mail		Печать…
 Warn unencodable:	Mail		Предупреждать о невозможности декодировать:
 Quit	Mail		Выход
 %n - Full name	Mail		%n - Полное имя
+ Read 	Mail		 Прочитанным 
+UTF-8	Mail	This string is used as a key to set default message compose encoding. It must be correct IANA name from http://cgit.haiku-os.org/haiku/tree/src/kits/textencoding/character_sets.cpp Translate it only if you want to change default message compose encoding for your locale. If you don't know what is it and why it may needs changing, just leave \"UTF-8\".	UTF-8
 Trash	Mail		Корзина
 Default account:	Mail		Аккаунт по умолчанию:
 Size:	Mail		Размер:
 Account from mail	Mail		Использовать аккаунт из письма
 Edit signatures…	Mail		Изменить подписи…
 New	Mail		Новое
+Attachments: 	Mail		Вложения: 
 On	Mail		Включить
-Set to %s	Mail		Установить как %s
+Set to %s	Mail		Пометить как %s
 Forward	Mail		Переслать
 E-mail draft could not be saved!	Mail		Черновик не может быть сохранен!
 %e wrote:\\n	Mail		%e написал:\\n
@@ -122,7 +126,7 @@ Mail couldn't find its dictionary.	Mail		Невозможно найти фай�
 Reply preamble:	Mail		Ответное вступление:
 Signatures	Mail		Подписи
 Next	Mail		Следущее
-Set to…	Mail		Установить в…
+Set to…	Mail		Пометить как…
 Use default account	Mail		Использовать аккаунт по умолчанию
 Sorry	Mail		Извините
 Encoding:	Mail		Кодировка:

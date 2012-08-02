@@ -45,9 +45,8 @@ radeon_gpu_reset()
 	struct gpu_state gpuState;
 	radeon_gpu_mc_halt(&gpuState);
 
-	if (radeon_gpu_mc_idlecheck() > 0) {
-		ERROR("%s: Timeout waiting for MC to idle!\n", __func__);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Couldn't idle memory controller!\n", __func__);
 
 	if (info.chipsetID < RADEON_CEDAR) {
 		Write32(OUT, CP_ME_CNTL, CP_ME_HALT);
@@ -167,62 +166,70 @@ void
 radeon_gpu_mc_halt(gpu_state* gpuState)
 {
 	// Backup current memory controller state
-	gpuState->d1vgaControl = Read32(OUT, D1VGA_CONTROL);
-	gpuState->d2vgaControl = Read32(OUT, D2VGA_CONTROL);
-	gpuState->vgaRenderControl = Read32(OUT, VGA_RENDER_CONTROL);
-	gpuState->vgaHdpControl = Read32(OUT, VGA_HDP_CONTROL);
-	gpuState->d1crtcControl = Read32(OUT, D1CRTC_CONTROL);
-	gpuState->d2crtcControl = Read32(OUT, D2CRTC_CONTROL);
+	gpuState->d1vgaControl = Read32(OUT, AVIVO_D1VGA_CONTROL);
+	gpuState->d2vgaControl = Read32(OUT, AVIVO_D2VGA_CONTROL);
+	gpuState->vgaRenderControl = Read32(OUT, AVIVO_VGA_RENDER_CONTROL);
+	gpuState->vgaHdpControl = Read32(OUT, AVIVO_VGA_HDP_CONTROL);
+	gpuState->d1crtcControl = Read32(OUT, AVIVO_D1CRTC_CONTROL);
+	gpuState->d2crtcControl = Read32(OUT, AVIVO_D2CRTC_CONTROL);
 
 	// halt all memory controller actions
-	Write32(OUT, D2CRTC_UPDATE_LOCK, 0);
-	Write32(OUT, VGA_RENDER_CONTROL, 0);
-	Write32(OUT, D1CRTC_UPDATE_LOCK, 1);
-	Write32(OUT, D2CRTC_UPDATE_LOCK, 1);
-	Write32(OUT, D1CRTC_CONTROL, 0);
-	Write32(OUT, D2CRTC_CONTROL, 0);
-	Write32(OUT, D1CRTC_UPDATE_LOCK, 0);
-	Write32(OUT, D2CRTC_UPDATE_LOCK, 0);
-	Write32(OUT, D1VGA_CONTROL, 0);
-	Write32(OUT, D2VGA_CONTROL, 0);
+	Write32(OUT, AVIVO_VGA_RENDER_CONTROL, 0);
+	Write32(OUT, AVIVO_D1CRTC_UPDATE_LOCK, 1);
+	Write32(OUT, AVIVO_D2CRTC_UPDATE_LOCK, 1);
+	Write32(OUT, AVIVO_D1CRTC_CONTROL, 0);
+	Write32(OUT, AVIVO_D2CRTC_CONTROL, 0);
+	Write32(OUT, AVIVO_D1CRTC_UPDATE_LOCK, 0);
+	Write32(OUT, AVIVO_D2CRTC_UPDATE_LOCK, 0);
+	Write32(OUT, AVIVO_D1VGA_CONTROL, 0);
+	Write32(OUT, AVIVO_D2VGA_CONTROL, 0);
 }
 
 
 void
 radeon_gpu_mc_resume(gpu_state* gpuState)
 {
-	Write32(OUT, D1GRPH_PRIMARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
-	Write32(OUT, D1GRPH_SECONDARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
-	Write32(OUT, D2GRPH_PRIMARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
-	Write32(OUT, D2GRPH_SECONDARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
-	Write32(OUT, VGA_MEMORY_BASE_ADDRESS, gInfo->fb.vramStart);
+	Write32(OUT, AVIVO_D1GRPH_PRIMARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
+	Write32(OUT, AVIVO_D1GRPH_SECONDARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
+	Write32(OUT, AVIVO_D2GRPH_PRIMARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
+	Write32(OUT, AVIVO_D2GRPH_SECONDARY_SURFACE_ADDRESS, gInfo->fb.vramStart);
+	// TODO: Evergreen high surface addresses?
+	Write32(OUT, AVIVO_VGA_MEMORY_BASE_ADDRESS, gInfo->fb.vramStart);
 
 	// Unlock host access
-	Write32(OUT, VGA_HDP_CONTROL, gpuState->vgaHdpControl);
+	Write32(OUT, AVIVO_VGA_HDP_CONTROL, gpuState->vgaHdpControl);
 	snooze(1);
 
 	// Restore memory controller state
-	Write32(OUT, D1VGA_CONTROL, gpuState->d1vgaControl);
-	Write32(OUT, D2VGA_CONTROL, gpuState->d2vgaControl);
-	Write32(OUT, D1CRTC_UPDATE_LOCK, 1);
-	Write32(OUT, D2CRTC_UPDATE_LOCK, 1);
-	Write32(OUT, D1CRTC_CONTROL, gpuState->d1crtcControl);
-	Write32(OUT, D2CRTC_CONTROL, gpuState->d2crtcControl);
-	Write32(OUT, D1CRTC_UPDATE_LOCK, 0);
-	Write32(OUT, D2CRTC_UPDATE_LOCK, 0);
-	Write32(OUT, VGA_RENDER_CONTROL, gpuState->vgaRenderControl);
+	Write32(OUT, AVIVO_D1VGA_CONTROL, gpuState->d1vgaControl);
+	Write32(OUT, AVIVO_D2VGA_CONTROL, gpuState->d2vgaControl);
+	Write32(OUT, AVIVO_D1CRTC_UPDATE_LOCK, 1);
+	Write32(OUT, AVIVO_D2CRTC_UPDATE_LOCK, 1);
+	Write32(OUT, AVIVO_D1CRTC_CONTROL, gpuState->d1crtcControl);
+	Write32(OUT, AVIVO_D2CRTC_CONTROL, gpuState->d2crtcControl);
+	Write32(OUT, AVIVO_D1CRTC_UPDATE_LOCK, 0);
+	Write32(OUT, AVIVO_D2CRTC_UPDATE_LOCK, 0);
+	Write32(OUT, AVIVO_VGA_RENDER_CONTROL, gpuState->vgaRenderControl);
 }
 
 
-uint32
-radeon_gpu_mc_idlecheck()
+status_t
+radeon_gpu_mc_idlewait()
 {
 	uint32 idleStatus;
 
 	uint32 busyBits
 		= (VMC_BUSY | MCB_BUSY | MCDZ_BUSY | MCDY_BUSY | MCDX_BUSY | MCDW_BUSY);
-	if (!((idleStatus = Read32(MC, SRBM_STATUS)) & busyBits))
-		return 0;
+
+	uint32 tryCount;
+	// We give the gpu 0.5 seconds to become idle checking once every 500usec
+	for (tryCount = 0; tryCount < 1000; tryCount++) {
+		if (((idleStatus = Read32(MC, SRBM_STATUS)) & busyBits) == 0)
+			return B_OK;
+		snooze(500);
+	}
+
+	ERROR("%s: Couldn't idle SRBM!\n", __func__);
 
 	bool state;
 	state = (idleStatus & VMC_BUSY) != 0;
@@ -238,7 +245,7 @@ radeon_gpu_mc_idlecheck()
 	state = (idleStatus & MCDW_BUSY) != 0;
 	TRACE("%s: MCDW is %s\n", __func__, state ? "busy" : "idle");
 
-	return idleStatus;
+	return B_TIMED_OUT;
 }
 
 
@@ -255,17 +262,14 @@ radeon_gpu_mc_setup_r600()
 		Write32(OUT, (0x2c20 + j), 0x00000000);
 		Write32(OUT, (0x2c24 + j), 0x00000000);
 	}
-	Write32(OUT, HDP_REG_COHERENCY_FLUSH_CNTL, 0);
+	Write32(OUT, R600_HDP_REG_COHERENCY_FLUSH_CNTL, 0);
 
 	// idle the memory controller
 	struct gpu_state gpuState;
 	radeon_gpu_mc_halt(&gpuState);
 
-	uint32 idleState = radeon_gpu_mc_idlecheck();
-	if (idleState > 0) {
-		ERROR("%s: Modifying non-idle Memory Controller! "
-			" idlestate: 0x%" B_PRIX32 "\n", __func__, idleState);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Modifying non-idle memory controller!\n", __func__);
 
 	// TODO: Memory Controller AGP
 	Write32(OUT, R600_MC_VM_SYSTEM_APERTURE_LOW_ADDR,
@@ -278,9 +282,9 @@ radeon_gpu_mc_setup_r600()
 	tmp |= ((gInfo->fb.vramStart >> 24) & 0xFFFF);
 
 	Write32(OUT, R600_MC_VM_FB_LOCATION, tmp);
-	Write32(OUT, HDP_NONSURFACE_BASE, (gInfo->fb.vramStart >> 8));
-	Write32(OUT, HDP_NONSURFACE_INFO, (2 << 7));
-	Write32(OUT, HDP_NONSURFACE_SIZE, 0x3FFFFFFF);
+	Write32(OUT, R600_HDP_NONSURFACE_BASE, (gInfo->fb.vramStart >> 8));
+	Write32(OUT, R600_HDP_NONSURFACE_INFO, (2 << 7));
+	Write32(OUT, R600_HDP_NONSURFACE_SIZE, 0x3FFFFFFF);
 
 	// is AGP?
 	//	Write32(OUT, R600_MC_VM_AGP_TOP, gInfo->fb.gartEnd >> 22);
@@ -291,11 +295,9 @@ radeon_gpu_mc_setup_r600()
 	Write32(OUT, R600_MC_VM_AGP_TOP, 0x0FFFFFFF);
 	Write32(OUT, R600_MC_VM_AGP_BOT, 0x0FFFFFFF);
 
-	idleState = radeon_gpu_mc_idlecheck();
-	if (idleState > 0) {
-		ERROR("%s: Modifying non-idle Memory Controller! "
-			" idlestate: 0x%" B_PRIX32 "\n", __func__, idleState);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Modifying non-idle memory controller!\n", __func__);
+
 	radeon_gpu_mc_resume(&gpuState);
 
 	// disable render control
@@ -320,19 +322,16 @@ radeon_gpu_mc_setup_r700()
 	}
 
 	// On r7xx read from HDP_DEBUG1 vs write HDP_REG_COHERENCY_FLUSH_CNTL
-	Read32(OUT, HDP_DEBUG1);
+	Read32(OUT, R700_HDP_DEBUG1);
 
 	// idle the memory controller
 	struct gpu_state gpuState;
 	radeon_gpu_mc_halt(&gpuState);
 
-	uint32 idleState = radeon_gpu_mc_idlecheck();
-	if (idleState > 0) {
-		ERROR("%s: Modifying non-idle Memory Controller! "
-			" idlestate: 0x%" B_PRIX32 "\n", __func__, idleState);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Modifying non-idle memory controller!\n", __func__);
 
-	Write32(OUT, VGA_HDP_CONTROL, VGA_MEMORY_DISABLE);
+	Write32(OUT, AVIVO_VGA_HDP_CONTROL, AVIVO_VGA_MEMORY_DISABLE);
 
 	// TODO: Memory Controller AGP
 	Write32(OUT, R700_MC_VM_SYSTEM_APERTURE_LOW_ADDR,
@@ -345,9 +344,9 @@ radeon_gpu_mc_setup_r700()
 	tmp |= ((gInfo->fb.vramStart >> 24) & 0xFFFF);
 
 	Write32(OUT, R700_MC_VM_FB_LOCATION, tmp);
-	Write32(OUT, HDP_NONSURFACE_BASE, (gInfo->fb.vramStart >> 8));
-	Write32(OUT, HDP_NONSURFACE_INFO, (2 << 7));
-	Write32(OUT, HDP_NONSURFACE_SIZE, 0x3FFFFFFF);
+	Write32(OUT, R700_HDP_NONSURFACE_BASE, (gInfo->fb.vramStart >> 8));
+	Write32(OUT, R700_HDP_NONSURFACE_INFO, (2 << 7));
+	Write32(OUT, R700_HDP_NONSURFACE_SIZE, 0x3FFFFFFF);
 
 	// is AGP?
 	//	Write32(OUT, R700_MC_VM_AGP_TOP, gInfo->fb.gartEnd >> 22);
@@ -358,11 +357,9 @@ radeon_gpu_mc_setup_r700()
 	Write32(OUT, R700_MC_VM_AGP_TOP, 0x0FFFFFFF);
 	Write32(OUT, R700_MC_VM_AGP_BOT, 0x0FFFFFFF);
 
-	idleState = radeon_gpu_mc_idlecheck();
-	if (idleState > 0) {
-		ERROR("%s: Modifying non-idle Memory Controller! "
-			" idlestate: 0x%" B_PRIX32 "\n", __func__, idleState);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Modifying non-idle memory controller!\n", __func__);
+
 	radeon_gpu_mc_resume(&gpuState);
 
 	// disable render control
@@ -385,19 +382,16 @@ radeon_gpu_mc_setup_evergreen()
 		Write32(OUT, (0x2c20 + j), 0x00000000);
 		Write32(OUT, (0x2c24 + j), 0x00000000);
 	}
-	Write32(OUT, HDP_REG_COHERENCY_FLUSH_CNTL, 0);
+	Write32(OUT, EVERGREEN_HDP_REG_COHERENCY_FLUSH_CNTL, 0);
 
 	// idle the memory controller
 	struct gpu_state gpuState;
 	radeon_gpu_mc_halt(&gpuState);
 
-	uint32 idleState = radeon_gpu_mc_idlecheck();
-	if (idleState > 0) {
-		ERROR("%s: Modifying non-idle Memory Controller! "
-			" idlestate: 0x%" B_PRIX32 "\n", __func__, idleState);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Modifying non-idle memory controller!\n", __func__);
 
-	Write32(OUT, VGA_HDP_CONTROL, VGA_MEMORY_DISABLE);
+	Write32(OUT, AVIVO_VGA_HDP_CONTROL, AVIVO_VGA_MEMORY_DISABLE);
 
 	// TODO: Memory Controller AGP
 	Write32(OUT, EVERGREEN_MC_VM_SYSTEM_APERTURE_LOW_ADDR,
@@ -421,9 +415,9 @@ radeon_gpu_mc_setup_evergreen()
 	tmp |= ((gInfo->fb.vramStart >> 24) & 0xFFFF);
 
 	Write32(OUT, EVERGREEN_MC_VM_FB_LOCATION, tmp);
-	Write32(OUT, HDP_NONSURFACE_BASE, (gInfo->fb.vramStart >> 8));
-	Write32(OUT, HDP_NONSURFACE_INFO, (2 << 7) | (1 << 30));
-	Write32(OUT, HDP_NONSURFACE_SIZE, 0x3FFFFFFF);
+	Write32(OUT, EVERGREEN_HDP_NONSURFACE_BASE, (gInfo->fb.vramStart >> 8));
+	Write32(OUT, EVERGREEN_HDP_NONSURFACE_INFO, (2 << 7) | (1 << 30));
+	Write32(OUT, EVERGREEN_HDP_NONSURFACE_SIZE, 0x3FFFFFFF);
 
 	// is AGP?
 	//	Write32(OUT, EVERGREEN_MC_VM_AGP_TOP, gInfo->fb.gartEnd >> 16);
@@ -434,11 +428,9 @@ radeon_gpu_mc_setup_evergreen()
 	Write32(OUT, EVERGREEN_MC_VM_AGP_TOP, 0x0FFFFFFF);
 	Write32(OUT, EVERGREEN_MC_VM_AGP_BOT, 0x0FFFFFFF);
 
-	idleState = radeon_gpu_mc_idlecheck();
-	if (idleState > 0) {
-		ERROR("%s: Modifying non-idle Memory Controller! "
-			" idlestate: 0x%" B_PRIX32 "\n", __func__, idleState);
-	}
+	if (radeon_gpu_mc_idlewait() != B_OK)
+		ERROR("%s: Modifying non-idle memory controller!\n", __func__);
+
 	radeon_gpu_mc_resume(&gpuState);
 
 	// disable render control
@@ -465,9 +457,8 @@ radeon_gpu_mc_init()
 	if (gInfo->shared_info->frame_buffer_size > 0)
 		gInfo->fb.valid = true;
 
-	// TODO: 0 should be correct here... but it gets me vertical stripes
-	//uint64 vramBase = 0;
-	uint64 vramBase = gInfo->shared_info->frame_buffer_phys;
+	// This is the card internal location.
+	uint64 vramBase = 0;
 
 	if ((info.chipsetFlags & CHIP_IGP) != 0) {
 		vramBase = Read32(OUT, fbVMLocationReg) & 0xFFFF;
@@ -510,17 +501,190 @@ radeon_gpu_mc_setup()
 
 
 status_t
-radeon_gpu_irq_setup()
+radeon_gpu_ring_setup()
 {
-	// TODO: Stub for IRQ setup
+	TRACE("%s called\n", __func__);
 
-	// allocate rings via r600_ih_ring_alloc
+	// init GFX ring queue
+	gInfo->ringQueue[RADEON_QUEUE_TYPE_GFX_INDEX]
+		= new RingQueue(1024 * 1024, RADEON_QUEUE_TYPE_GFX_INDEX);
 
-	// disable irq's via r600_disable_interrupts
+	#if 0
+	// init IRQ ring queue (reverse of rendering/cp ring queue)
+	gInfo->irqRingQueue
+		= new IRQRingQueue(64 * 1024)
+	#endif
 
-	// r600_rlc_init
 
-	// setup interrupt control
+	return B_OK;
+}
 
-	return B_ERROR;
+
+status_t
+radeon_gpu_ring_boot(uint32 ringType)
+{
+	TRACE("%s called\n", __func__);
+
+	RingQueue* ring = gInfo->ringQueue[ringType];
+	if (ring == NULL) {
+		ERROR("%s: Specified ring doesn't exist!\n", __func__);
+		return B_ERROR;
+	}
+
+	// We don't execute this code until it's more complete.
+	ERROR("%s: TODO\n", __func__);
+	return B_OK;
+
+
+	// TODO: Write initial ring PACKET3 STATE
+
+	// *** r600_cp_init_ring_buffer
+	// Reset command processor
+	Write32(OUT, GRBM_SOFT_RESET, RADEON_SOFT_RESET_CP);
+	Read32(OUT, GRBM_SOFT_RESET);
+	snooze(15000);
+	Write32(OUT, GRBM_SOFT_RESET, 0);
+
+	// Set ring buffer size
+	uint32 controlScratch = RB_NO_UPDATE
+		| (compute_order(4096 / 8) << 8) // rptr_update_l2qw
+		| compute_order(ring->GetSize() / 8); // size_l2qw
+	#ifdef __BIG_ENDIAN
+	controlScratch |= BUF_SWAP_32BIT;
+	#endif
+	Write32(OUT, CP_RB_CNTL, controlScratch);
+
+	// Set delays and timeouts
+	Write32(OUT, CP_SEM_WAIT_TIMER, 0);
+	Write32(OUT, CP_RB_WPTR_DELAY, 0);
+
+	// Enable RenderBuffer Reads
+	controlScratch |= RB_RPTR_WR_ENA;
+	Write32(OUT, CP_RB_CNTL, controlScratch);
+
+	// Zero out command processor read and write pointers
+	Write32(OUT, CP_RB_RPTR_WR, 0);
+	Write32(OUT, CP_RB_WPTR, 0);
+
+	#if 0
+	int ringPointer = 0;
+	// TODO: AGP cards
+	/*
+	if (RADEON_IS_AGP) {
+		ringPointer = dev_priv->ring_rptr->offset
+			- dev->agp->base
+			+ dev_priv->gart_vm_start;
+	} else {
+	*/
+	ringPointer = dev_priv->ring_rptr->offset
+		- ((unsigned long) dev->sg->virtual)
+		+ dev_priv->gart_vm_start;
+
+	Write32(OUT, CP_RB_RPTR_ADDR, (ringPointer & 0xfffffffc));
+	Write32(OUT, CP_RB_RPTR_ADDR_HI, upper_32_bits(ringPointer));
+
+	// Drop RPTR_WR_ENA and update CP RB Control
+	controlScratch &= ~R600_RB_RPTR_WR_ENA;
+	Write32(OUT, CP_RB_CNTL, controlScratch);
+	#endif
+
+	#if 0
+	// Update command processor pointer
+	int commandPointer = 0;
+
+	// TODO: AGP cards
+	/*
+	if (RADEON_IS_AGP) {
+		commandPointer = (dev_priv->cp_ring->offset
+			- dev->agp->base
+			+ dev_priv->gart_vm_start);
+	}
+	*/
+	commandPointer = (dev_priv->cp_ring->offset
+		- (unsigned long)dev->sg->virtual
+		+ dev_priv->gart_vm_start);
+	#endif
+
+	#if 0
+	Write32(OUT, CP_RB_BASE, commandPointer >> 8);
+	Write32(OUT, CP_ME_CNTL, 0xff);
+	Write32(OUT, CP_DEBUG, (1 << 27) | (1 << 28));
+	#endif
+
+	#if 0
+	// Initialize scratch register pointer.
+	// This wil lcause the scratch register values to be wtitten
+	// to memory whenever they are updated.
+
+	uint64 scratchAddr = Read32(OUT, CP_RB_RPTR_ADDR) & 0xFFFFFFFC;
+	scratchAddr |= ((uint64)Read32(OUT, CP_RB_RPTR_ADDR_HI)) << 32;
+	scratchAddr += R600_SCRATCH_REG_OFFSET;
+	scratchAddr >>= 8;
+	scratchAddr &= 0xffffffff;
+
+	Write32(OUT, R600_SCRATCH_ADDR, (uint32)scratchAddr);
+
+	Write32(OUT, R600_SCRATCH_UMSK, 0x7);
+	#endif
+
+	#if 0
+	// Enable bus mastering
+	radeon_enable_bm(dev_priv);
+
+	radeon_write_ring_rptr(dev_priv, R600_SCRATCHOFF(0), 0);
+	Write32(OUT, R600_LAST_FRAME_REG, 0);
+
+	radeon_write_ring_rptr(dev_priv, R600_SCRATCHOFF(1), 0);
+	Write32(OUT, R600_LAST_DISPATCH_REG, 0);
+
+	radeon_write_ring_rptr(dev_priv, R600_SCRATCHOFF(2), 0);
+	Write32(OUT, R600_LAST_CLEAR_REG, 0);
+	#endif
+
+	// Reset sarea?
+	#if 0
+	master_priv = file_priv->master->driver_priv;
+	if (master_priv->sarea_priv) {
+		master_priv->sarea_priv->last_frame = 0;
+		master_priv->sarea_priv->last_dispatch = 0;
+		master_priv->sarea_priv->last_clear = 0;
+	}
+
+	r600_do_wait_for_idle(dev_priv);
+	#endif
+
+	return B_OK;
+}
+
+
+status_t
+radeon_gpu_ss_disable()
+{
+	TRACE("%s called\n", __func__);
+
+	radeon_shared_info &info = *gInfo->shared_info;
+	uint32 ssControl;
+
+	if (info.chipsetID >= RADEON_CEDAR) {
+		// PLL1
+		ssControl = Read32(OUT, EVERGREEN_P1PLL_SS_CNTL);
+		ssControl &= ~EVERGREEN_PxPLL_SS_EN;
+		Write32(OUT, EVERGREEN_P1PLL_SS_CNTL, ssControl);
+		// PLL2
+		ssControl = Read32(OUT, EVERGREEN_P2PLL_SS_CNTL);
+		ssControl &= ~EVERGREEN_PxPLL_SS_EN;
+		Write32(OUT, EVERGREEN_P2PLL_SS_CNTL, ssControl);
+	} else if (info.chipsetID >= RADEON_RS600) {
+		// PLL1
+		ssControl = Read32(OUT, AVIVO_P1PLL_INT_SS_CNTL);
+		ssControl &= ~1;
+		Write32(OUT, AVIVO_P1PLL_INT_SS_CNTL, ssControl);
+		// PLL2
+		ssControl = Read32(OUT, AVIVO_P2PLL_INT_SS_CNTL);
+		ssControl &= ~1;
+		Write32(OUT, AVIVO_P2PLL_INT_SS_CNTL, ssControl);
+	} else
+		return B_ERROR;
+
+	return B_OK;
 }

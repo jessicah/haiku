@@ -1,0 +1,34 @@
+1	japanese	x-vnd.Haiku-libbe	180647795
+Close	AboutWindow		閉じる
+%3.2f GiB	StringForSize		%3.2f GiB
+Written by:	AboutWindow		作者：
+About %app%	AboutMenuItem		%app%について
+Cut	TextView		切り取り
+Cannot create the replicant for \"%description\".\n%error	ZombieReplicantView		\"%description\"用のレプリカントを作成できません。\n%error
+Copy	TextView		コピー
+%3.2f KiB	StringForSize		%3.2f KiB
+%d bytes	StringForSize		%d バイト
+About…	AboutWindow		このソフトウエアについて…
+Error	PrintJob		エラー
+No Pages to print!	PrintJob		印刷するページがありません。
+OK	Dragger		OK
+OK	PrintJob		OK
+Green:	ColorControl		緑：
+Remove replicant	Dragger		レプリカントを削除
+OK	ZombieReplicantView		OK
+Print Server is not responding.	PrintJob		プリントサーバーが応答しません。
+Paste	TextView		貼り付け
+Copyright © %years% Haiku, Inc.	AboutWindow		Copyright © %years% Haiku, Inc. 
+%.2f TiB	StringForSize		%.2f TiB
+Cannot locate the application for the replicant. No application signature supplied.\n%error	ZombieReplicantView		このレプリカント用のアプリケーションを見つけることができません。アプリケーション識別子が提供されていません。\n%error
+Redo	TextView		やり直し
+<empty>	Menu		<空>
+Select All	TextView		すべて選択
+Warning	Dragger		警告
+Undo	TextView		元に戻す
+Red:	ColorControl		赤：
+%3.2f MiB	StringForSize		%3.2f MiB
+About %app…	Dragger		%appについて…
+Error	ZombieReplicantView		エラー
+Blue:	ColorControl		青：
+Can't delete this replicant from its original application. Life goes on.	Dragger		このレプリカントを元々のアプリケーションから削除することはできません。現状を維持します。

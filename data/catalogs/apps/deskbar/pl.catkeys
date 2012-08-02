@@ -1,38 +1,51 @@
-1	polish	x-vnd.Be-TSKB	3232664655
-<Be folder is empty>	BeMenu		<folder Be jest pusty>
-Always on top	PreferencesWindow		Zawsze na wierzchu
+1	polish	x-vnd.Be-TSKB	3726855474
+Power off	DeskbarMenu		Wyłącz komputer
+Show day of week	PreferencesWindow		Pokaż dzień tygodnia
+Edit menu…	PreferencesWindow		Edytuj zawartość menu…
 Applications	PreferencesWindow		Lista aplikacji
+Time preferences…	TimeView		Ustawienia czasu...
+About Haiku	DeskbarMenu		O Haiku
+Recent documents:	PreferencesWindow		Ostatnio przeglądane dokumenty:
+Recent applications	DeskbarMenu		Ostatnio uruchomione aplikacje
+Sort running applications	PreferencesWindow		Sortuj uruchomione aplikacje alfabetycznie
+Show time	Tray		Pokaż czas
+Applications	B_USER_DESKBAR_DIRECTORY/Applications		Aplikacje
+Find…	DeskbarMenu		Wyszukaj…
+Window	PreferencesWindow		Położenie
+Menu	PreferencesWindow		Menu
+Recent documents	DeskbarMenu		Ostatnio otwarte dokumenty
+Show seconds	PreferencesWindow		Pokaż sekundy
+Auto-hide	PreferencesWindow		Autoukrywanie
+Always on top	PreferencesWindow		Zawsze na wierzchu
+<Deskbar folder is empty>	DeskbarMenu		Folder Paska Pulpitu jest pusty
+Show all	WindowMenu		Pokaż wszystkie okna
+No windows	WindowMenu		Brak okien aplikacji
+Deskbar	System name		Pasek Pulpitu
+Restart system	DeskbarMenu		Uruchom ponownie
+Large	PreferencesWindow		Duże
 Auto-raise	PreferencesWindow		Automatyczne rozszerzanie
-Change time…	TimeView		Zmień czas...
-Clock	PreferencesWindow		Zegar
+Hide time	TimeView		Ukryj czas
+Recent folders:	PreferencesWindow		Ostatnio przeglądane foldery:
+Show application expander	PreferencesWindow		Aplikacje jako lista rozwijalna
+Restart Tracker	DeskbarMenu		Uruchom ponownie Trackera
 Close all	WindowMenu		Zamknij wszystkie okna
 Deskbar preferences	PreferencesWindow		Ustawienia Panelu Pulpitu
-Deskbar preferences…	BeMenu		Ustawienia Panelu Pulpitu...
-Edit menu…	PreferencesWindow		Edytuj zawartość menu...
-Expand new applications	PreferencesWindow		Uruchamiaj aplikacje rozwinięte
-Find…	BeMenu		Wyszukaj...
-Hide all	WindowMenu		Ukryj wszystkie okna
-Hide time	TimeView		Ukryj czas
-Menu	PreferencesWindow		Menu
-Mount	BeMenu		Zamontuj
-No windows	WindowMenu		Brak okien aplikacji
-Power off	BeMenu		Wyłącz komputer
-Quit application	WindowMenu		Zakończ pracę aplikacji
-Recent applications	BeMenu		Ostatnio używane aplikacje
+Mount	DeskbarMenu		Zamontuj
+Small	PreferencesWindow		Małe
 Recent applications:	PreferencesWindow		Ostatnio używane aplikacje:
-Recent documents	BeMenu		Ostatnio przeglądane dokumenty
-Recent documents:	PreferencesWindow		Ostatnio przeglądane dokumenty:
-Recent folders	BeMenu		Ostatnio przeglądane foldery
-Recent folders:	PreferencesWindow		Ostatnio przeglądane foldery:
-Restart Tracker	BeMenu		Uruchom ponownie Tracker
-Restart system	BeMenu		Uruchom komputer ponownie
-Show Time	Tray		Pokaż czas
-Show all	WindowMenu		Pokaż wszystkie okna
-Show application expander	PreferencesWindow		Aplikacje jako lista rozwijalna
-Show calendar…	TimeView		Wyświetl kalendarz...
-Show replicants	BeMenu		Pokazuj replikanty
-Show seconds	PreferencesWindow		Pokazuj sekundy
-Shutdown…	BeMenu		Zakończ pracę...
-Sort running applications	PreferencesWindow		Sortuj uruchomione aplikacje alfabetycznie
+Shutdown…	DeskbarMenu		Wyłącz…
 Tracker always first	PreferencesWindow		Tracker zawsze na początku
-Window	PreferencesWindow		Położenie
+Preferences	B_USER_DESKBAR_DIRECTORY/Preferences		Ustawienia
+Recent folders	DeskbarMenu		Ostatnio przeglądane foldery
+About this system	DeskbarMenu		Informacje o systemie
+Show calendar…	TimeView		Wyświetl kalendarz…
+Deskbar preferences…	DeskbarMenu		Preferencje Deskbara…
+Expand new applications	PreferencesWindow		Uruchamiaj aplikacje rozwinięte
+Show replicants	DeskbarMenu		Pokaż replikanty
+Hide application names	PreferencesWindow		Ukryj nazwy aplikacji
+Clock	PreferencesWindow		Zegar
+Demos	B_USER_DESKBAR_DIRECTORY/Demos		Dema
+Icon size	PreferencesWindow		Rozmiar ikon
+Desktop applets	B_USER_DESKBAR_DIRECTORY/Desktop applets		Aplety pulpitu
+Hide all	WindowMenu		Ukryj wszystkie okna
+Quit application	WindowMenu		Zakończ pracę aplikacji

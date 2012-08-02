@@ -642,6 +642,22 @@ BScrollBar::MessageReceived(BMessage* message)
 				ValueChanged(value);
 			break;
 		}
+		case B_MOUSE_WHEEL_CHANGED:
+		{
+			// Must handle this here since BView checks for the existence of
+			// scrollbars, which a scrollbar itself does not have
+			float deltaX = 0.0f, deltaY = 0.0f;
+			message->FindFloat("be:wheel_delta_x", &deltaX);
+			message->FindFloat("be:wheel_delta_y", &deltaY);
+
+			if (deltaX == 0.0f && deltaY == 0.0f)
+				break;
+
+			if (deltaX != 0.0f && deltaY == 0.0f)
+				deltaY = deltaX;
+
+			ScrollWithMouseWheelDelta(this, deltaY);
+		}
 		default:
 			BView::MessageReceived(message);
 			break;
@@ -1282,11 +1298,11 @@ BScrollBar::Perform(perform_code code, void* _data)
 			BScrollBar::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BScrollBar::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BScrollBar::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:

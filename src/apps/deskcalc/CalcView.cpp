@@ -1,5 +1,5 @@
 /*
- * Copyright 2006-2011, Haiku, Inc. All rights reserved.
+ * Copyright 2006-2012, Haiku, Inc. All rights reserved.
  * Copyright 1997, 1998 R3 Software Ltd. All Rights Reserved.
  * Distributed under the terms of the MIT License.
  *
@@ -8,6 +8,7 @@
  *		Stephan Aßmus <superstippi@gmx.de>
  *		Philippe Saint-Pierre, stpere@gmail.com
  */
+
 
 #include "CalcView.h"
 
@@ -23,7 +24,7 @@
 #include <AppFileInfo.h>
 #include <Beep.h>
 #include <Bitmap.h>
-#include <Catalog.h> 
+#include <Catalog.h>
 #include <ControlLook.h>
 #include <Clipboard.h>
 #include <File.h>
@@ -43,8 +44,8 @@
 #include "CalcOptions.h"
 #include "ExpressionTextView.h"
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "CalcView"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "CalcView"
 
 //const uint8 K_COLOR_OFFSET				= 32;
 const float kFontScaleY						= 0.4f;
@@ -152,9 +153,6 @@ CalcView::CalcView(BRect frame, rgb_color rgbBaseColor, BMessage* settings)
 	// colorize based on base color.
 	_Colorize();
 
-	// create pop-up menu system
-	_CreatePopUpMenu();
-
 	// Fetch the calc icon for compact view
 	_FetchAppIcon(fCalcIcon);
 }
@@ -196,9 +194,6 @@ CalcView::CalcView(BMessage* archive)
 	// read data from archive
 	_LoadSettings(archive);
 
-	// create pop-up menu system
-	_CreatePopUpMenu();
-
 	// Fetch the calc icon for compact view
 	_FetchAppIcon(fCalcIcon);
 }
@@ -221,21 +216,51 @@ CalcView::AttachedToWindow()
 	BRect frame(Frame());
 	FrameResized(frame.Width(), frame.Height());
 
-	SetKeypadMode(fOptions->keypad_mode);
+	bool addKeypadModeMenuItems = true;
+	if (Parent() && (Parent()->Flags() & B_DRAW_ON_CHILDREN) != 0) {
+		// don't add these items if we are a replicant on the desktop
+		addKeypadModeMenuItems = false;
+	}
+
+	// create and attach the pop-up menu
+	_CreatePopUpMenu(addKeypadModeMenuItems);
+
+	if (addKeypadModeMenuItems)
+		SetKeypadMode(fOptions->keypad_mode);
 }
 
 
 void
 CalcView::MessageReceived(BMessage* message)
 {
+	if (Parent() && (Parent()->Flags() & B_DRAW_ON_CHILDREN) != 0) {
+		// if we are embedded in desktop we need to receive these
+		// message here since we don't have a parent BWindow
+		switch (message->what) {
+			case MSG_OPTIONS_AUTO_NUM_LOCK:
+				ToggleAutoNumlock();
+				return;
+
+			case MSG_OPTIONS_AUDIO_FEEDBACK:
+				ToggleAudioFeedback();
+				return;
+
+			case MSG_OPTIONS_ANGLE_MODE_RADIAN:
+				SetDegreeMode(false);
+				return;
+
+			case MSG_OPTIONS_ANGLE_MODE_DEGREE:
+				SetDegreeMode(true);
+				return;
+		}
+	}
+
 	// check if message was dropped
 	if (message->WasDropped()) {
 		// pass message on to paste
 		if (message->IsSourceRemote())
 			Paste(message);
-
 	} else {
-
 		// act on posted message type
 		switch (message->what) {
 
@@ -416,6 +441,7 @@ CalcView::Draw(BRect updateRect)
 					flags |= BControlLook::B_BLEND_FRAME;
 				if (key->flags != 0)
 					flags |= BControlLook::B_ACTIVATED;
+				flags |= BControlLook::B_IGNORE_OUTLINE;
 
 				be_control_look->DrawButtonFrame(this, frame, updateRect,
 					fBaseColor, fBaseColor, flags);
@@ -509,8 +535,8 @@ CalcView::MouseDown(BPoint point)
 	int32 buttons = 0;
 	Window()->CurrentMessage()->FindInt32("buttons", &buttons);
 
-	// display popup menu if not primary mouse button
 	if ((B_PRIMARY_MOUSE_BUTTON & buttons) == 0) {
+		// display popup menu if not primary mouse button
 		BMenuItem* selected;
 		if ((selected = fPopUpMenu->Go(ConvertToScreen(point))) != NULL
 			&& selected->Message() != NULL) {
@@ -676,7 +702,7 @@ CalcView::FrameResized(float width, float height)
 
 	frame.OffsetTo(B_ORIGIN);
 	float inset = (frame.Height() - fExpressionTextView->LineHeight(0)) / 2;
-	frame.InsetBy(inset, inset);
+	frame.InsetBy(0, inset);
 	fExpressionTextView->SetTextRect(frame);
 	Invalidate();
 }
@@ -817,7 +843,7 @@ CalcView::_LoadSettings(BMessage* archive)
 	if (archive->FindData("rgbBaseColor", B_RGB_COLOR_TYPE,
 			(const void**)&color, &size) < B_OK
 		|| size != sizeof(rgb_color)) {
-		fBaseColor = (rgb_color){ 128, 128, 128, 255 };
+		fBaseColor = ui_color(B_PANEL_BACKGROUND_COLOR);
 		puts("Missing rgbBaseColor from CalcView archive!\n");
 	} else {
 		fBaseColor = *color;
@@ -913,6 +939,7 @@ CalcView::Evaluate()
 
 	try {
 		ExpressionParser parser;
+		parser.SetDegreeMode(fOptions->degree_mode);
 		value = parser.Evaluate(expression.String());
 	} catch (ParseException e) {
 		BString error(e.message.String());
@@ -951,6 +978,16 @@ CalcView::ToggleAudioFeedback(void)
 	fOptions->audio_feedback = !fOptions->audio_feedback;
 	fAudioFeedbackItem->SetMarked(fOptions->audio_feedback);
 }
+
+
+void
+CalcView::SetDegreeMode(bool degrees)
+{
+	fOptions->degree_mode = degrees;
+	fAngleModeRadianItem->SetMarked(!degrees);
+	fAngleModeDegreeItem->SetMarked(degrees);
+}
+
 
 void
 CalcView::SetKeypadMode(uint8 mode)
@@ -1232,36 +1269,49 @@ CalcView::_Colorize()
 
 
 void
-CalcView::_CreatePopUpMenu()
+CalcView::_CreatePopUpMenu(bool addKeypadModeMenuItems)
 {
 	// construct items
 	fAutoNumlockItem = new BMenuItem(B_TRANSLATE("Enable Num Lock on startup"),
 		new BMessage(MSG_OPTIONS_AUTO_NUM_LOCK));
 	fAudioFeedbackItem = new BMenuItem(B_TRANSLATE("Audio Feedback"),
 		new BMessage(MSG_OPTIONS_AUDIO_FEEDBACK));
-	fKeypadModeCompactItem = new BMenuItem(B_TRANSLATE("Compact"),
-		new BMessage(MSG_OPTIONS_KEYPAD_MODE_COMPACT), '0');
-	fKeypadModeBasicItem = new BMenuItem(B_TRANSLATE("Basic"),
-		new BMessage(MSG_OPTIONS_KEYPAD_MODE_BASIC), '1');
-	fKeypadModeScientificItem = new BMenuItem(B_TRANSLATE("Scientific"),
-		new BMessage(MSG_OPTIONS_KEYPAD_MODE_SCIENTIFIC), '2');
+	fAngleModeRadianItem = new BMenuItem(B_TRANSLATE("Radians"),
+		new BMessage(MSG_OPTIONS_ANGLE_MODE_RADIAN));
+	fAngleModeDegreeItem = new BMenuItem(B_TRANSLATE("Degrees"),
+		new BMessage(MSG_OPTIONS_ANGLE_MODE_DEGREE));
+	if (addKeypadModeMenuItems) {
+		fKeypadModeCompactItem = new BMenuItem(B_TRANSLATE("Compact"),
+			new BMessage(MSG_OPTIONS_KEYPAD_MODE_COMPACT), '0');
+		fKeypadModeBasicItem = new BMenuItem(B_TRANSLATE("Basic"),
+			new BMessage(MSG_OPTIONS_KEYPAD_MODE_BASIC), '1');
+		fKeypadModeScientificItem = new BMenuItem(B_TRANSLATE("Scientific"),
+			new BMessage(MSG_OPTIONS_KEYPAD_MODE_SCIENTIFIC), '2');
+	}
 
 	// apply current settings
 	fAutoNumlockItem->SetMarked(fOptions->auto_num_lock);
 	fAudioFeedbackItem->SetMarked(fOptions->audio_feedback);
-	_MarkKeypadItems(fOptions->keypad_mode);
+	fAngleModeRadianItem->SetMarked(!fOptions->degree_mode);
+	fAngleModeDegreeItem->SetMarked(fOptions->degree_mode);
 
 	// construct menu
 	fPopUpMenu = new BPopUpMenu("pop-up", false, false);
 
 	fPopUpMenu->AddItem(fAutoNumlockItem);
-// TODO: Enabled when we use beep events which can be configured in the Sounds
-// preflet.
-//	fPopUpMenu->AddItem(fAudioFeedbackItem);
+	// TODO: Enable this when we use beep events which can be configured
+	// in the Sounds preflet.
+	//fPopUpMenu->AddItem(fAudioFeedbackItem);
 	fPopUpMenu->AddSeparatorItem();
-	fPopUpMenu->AddItem(fKeypadModeCompactItem);
-	fPopUpMenu->AddItem(fKeypadModeBasicItem);
-	fPopUpMenu->AddItem(fKeypadModeScientificItem);
+	fPopUpMenu->AddItem(fAngleModeRadianItem);
+	fPopUpMenu->AddItem(fAngleModeDegreeItem);
+	if (addKeypadModeMenuItems) {
+		fPopUpMenu->AddSeparatorItem();
+		fPopUpMenu->AddItem(fKeypadModeCompactItem);
+		fPopUpMenu->AddItem(fKeypadModeBasicItem);
+		fPopUpMenu->AddItem(fKeypadModeScientificItem);
+		_MarkKeypadItems(fOptions->keypad_mode);
+	}
 }
 
 

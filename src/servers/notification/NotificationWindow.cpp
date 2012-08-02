@@ -10,8 +10,6 @@
  *		Mikael Eiman, mikael@eiman.tv
  *		Pier Luigi Fiorini, pierluigi.fiorini@gmail.com
  */
-
-
 #include "NotificationWindow.h"
 
 #include <algorithm>
@@ -19,20 +17,22 @@
 #include <Alert.h>
 #include <Application.h>
 #include <Catalog.h>
+#include <Deskbar.h>
+#include <Directory.h>
 #include <File.h>
+#include <FindDirectory.h>
 #include <GroupLayout.h>
-#include <GroupLayoutBuilder.h>
-#include <Layout.h>
 #include <NodeMonitor.h>
+#include <Notifications.h>
 #include <Path.h>
 #include <PropertyInfo.h>
-#include <private/interface/WindowPrivate.h>
 
 #include "AppGroupView.h"
 #include "AppUsage.h"
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "NotificationWindow"
+
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "NotificationWindow"
 
 
 property_info main_prop_list[] = {
@@ -100,7 +100,7 @@ NotificationWindow::WorkspaceActivated(int32 /*workspace*/, bool active)
 {
 	// Ensure window is in the correct position
 	if (active)
-		_ResizeAll();
+		SetPosition();
 }
 
 
@@ -189,7 +189,7 @@ NotificationWindow::MessageReceived(BMessage* message)
 
 					group->AddInfo(view);
 
-					_ResizeAll();
+					_ShowHide();
 
 					reply.AddInt32("error", B_OK);
 				} else
@@ -212,8 +212,28 @@ NotificationWindow::MessageReceived(BMessage* message)
 
 			if (it != fViews.end())
 				fViews.erase(it);
+			break;
+		}
+		case kRemoveGroupView:
+		{
+			AppGroupView* view = NULL;
+			if (message->FindPointer("view", (void**)&view) != B_OK)
+				return;
 
-			_ResizeAll();
+			// It's possible that between sending this message, and us receiving
+			// it, the view has become used again, in which case we shouldn't
+			// delete it.
+			if (view->HasChildren())
+				return;
+
+			// this shouldn't happen
+			if (fAppViews.erase(view->Group()) < 1)
+				break;
+
+			if (GetLayout()->RemoveView(view))
+				delete view;
+
+			_ShowHide();
 			break;
 		}
 		default:
@@ -290,41 +310,28 @@ NotificationWindow::Width()
 
 
 void
-NotificationWindow::_ResizeAll()
+NotificationWindow::_ShowHide()
 {
-	appview_t::iterator aIt;
-	bool shouldHide = true;
-
-	for (aIt = fAppViews.begin(); aIt != fAppViews.end(); aIt++) {
-		AppGroupView* app = aIt->second;
-		if (app->HasChildren()) {
-			shouldHide = false;
-			break;
-		}
-	}
-
-	if (shouldHide) {
-		if (!IsHidden())
-			Hide();
+	if (fAppViews.empty() && !IsHidden()) {
+		Hide();
 		return;
 	}
 
-	for (aIt = fAppViews.begin(); aIt != fAppViews.end(); aIt++) {
-		AppGroupView* view = aIt->second;
-
-		if (!view->HasChildren()) {
-			if (!view->IsHidden())
-				view->Hide();
-		} else {
-			if (view->IsHidden())
-				view->Show();
-		}
-	}
-
-	SetPosition();
-
-	if (IsHidden())
+	if (IsHidden()) {
+		SetPosition();
 		Show();
+	}
+}
+
+
+void
+NotificationWindow::NotificationViewSwapped(NotificationView* stale,
+	NotificationView* fresh)
+{
+	views_t::iterator it = find(fViews.begin(), fViews.end(), stale);
+
+	if (it != fViews.end())
+		*it = fresh;
 }
 
 
@@ -524,6 +531,8 @@ NotificationWindow::_LoadDisplaySettings(bool startMonitor)
 
 	if (settings.FindFloat(kWidthName, &fWidth) != B_OK)
 		fWidth = kDefaultWidth;
+	GetLayout()->SetExplicitMaxSize(BSize(fWidth, B_SIZE_UNSET));
+	GetLayout()->SetExplicitMinSize(BSize(fWidth, B_SIZE_UNSET));
 
 	if (settings.FindInt32(kIconSizeName, &setting) != B_OK)
 		fIconSize = kDefaultIconSize;

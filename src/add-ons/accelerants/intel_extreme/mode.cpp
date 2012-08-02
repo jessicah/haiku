@@ -600,6 +600,15 @@ get_color_space_format(const display_mode &mode, uint32 &colorMode,
 static bool
 sanitize_display_mode(display_mode& mode)
 {
+	// Some cards only support even pixel counts, while others require an odd
+	// one.
+	bool olderCard = gInfo->shared_info->device_type.InGroup(INTEL_TYPE_Gxx);
+	olderCard |= gInfo->shared_info->device_type.InGroup(INTEL_TYPE_96x);
+	olderCard |= gInfo->shared_info->device_type.InGroup(INTEL_TYPE_94x);
+	olderCard |= gInfo->shared_info->device_type.InGroup(INTEL_TYPE_91x);
+	olderCard |= gInfo->shared_info->device_type.InFamily(INTEL_TYPE_8xx);
+	olderCard |= gInfo->shared_info->device_type.InFamily(INTEL_TYPE_7xx);
+
 	// TODO: verify constraints - these are more or less taken from the
 	// radeon driver!
 	const display_constraints constraints = {
@@ -609,7 +618,7 @@ sanitize_display_mode(display_mode& mode)
 		gInfo->shared_info->pll_info.min_frequency,
 		gInfo->shared_info->pll_info.max_frequency,
 		// horizontal
-		{2, 0, 8160, 32, 8192, 0, 8192},
+		{olderCard ? 2 : 1, 0, 8160, 32, 8192, 0, 8192},
 		{1, 1, 4092, 2, 63, 1, 4096}
 	};
 
@@ -644,6 +653,25 @@ intel_propose_display_mode(display_mode* target, const display_mode* low,
 	const display_mode* high)
 {
 	TRACE(("intel_propose_display_mode()\n"));
+
+	// first search for the specified mode in the list, if no mode is found
+	// try to fix the target mode in sanitize_display_mode
+	// TODO: Only sanitize_display_mode should be used. However, at the moments
+	// the mode constraints are not optimal and do not work for all
+	// configurations.
+	for (uint32 i = 0; i < gInfo->shared_info->mode_count; i++) {
+		display_mode *mode = &gInfo->mode_list[i];
+		
+		// TODO: improve this, ie. adapt pixel clock to allowed values!!!
+		
+		if (target->virtual_width != mode->virtual_width
+		        || target->virtual_height != mode->virtual_height
+		        || target->space != mode->space)
+		        continue;
+		
+		*target = *mode;
+		return B_OK;
+	}
 
 	sanitize_display_mode(*target);
 

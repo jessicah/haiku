@@ -94,7 +94,8 @@ pci_reserve_device(uchar virtualBus, uchar device, uchar function,
 	status_t status;
 	uint8 bus;
 	int domain;
-	TRACE(("pci_reserve_device(%d, %d, %d, %s)\n", virtualBus, device, function, driverName));
+	TRACE(("pci_reserve_device(%d, %d, %d, %s)\n", virtualBus, device, function,
+		driverName));
 
 	/*
 	 * we add 2 nodes to the PCI devices, one with constant attributes,
@@ -178,7 +179,8 @@ err1:
 	gDeviceManager->put_node(pci);
 err0:
 	gDeviceManager->put_node(root);
-	TRACE(("pci_reserve_device for driver %s failed: %s\n", driverName, strerror(status)));
+	TRACE(("pci_reserve_device for driver %s failed: %s\n", driverName,
+		strerror(status)));
 	return status;
 }
 
@@ -190,7 +192,8 @@ pci_unreserve_device(uchar virtualBus, uchar device, uchar function,
 	status_t status;
 	uint8 bus;
 	int domain;
-	TRACE(("pci_unreserve_device(%d, %d, %d, %s)\n", virtualBus, device, function, driverName));
+	TRACE(("pci_unreserve_device(%d, %d, %d, %s)\n", virtualBus, device,
+		function, driverName));
 
 	if (gPCI->ResolveVirtualBus(virtualBus, &domain, &bus) != B_OK)
 		return B_ERROR;
@@ -274,7 +277,8 @@ err1:
 	gDeviceManager->put_node(pci);
 err0:
 	gDeviceManager->put_node(root);
-	TRACE(("pci_unreserve_device for driver %s failed: %s\n", driverName, strerror(status)));
+	TRACE(("pci_unreserve_device for driver %s failed: %s\n", driverName,
+		strerror(status)));
 	return status;
 }
 
@@ -469,6 +473,7 @@ pci_init(void)
 
 	if (pci_controller_init() != B_OK) {
 		TRACE(("PCI: pci_controller_init failed\n"));
+		panic("PCI: pci_controller_init failed\n");
 		return B_ERROR;
 	}
 
@@ -830,6 +835,15 @@ PCI::_FixupDevices(int domain, uint8 bus)
 	FLOW("PCI: FixupDevices domain %u, bus %u\n", domain, bus);
 
 	int maxBusDevices = _GetDomainData(domain)->max_bus_devices;
+	static int recursed = 0;
+
+	if (recursed++ > 10) {
+		// guard against buggy chipsets
+		// XXX: is there any official limit ?
+		dprintf("PCI: FixupDevices: too many recursions (buggy chipset?)\n");
+		recursed--;
+		return;
+	}
 
 	for (int dev = 0; dev < maxBusDevices; dev++) {
 		uint16 vendorId = ReadConfig(domain, bus, dev, 0, PCI_vendor_id, 2);
@@ -857,9 +871,12 @@ PCI::_FixupDevices(int domain, uint8 bus)
 			int busBehindBridge = ReadConfig(domain, bus, dev, function,
 				PCI_secondary_bus, 1);
 
+			TRACE(("PCI: FixupDevices: checking bus %d behind %04x:%04x\n",
+				busBehindBridge, vendorId, deviceId));
 			_FixupDevices(domain, busBehindBridge);
 		}
 	}
+	recursed--;
 }
 
 
@@ -875,16 +892,21 @@ PCI::_ConfigureBridges(PCIBus *bus)
 			// Enable: Parity Error Response, SERR, Master Abort Mode, Discard
 			// Timer SERR
 			// Clear: Discard Timer Status
-			bridgeControlNew |= (1 << 0) | (1 << 1) | (1 << 5) | (1 << 10)
-				| (1 << 11);
+			bridgeControlNew |= PCI_bridge_parity_error_response
+				| PCI_bridge_serr | PCI_bridge_master_abort
+				| PCI_bridge_discard_timer_status
+				| PCI_bridge_discard_timer_serr;
 			// Set discard timer to 2^15 PCI clocks
-			bridgeControlNew &= ~((1 << 8) | (1 << 9));
+			bridgeControlNew &= ~(PCI_bridge_primary_discard_timeout
+				| PCI_bridge_secondary_discard_timeout);
 			WriteConfig(dev->domain, dev->bus, dev->device, dev->function,
 				PCI_bridge_control, 2, bridgeControlNew);
 			bridgeControlNew = ReadConfig(dev->domain, dev->bus, dev->device,
 				dev->function, PCI_bridge_control, 2);
-			dprintf("PCI: dom %u, bus %u, dev %2u, func %u, changed PCI bridge control from 0x%04x to 0x%04x\n",
-				dev->domain, dev->bus, dev->device, dev->function, bridgeControlOld, bridgeControlNew);
+			dprintf("PCI: dom %u, bus %u, dev %2u, func %u, changed PCI bridge"
+				" control from 0x%04x to 0x%04x\n", dev->domain, dev->bus,
+				dev->device, dev->function, bridgeControlOld,
+				bridgeControlNew);
 		}
 
 		if (dev->child)
@@ -909,22 +931,23 @@ PCI::ClearDeviceStatus(PCIBus *bus, bool dumpStatus)
 		// Clear and dump PCI device status
 		uint16 status = ReadConfig(dev->domain, dev->bus, dev->device,
 			dev->function, PCI_status, 2);
-		WriteConfig(dev->domain, dev->bus, dev->device, dev->function, PCI_status,
-			2, status);
+		WriteConfig(dev->domain, dev->bus, dev->device, dev->function,
+			PCI_status, 2, status);
 		if (dumpStatus) {
-			kprintf("domain %u, bus %u, dev %2u, func %u, PCI device status 0x%04x\n",
-				dev->domain, dev->bus, dev->device, dev->function, status);
-			if (status & (1 << 15))
+			kprintf("domain %u, bus %u, dev %2u, func %u, PCI device status "
+				"0x%04x\n", dev->domain, dev->bus, dev->device, dev->function,
+				status);
+			if (status & PCI_status_parity_error_detected)
 				kprintf("  Detected Parity Error\n");
-			if (status & (1 << 14))
+			if (status & PCI_status_serr_signalled)
 				kprintf("  Signalled System Error\n");
-			if (status & (1 << 13))
+			if (status & PCI_status_master_abort_received)
 				kprintf("  Received Master-Abort\n");
-			if (status & (1 << 12))
+			if (status & PCI_status_target_abort_received)
 				kprintf("  Received Target-Abort\n");
-			if (status & (1 << 11))
+			if (status & PCI_status_target_abort_signalled)
 				kprintf("  Signalled Target-Abort\n");
-			if (status & (1 << 8))
+			if (status & PCI_status_parity_signalled)
 				kprintf("  Master Data Parity Error\n");
 		}
 
@@ -936,19 +959,20 @@ PCI::ClearDeviceStatus(PCIBus *bus, bool dumpStatus)
 			WriteConfig(dev->domain, dev->bus, dev->device, dev->function,
 				PCI_secondary_status, 2, secondaryStatus);
 			if (dumpStatus) {
-				kprintf("domain %u, bus %u, dev %2u, func %u, PCI bridge secondary status 0x%04x\n",
-					dev->domain, dev->bus, dev->device, dev->function, secondaryStatus);
-				if (secondaryStatus & (1 << 15))
+				kprintf("domain %u, bus %u, dev %2u, func %u, PCI bridge "
+					"secondary status 0x%04x\n", dev->domain, dev->bus,
+					dev->device, dev->function, secondaryStatus);
+				if (secondaryStatus & PCI_status_parity_error_detected)
 					kprintf("  Detected Parity Error\n");
-				if (secondaryStatus & (1 << 14))
+				if (secondaryStatus & PCI_status_serr_signalled)
 					kprintf("  Received System Error\n");
-				if (secondaryStatus & (1 << 13))
+				if (secondaryStatus & PCI_status_master_abort_received)
 					kprintf("  Received Master-Abort\n");
-				if (secondaryStatus & (1 << 12))
+				if (secondaryStatus & PCI_status_target_abort_received)
 					kprintf("  Received Target-Abort\n");
-				if (secondaryStatus & (1 << 11))
+				if (secondaryStatus & PCI_status_target_abort_signalled)
 					kprintf("  Signalled Target-Abort\n");
-				if (secondaryStatus & (1 << 8))
+				if (secondaryStatus & PCI_status_parity_signalled)
 					kprintf("  Data Parity Reported\n");
 			}
 
@@ -958,9 +982,10 @@ PCI::ClearDeviceStatus(PCIBus *bus, bool dumpStatus)
 			WriteConfig(dev->domain, dev->bus, dev->device, dev->function,
 				PCI_bridge_control, 2, bridgeControl);
 			if (dumpStatus) {
-				kprintf("domain %u, bus %u, dev %2u, func %u, PCI bridge control 0x%04x\n",
-					dev->domain, dev->bus, dev->device, dev->function, bridgeControl);
-				if (bridgeControl & (1 << 10)) {
+				kprintf("domain %u, bus %u, dev %2u, func %u, PCI bridge "
+					"control 0x%04x\n", dev->domain, dev->bus, dev->device,
+					dev->function, bridgeControl);
+				if (bridgeControl & PCI_bridge_discard_timer_status) {
 					kprintf("  bridge-control: Discard Timer Error\n");
 				}
 			}
@@ -981,6 +1006,15 @@ PCI::_DiscoverBus(PCIBus *bus)
 	FLOW("PCI: DiscoverBus, domain %u, bus %u\n", bus->domain, bus->bus);
 
 	int maxBusDevices = _GetDomainData(bus->domain)->max_bus_devices;
+	static int recursed = 0;
+
+	if (recursed++ > 10) {
+		// guard against buggy chipsets
+		// XXX: is there any official limit ?
+		dprintf("PCI: DiscoverBus: too many recursions (buggy chipset?)\n");
+		recursed--;
+		return;
+	}
 
 	for (int dev = 0; dev < maxBusDevices; dev++) {
 		uint16 vendorID = ReadConfig(bus->domain, bus->bus, dev, 0,
@@ -995,6 +1029,7 @@ PCI::_DiscoverBus(PCIBus *bus)
 
 	if (bus->next)
 		_DiscoverBus(bus->next);
+	recursed--;
 }
 
 

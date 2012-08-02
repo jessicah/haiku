@@ -225,7 +225,7 @@ switch $(HAIKU_CPU) {
 	case arm :
 	{
 		HAIKU_DEFINES += __ARM__ ;
-		HAIKU_BOOT_PLATFORM = u-boot ;
+		HAIKU_BOOT_PLATFORM ?= u-boot ;
 		HAIKU_BOOT_BOARD ?= verdex ;
 		HAIKU_BOOT_FLOPPY_IMAGE_SIZE = 1440 ;
 			# in kB (there is not really a floppy on the gumstix ;) )
@@ -293,6 +293,13 @@ switch $(HAIKU_CPU) {
 	case * :
 		Exit "Currently unsupported target CPU:" $(HAIKU_CPU) ;
 }
+
+# Include embedded board-specific file.
+if $(HAIKU_BOOT_BOARD) {
+	include [ FDirName $(HAIKU_BUILD_RULES_DIR) board $(HAIKU_BOOT_BOARD)
+		BoardSetup ] ;
+}
+
 HAIKU_ARCH ?= $(HAIKU_CPU) ;
 HAIKU_ARCH_MACRO_DEFINE = ARCH_$(HAIKU_ARCH) ;
 HAIKU_DEFINES += $(HAIKU_ARCH_MACRO_DEFINE) ;
@@ -477,7 +484,7 @@ HAIKU_SELECT_UNAME_ETC_LIB = ;	# libroot, against which we link anyway
 
 
 # locale libraries
-HAIKU_LOCALE_LIBS = liblocale.so liblocalestub.a ;
+HAIKU_LOCALE_LIBS = liblocalestub.a ;
 
 
 # library and executable glue code
@@ -525,9 +532,9 @@ HAIKU_BUILD_DESCRIPTION ?= "Unknown Build" ;
 # init library name map
 {
 	local i ;
-	for i in be bnetapi debug game GL locale mail media midi midi2 network
-			opengl package root screensaver textencoding tracker translation
-			z {
+	for i in be bnetapi debug device game GL locale mail media midi midi2
+			network opengl package root screensaver textencoding tracker
+			translation z {
 		HAIKU_LIBRARY_NAME_MAP_$(i) = lib$(i).so ;
 	}
 	HAIKU_LIBRARY_NAME_MAP_libstdc++ = $(HAIKU_LIBSTDC++) ;
@@ -600,6 +607,13 @@ if $(HOST_PLATFORM) = linux || $(HOST_PLATFORM) = freebsd
 	if $(LEX) = lex {
 		LEX = flex ;
 	}
+}
+
+# On recent versions of OS X cc and c++ point to clang, which fails to
+# compile some of the host tools. As a workaround, force use of GCC.
+if $(HOST_PLATFORM) = darwin {
+	HOST_CC = gcc ;
+	HOST_C++ = g++ ;
 }
 
 if $(HOST_PLATFORM) = cygwin {
@@ -904,6 +918,7 @@ if ! $(HOST_PLATFORM_BEOS_COMPATIBLE) {
 		[ FDirName $(HAIKU_TOP) headers build os drivers ]
 		[ FDirName $(HAIKU_TOP) headers build os kernel ]
 		[ FDirName $(HAIKU_TOP) headers build os interface ]
+		[ FDirName $(HAIKU_TOP) headers build os locale ]
 		[ FDirName $(HAIKU_TOP) headers build os opengl ]
 		[ FDirName $(HAIKU_TOP) headers build os storage ]
 		[ FDirName $(HAIKU_TOP) headers build os support ]
@@ -1067,7 +1082,7 @@ if ! $(TARGET_PLATFORM_HAIKU_COMPATIBLE) && $(TARGET_PLATFORM_BEOS_COMPATIBLE) {
 if $(TARGET_PLATFORM) = libbe_test {
 	# headers and flags
 	TARGET_HDRS +=
-		[ PublicHeaders $(DOT) app drivers game interface kernel storage
+		[ PublicHeaders $(DOT) app drivers game interface kernel locale storage
 			support ]
 		[ PrivateHeaders $(DOT) ] ;
 	TARGET_DEFINES += __HAIKU__ ;
@@ -1185,22 +1200,22 @@ AUTO_SET_UP_CONFIG_VARIABLES +=
 
 
 # enable -Werror for certain parts of the source tree
-
-if $(HAIKU_GCC_VERSION[1]) = 2 {
-	rule EnableWerror dirTokens : scope {
-		AppendToConfigVar CCFLAGS : HAIKU_TOP $(dirTokens) : -Werror
-			: $(scope) ;
-		AppendToConfigVar C++FLAGS : HAIKU_TOP $(dirTokens) : -Werror
-			: $(scope) ;
-	}
-} else {
+HAIKU_WERRORFLAGS = ;
+if $(HAIKU_GCC_VERSION[1]) >= 4 {
 	# -Wuninitialized gives too many false positives.
-	rule EnableWerror dirTokens : scope {
-		AppendToConfigVar CCFLAGS : HAIKU_TOP $(dirTokens)
-			: -Werror -Wno-error=uninitialized : $(scope) ;
-		AppendToConfigVar C++FLAGS : HAIKU_TOP $(dirTokens)
-			: -Werror -Wno-error=uninitialized : $(scope) ;
+	HAIKU_WERRORFLAGS = -Wno-error=uninitialized ;
+
+	if $(HAIKU_GCC_VERSION[2]) >= 6 {
+		# TODO: remove the -Wno-unused-but-set-variable option
+		HAIKU_WERRORFLAGS += -Wno-unused-but-set-variable ;
 	}
+}
+
+rule EnableWerror dirTokens : scope {
+	AppendToConfigVar CCFLAGS : HAIKU_TOP $(dirTokens)
+		: -Werror $(HAIKU_WERRORFLAGS) : $(scope) ;
+	AppendToConfigVar C++FLAGS : HAIKU_TOP $(dirTokens)
+		: -Werror $(HAIKU_WERRORFLAGS) : $(scope) ;
 }
 
 # Work-around for GCC 2 problem -- despite -Wno-multichar it reports
@@ -1222,7 +1237,7 @@ if $(HAIKU_NO_WERROR) != 1 {
 #	EnableWerror src add-ons accelerants nvidia ;
 	EnableWerror src add-ons accelerants nvidia_gpgpu ;
 #	EnableWerror src add-ons accelerants radeon ;
-	EnableWerror src add-ons accelerants radeon_hd ;
+#	EnableWerror src add-ons accelerants radeon_hd ;
 	EnableWerror src add-ons accelerants s3 ;
 	EnableWerror src add-ons accelerants skeleton ;
 	EnableWerror src add-ons accelerants vesa ;
@@ -1239,7 +1254,7 @@ if $(HAIKU_NO_WERROR) != 1 {
 	EnableWerror src add-ons kernel bus_managers agp_gart ;
 	EnableWerror src add-ons kernel bus_managers ata ;
 	EnableWerror src add-ons kernel bus_managers config_manager ;
-	EnableWerror src add-ons kernel bus_managers firewire ;
+#	EnableWerror src add-ons kernel bus_managers firewire ;
 	EnableWerror src add-ons kernel bus_managers isa ;
 	EnableWerror src add-ons kernel bus_managers pci ;
 #	EnableWerror src add-ons kernel bus_managers ps2 ; # gcc2
@@ -1352,10 +1367,10 @@ if $(HAIKU_NO_WERROR) != 1 {
 	EnableWerror src add-ons translators rtf ;
 	EnableWerror src add-ons translators sgi ;
 	EnableWerror src add-ons translators shared ;
-	EnableWerror src add-ons translators stxt ;
+#	EnableWerror src add-ons translators stxt ;
 	EnableWerror src add-ons translators tga ;
 	EnableWerror src add-ons translators tiff ;
-	EnableWerror src add-ons translators wonderbrush ;
+#	EnableWerror src add-ons translators wonderbrush ;
 	EnableWerror src add-ons print ;
 	EnableWerror src bin package ;
 	EnableWerror src apps ;
@@ -1369,3 +1384,18 @@ if $(HAIKU_NO_WERROR) != 1 {
 	EnableWerror src system runtime_loader ;
 }
 
+# The following directories cannot currently be compiled with DEBUG=1
+SetConfigVar DEBUG : HAIKU_TOP src add-ons disk_systems bfs : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel drivers audio hda : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel drivers audio ac97 auich : 0 : local ; # fails with gcc4 only
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel drivers audio ac97 auvia : 0 : local ; # fails with gcc4 only
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel drivers audio ac97 sis7018 : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel file_systems btrfs : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel file_systems ntfs libntfs : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons kernel file_systems udf : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons media media-add-ons dvb : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src add-ons print drivers gutenprint : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src servers input : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src servers media_addon : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src system boot loader file_systems bfs : 0 : local ;
+SetConfigVar DEBUG : HAIKU_TOP src system boot loader file_systems tarfs : 0 : local ;

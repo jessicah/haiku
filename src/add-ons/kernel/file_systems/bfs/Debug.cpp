@@ -277,7 +277,7 @@ static int
 dump_inode(int argc, char** argv)
 {
 	bool block = false;
-	if (argc == 3 && !strcmp(argv[1], "-b"))
+	if (argc >= 3 && !strcmp(argv[1], "-b"))
 		block = true;
 
 	if (argc != 2 + (block ? 1 : 0) || !strcmp(argv[1], "--help")) {
@@ -373,7 +373,8 @@ static int
 dump_block_run_array(int argc, char** argv)
 {
 	if (argc < 2 || !strcmp(argv[1], "--help")) {
-		kprintf("usage: %s <ptr-to-array> [number-of-runs]\n", argv[0]);
+		kprintf("usage: %s <ptr-to-array> [number-of-runs] [block-size] "
+			"[start-offset] [search-offset]\n", argv[0]);
 		return 0;
 	}
 
@@ -382,9 +383,32 @@ dump_block_run_array(int argc, char** argv)
 	if (argc > 2)
 		count = parse_expression(argv[2]);
 
+	uint32 blockSize = 0;
+	if (argc > 3)
+		blockSize = parse_expression(argv[3]);
+
+	off_t offset = 0;
+	if (argc > 4)
+		offset = parse_expression(argv[4]);
+
+	off_t searchOffset = 0;
+	if (argc > 5)
+		searchOffset = parse_expression(argv[5]);
+
 	for (uint32 i = 0; i < count; i++) {
-		dprintf("[%3lu]  ", i);
+		if (blockSize != 0)
+			dprintf("[%3lu]  %10" B_PRIdOFF "  ", i, offset);
+		else
+			dprintf("[%3lu]  ", i);
+
+		uint32 size = runs[i].Length() * blockSize;
+		if (searchOffset != 0 && searchOffset >= offset
+			&& searchOffset < offset + size)
+			dprintf("*  ");
+
 		dump_block_run("", runs[i]);
+
+		offset += size;
 	}
 
 	return 0;

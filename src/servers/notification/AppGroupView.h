@@ -32,9 +32,9 @@ public:
 
 			void				AddInfo(NotificationView* view);
 
-private:
-			void				_ResizeViews();
+			const BString&		Group() const;
 
+private:
 			BString				fLabel;
 			NotificationWindow*	fParent;
 			infoview_t			fInfo;

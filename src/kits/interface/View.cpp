@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2010, Haiku.
+ * Copyright 2001-2012, Haiku.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
@@ -34,6 +34,7 @@
 #include <MenuBar.h>
 #include <Message.h>
 #include <MessageQueue.h>
+#include <ObjectList.h>
 #include <Picture.h>
 #include <Point.h>
 #include <Polygon.h>
@@ -335,6 +336,7 @@ struct BView::LayoutData {
 		fLayoutInvalidationDisabled(0),
 		fLayout(NULL),
 		fLayoutContext(NULL),
+		fLayoutItems(5, false),
 		fLayoutValid(true),		// TODO: Rethink these initial values!
 		fMinMaxValid(true),		//
 		fLayoutInProgress(false),
@@ -375,6 +377,7 @@ struct BView::LayoutData {
 	int				fLayoutInvalidationDisabled;
 	BLayout*		fLayout;
 	BLayoutContext*	fLayoutContext;
+	BObjectList<BLayoutItem> fLayoutItems;
 	bool			fLayoutValid;
 	bool			fMinMaxValid;
 	bool			fLayoutInProgress;
@@ -996,7 +999,7 @@ BView::Hide()
 	}
 	fShowLevel++;
 
-	if (fShowLevel == 1 && fParent)
+	if (fShowLevel == 1)
 		_InvalidateParentLayout();
 }
 
@@ -1011,7 +1014,7 @@ BView::Show()
 		fOwner->fLink->Flush();
 	}
 
-	if (fShowLevel == 0 && fParent)
+	if (fShowLevel == 0)
 		_InvalidateParentLayout();
 }
 
@@ -3634,6 +3637,9 @@ BView::EndPicture()
 			fCurrentPicture = picture->StepDown();
 			picture->SetToken(token);
 
+			// TODO do this more efficient e.g. use a shared area and let the
+			// client write into it
+			picture->_Download();
 			return picture;
 		}
 	}
@@ -4019,8 +4025,17 @@ BView::PreviousSibling() const
 bool
 BView::RemoveSelf()
 {
-	if (fParent && fParent->fLayoutData->fLayout)
-		return fParent->fLayoutData->fLayout->RemoveViewRecursive(this);
+	if (fParent && fParent->fLayoutData->fLayout) {
+		int32 itemsRemaining = fLayoutData->fLayoutItems.CountItems();
+		while (itemsRemaining-- > 0) {
+			BLayoutItem* item = fLayoutData->fLayoutItems.ItemAt(0);
+				// always remove item at index 0, since items are shuffled
+				// downwards by BObjectList
+			item->Layout()->RemoveItem(item);
+				// removes item from fLayoutItems list
+			delete item;
+		}
+	}
 
 	return _RemoveSelf();
 }
@@ -4335,31 +4350,12 @@ BView::MessageReceived(BMessage* msg)
 				if (deltaX == 0.0f && deltaY == 0.0f)
 					break;
 
-				float smallStep, largeStep;
 				if (horizontal != NULL) {
-					horizontal->GetSteps(&smallStep, &largeStep);
-
-					// pressing the option/command/control key scrolls faster
-					if (modifiers()
-						& (B_OPTION_KEY | B_COMMAND_KEY | B_CONTROL_KEY)) {
-						deltaX *= largeStep;
-					} else
-						deltaX *= smallStep * 3;
-
-					horizontal->SetValue(horizontal->Value() + deltaX);
+					ScrollWithMouseWheelDelta(horizontal, deltaX);
 				}
 
 				if (vertical != NULL) {
-					vertical->GetSteps(&smallStep, &largeStep);
-
-					// pressing the option/command/control key scrolls faster
-					if (modifiers()
-						& (B_OPTION_KEY | B_COMMAND_KEY | B_CONTROL_KEY)) {
-						deltaY *= largeStep;
-					} else
-						deltaY *= smallStep * 3;
-
-					vertical->SetValue(vertical->Value() + deltaY);
+					ScrollWithMouseWheelDelta(vertical, deltaY);
 				}
 				break;
 			}
@@ -4472,16 +4468,21 @@ BView::Perform(perform_code code, void* _data)
 			BView::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BView::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BView::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
 		{
 			BView::DoLayout();
+			return B_OK;
+		}
+		case PERFORM_CODE_LAYOUT_CHANGED:
+		{
+			BView::LayoutChanged();
 			return B_OK;
 		}
 		case PERFORM_CODE_GET_TOOL_TIP_AT:
@@ -4683,31 +4684,29 @@ BView::InvalidateLayout(bool descendants)
 	//	this, descendants, fLayoutData->fLayoutValid,
 	//	fLayoutData->fLayoutInProgress);
 
-	if (fLayoutData->fMinMaxValid && !fLayoutData->fLayoutInProgress
- 		&& fLayoutData->fLayoutInvalidationDisabled == 0) {
+	if (!fLayoutData->fMinMaxValid || fLayoutData->fLayoutInProgress
+ 			|| fLayoutData->fLayoutInvalidationDisabled > 0) {
+		return;
+	}
 
-		fLayoutData->fLayoutValid = false;
-		fLayoutData->fMinMaxValid = false;
+	fLayoutData->fLayoutValid = false;
+	fLayoutData->fMinMaxValid = false;
+	LayoutInvalidated(descendants);
 
-		if (descendants) {
-			for (BView* child = fFirstChild;
-				child; child = child->fNextSibling) {
-				child->InvalidateLayout(descendants);
-			}
-		}
-
-		if (fLayoutData->fLayout && fLayoutData->fLayout->InvalidationLegal())
-			fLayoutData->fLayout->InvalidateLayout(descendants);
-		else if (!fLayoutData->fLayout && fParent) {
-			_InvalidateParentLayout();
-		}
-
-		if (fTopLevelView) {
-			// trigger layout process
-			if (fOwner)
-				fOwner->PostMessage(B_LAYOUT_WINDOW);
+	if (descendants) {
+		for (BView* child = fFirstChild;
+			child; child = child->fNextSibling) {
+			child->InvalidateLayout(descendants);
 		}
 	}
+
+	if (fLayoutData->fLayout)
+		fLayoutData->fLayout->InvalidateLayout(descendants);
+	else
+		_InvalidateParentLayout();
+
+	if (fTopLevelView && fOwner)
+		fOwner->PostMessage(B_LAYOUT_WINDOW);
 }
 
 
@@ -4723,6 +4722,15 @@ void
 BView::DisableLayoutInvalidation()
 {
 	fLayoutData->fLayoutInvalidationDisabled++;
+}
+
+
+bool
+BView::IsLayoutInvalidationDisabled()
+{
+	if (fLayoutData->fLayoutInvalidationDisabled > 0)
+		return true;
+	return false;
 }
 
 
@@ -4782,6 +4790,13 @@ BView::Relayout()
 
 
 void
+BView::LayoutInvalidated(bool descendants)
+{
+	// hook method
+}
+
+
+void
 BView::DoLayout()
 {
 	if (fLayoutData->fLayout)
@@ -4792,9 +4807,10 @@ BView::DoLayout()
 void
 BView::SetToolTip(const char* text)
 {
-	// TODO: temporary work-around for bug #5669
-	HideToolTip();
-	SetToolTip(static_cast<BToolTip*>(NULL));
+	if (text == NULL || text[0] == '\0') {
+		SetToolTip((BToolTip*)NULL);
+		return;
+	}
 
 	if (BTextToolTip* tip = dynamic_cast<BTextToolTip*>(fToolTip))
 		tip->SetText(text);
@@ -4808,10 +4824,14 @@ BView::SetToolTip(BToolTip* tip)
 {
 	if (fToolTip == tip)
 		return;
+	else if (tip == NULL)
+		HideToolTip();
 
 	if (fToolTip != NULL)
 		fToolTip->ReleaseReference();
+
 	fToolTip = tip;
+
 	if (fToolTip != NULL)
 		fToolTip->AcquireReference();
 }
@@ -4830,12 +4850,10 @@ BView::ShowToolTip(BToolTip* tip)
 	if (tip == NULL)
 		return;
 
-	fVisibleToolTip = tip;
-
 	BPoint where;
 	GetMouse(&where, NULL, false);
 
-	BToolTipManager::Manager()->ShowTip(tip, ConvertToScreen(where));
+	BToolTipManager::Manager()->ShowTip(tip, ConvertToScreen(where), this);
 }
 
 
@@ -4843,17 +4861,12 @@ void
 BView::HideToolTip()
 {
 	BToolTipManager::Manager()->HideTip();
-	fVisibleToolTip = NULL;
 }
 
 
 bool
 BView::GetToolTipAt(BPoint point, BToolTip** _tip)
 {
-	if (fVisibleToolTip != NULL) {
-		*_tip = fVisibleToolTip;
-		return true;
-	}
 	if (fToolTip != NULL) {
 		*_tip = fToolTip;
 		return true;
@@ -4861,6 +4874,13 @@ BView::GetToolTipAt(BPoint point, BToolTip** _tip)
 
 	*_tip = NULL;
 	return false;
+}
+
+
+void
+BView::LayoutChanged()
+{
+	// hook method
 }
 
 
@@ -4894,6 +4914,8 @@ BView::_Layout(bool force, BLayoutContext* context)
 				child->_Layout(force, context);
 		}
 
+		LayoutChanged();
+
 		fLayoutData->fLayoutContext = oldContext;
 
 		// invalidate the drawn content, if requested
@@ -4919,13 +4941,19 @@ BView::_LayoutLeft(BLayout* deleted)
 void
 BView::_InvalidateParentLayout()
 {
+	if (!fParent)
+		return;
+
 	BLayout* layout = fLayoutData->fLayout;
 	BLayout* layoutParent = layout ? layout->Layout() : NULL;
-	if (layoutParent && layoutParent->InvalidationLegal()) {
-		layout->Layout()->InvalidateLayout();
-	} else if (fParent && fParent->fLayoutData->fLayout) {
-		fParent->fLayoutData->fLayout->InvalidateLayoutsForView(this);
-	} else if (fParent) {
+	if (layoutParent) {
+		layoutParent->InvalidateLayout();
+	} else if (fLayoutData->fLayoutItems.CountItems() > 0) {
+		int32 count = fLayoutData->fLayoutItems.CountItems();
+		for (int32 i = 0; i < count; i++) {
+			fLayoutData->fLayoutItems.ItemAt(i)->Layout()->InvalidateLayout();
+		}
+	} else {
 		fParent->InvalidateLayout();
 	}
 }
@@ -4995,7 +5023,6 @@ BView::_InitData(BRect frame, const char* name, uint32 resizingMode,
 	fLayoutData = new LayoutData;
 
 	fToolTip = NULL;
-	fVisibleToolTip = NULL;
 }
 
 
@@ -5675,6 +5702,26 @@ BView::_SwitchServerCurrentView() const
 }
 
 
+void
+BView::ScrollWithMouseWheelDelta(BScrollBar* scrollBar, float delta)
+{
+	if (scrollBar == NULL || delta == 0.0f)
+		return;
+
+	float smallStep, largeStep;
+	scrollBar->GetSteps(&smallStep, &largeStep);
+
+	// pressing the option/command/control key scrolls faster
+	if (modifiers()
+			& (B_OPTION_KEY | B_COMMAND_KEY | B_CONTROL_KEY)) {
+		delta *= largeStep;
+	} else
+		delta *= smallStep * 3;
+
+	scrollBar->SetValue(scrollBar->Value() + delta);
+}
+
+
 #if __GNUC__ == 2
 
 
@@ -5763,10 +5810,10 @@ _ReservedView8__5BView(BView* view, BLayout* layout)
 extern "C" void
 _ReservedView9__5BView(BView* view, bool descendants)
 {
-	// InvalidateLayout()
-	perform_data_invalidate_layout data;
+	// LayoutInvalidated()
+	perform_data_layout_invalidated data;
 	data.descendants = descendants;
-	view->Perform(PERFORM_CODE_INVALIDATE_LAYOUT, &data);
+	view->Perform(PERFORM_CODE_LAYOUT_INVALIDATED, &data);
 }
 
 
@@ -5778,8 +5825,12 @@ _ReservedView10__5BView(BView* view)
 }
 
 
+#endif	// __GNUC__ == 2
+
+
 extern "C" bool
-_ReservedView11__5BView(BView* view, BPoint point, BToolTip** _toolTip)
+B_IF_GCC_2(_ReservedView11__5BView, _ZN5BView15_ReservedView11Ev)(
+	BView* view, BPoint point, BToolTip** _toolTip)
 {
 	// GetToolTipAt()
 	perform_data_get_tool_tip_at data;
@@ -5790,24 +5841,15 @@ _ReservedView11__5BView(BView* view, BPoint point, BToolTip** _toolTip)
 }
 
 
-#elif __GNUC__ > 2
-
-
-extern "C" bool
-_ZN5BView15_ReservedView11Ev(BView* view, BPoint point, BToolTip** _toolTip)
+extern "C" void
+B_IF_GCC_2(_ReservedView12__5BView, _ZN5BView15_ReservedView12Ev)(
+	BView* view)
 {
-	// GetToolTipAt()
-	perform_data_get_tool_tip_at data;
-	data.point = point;
-	data.tool_tip = _toolTip;
-	view->Perform(PERFORM_CODE_GET_TOOL_TIP_AT, &data);
-	return data.return_value;
+	// LayoutChanged();
+	view->Perform(PERFORM_CODE_LAYOUT_CHANGED, NULL);
 }
 
 
-#endif	// __GNUC__ > 2
-
-void BView::_ReservedView12() {}
 void BView::_ReservedView13() {}
 void BView::_ReservedView14() {}
 void BView::_ReservedView15() {}
@@ -5957,6 +5999,34 @@ BView::_PrintTree()
 
 
 // #pragma mark -
+
+
+BLayoutItem*
+BView::Private::LayoutItemAt(int32 index)
+{
+	return fView->fLayoutData->fLayoutItems.ItemAt(index);
+}
+
+
+int32
+BView::Private::CountLayoutItems()
+{
+	return fView->fLayoutData->fLayoutItems.CountItems();
+}
+
+
+void
+BView::Private::RegisterLayoutItem(BLayoutItem* item)
+{
+	fView->fLayoutData->fLayoutItems.AddItem(item);
+}
+
+
+void
+BView::Private::DeregisterLayoutItem(BLayoutItem* item)
+{
+	fView->fLayoutData->fLayoutItems.RemoveItem(item);
+}
 
 
 bool

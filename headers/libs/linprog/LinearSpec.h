@@ -11,6 +11,7 @@
 
 #include <List.h>
 #include <OS.h>
+#include <Referenceable.h>
 #include <Size.h>
 #include <String.h>
 #include <SupportDefs.h>
@@ -54,6 +55,13 @@ public:
 	virtual	BSize				MinSize(Variable* width, Variable* height) = 0;
 	virtual	BSize				MaxSize(Variable* width, Variable* height) = 0;
 
+	virtual	ResultType			FindMins(const VariableList* variables) = 0;
+	virtual	ResultType			FindMaxs(const VariableList* variables) = 0;
+
+	virtual	void				GetRangeConstraints(const Variable* var,
+									const Constraint** _min,
+									const Constraint** _max) const = 0;
+
 protected:
 			LinearSpec*			fLinearSpec; 
 };
@@ -62,7 +70,7 @@ protected:
 /*!
  * Specification of a linear programming problem.
  */
-class LinearSpec {
+class LinearSpec : public BReferenceable {
 public:
 								LinearSpec();
 	virtual						~LinearSpec();
@@ -121,6 +129,9 @@ public:
 			BSize				MinSize(Variable* width, Variable* height);
 			BSize				MaxSize(Variable* width, Variable* height);
 
+			ResultType			FindMins(const VariableList* variables);
+			ResultType			FindMaxs(const VariableList* variables);
+
 			ResultType			Solve();
 			bool				Save(const char* fileName);
 
@@ -131,6 +142,9 @@ public:
 
 			BString				ToString() const;
 
+			void				GetRangeConstraints(const Variable*,
+									const Constraint** _min,
+								   	const Constraint** _max) const;
 	const	ConstraintList&		Constraints() const;
 	const	VariableList&		UsedVariables() const;
 	const	VariableList&		AllVariables() const;

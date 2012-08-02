@@ -4,6 +4,7 @@
  *
  * Copyright 2001-2002, Travis Geiselbrecht. All rights reserved.
  * Distributed under the terms of the NewOS License.
+ *
  */
 
 
@@ -26,6 +27,7 @@
 #include <vm/VMAddressSpace.h>
 
 #include <arch_system_info.h>
+#include <arch/x86/apic.h>
 #include <arch/x86/selector.h>
 #include <boot/kernel_args.h>
 
@@ -63,6 +65,11 @@ static const struct cpu_vendor_info vendor_info[VENDOR_NUM] = {
 #define CR4_OS_FXSR				(1UL << 9)
 #define CR4_OS_XMM_EXCEPTION	(1UL << 10)
 
+#define K8_SMIONCMPHALT			(1ULL << 27)
+#define K8_C1EONCMPHALT			(1ULL << 28)
+
+#define K8_CMPHALT				(K8_SMIONCMPHALT | K8_C1EONCMPHALT)
+
 struct set_mtrr_parameter {
 	int32	index;
 	uint64	base;
@@ -81,6 +88,7 @@ extern "C" void reboot(void);
 	// from arch_x86.S
 
 void (*gX86SwapFPUFunc)(void *oldState, const void *newState);
+void (*gCpuIdleFunc)(void);
 bool gHasSSE = false;
 
 static uint32 sCpuRendezvous;
@@ -136,7 +144,7 @@ acpi_shutdown(bool rebootSystem)
 		status = acpi->prepare_sleep_state(ACPI_POWER_STATE_OFF, NULL, 0);
 		if (status == B_OK) {
 			//cpu_status state = disable_interrupts();
-			status = acpi->enter_sleep_state(ACPI_POWER_STATE_OFF);
+			status = acpi->enter_sleep_state(ACPI_POWER_STATE_OFF, 0);
 			//restore_interrupts(state);
 		}
 	}
@@ -299,14 +307,25 @@ x86_set_mtrrs(uint8 defaultType, const x86_mtrr_info* infos, uint32 count)
 }
 
 
-extern "C" void
-init_sse(void)
+void
+x86_init_fpu(void)
 {
-	if (!x86_check_feature(IA32_FEATURE_SSE, FEATURE_COMMON)
-		|| !x86_check_feature(IA32_FEATURE_FXSR, FEATURE_COMMON)) {
-		// we don't have proper SSE support
+	if (!x86_check_feature(IA32_FEATURE_FPU, FEATURE_COMMON)) {
+		// No FPU... time to install one in your 386?
+		dprintf("%s: Warning: CPU has no reported FPU.\n", __func__);
+		gX86SwapFPUFunc = i386_noop_swap;
 		return;
 	}
+
+	if (!x86_check_feature(IA32_FEATURE_SSE, FEATURE_COMMON)
+		|| !x86_check_feature(IA32_FEATURE_FXSR, FEATURE_COMMON)) {
+		dprintf("%s: CPU has no SSE... just enabling FPU.\n", __func__);
+		// we don't have proper SSE support, just enable FPU
+		x86_write_cr0(x86_read_cr0() & ~(CR0_FPU_EMULATION | CR0_MONITOR_FPU));
+		gX86SwapFPUFunc = i386_fnsave_swap;
+		return;
+	}
+	dprintf("%s: CPU has SSE... enabling FXSR and XMM.\n", __func__);
 
 	// enable OS support for SSE
 	x86_write_cr4(x86_read_cr4() | CR4_OS_FXSR | CR4_OS_XMM_EXCEPTION);
@@ -498,6 +517,22 @@ dump_feature_string(int currentCPU, cpu_ent *cpu)
 		strlcat(features, "3dnowext ", sizeof(features));
 	if (cpu->arch.feature[FEATURE_EXT_AMD] & IA32_FEATURE_AMD_EXT_3DNOW)
 		strlcat(features, "3dnow ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_EAX] & IA32_FEATURE_DTS)
+		strlcat(features, "dts ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_EAX] & IA32_FEATURE_ITB)
+		strlcat(features, "itb ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_EAX] & IA32_FEATURE_ARAT)
+		strlcat(features, "arat ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_EAX] & IA32_FEATURE_PLN)
+		strlcat(features, "pln ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_EAX] & IA32_FEATURE_ECMD)
+		strlcat(features, "ecmd ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_EAX] & IA32_FEATURE_PTM)
+		strlcat(features, "ptm ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_ECX] & IA32_FEATURE_APERFMPERF)
+		strlcat(features, "aperfmperf ", sizeof(features));
+	if (cpu->arch.feature[FEATURE_6_ECX] & IA32_FEATURE_EPB)
+		strlcat(features, "epb ", sizeof(features));
 
 	dprintf("CPU %d: features: %s\n", currentCPU, features);
 }
@@ -607,6 +642,9 @@ detect_cpu(int currentCPU)
 		get_current_cpuid(&cpuid, 0x80000001);
 		cpu->arch.feature[FEATURE_EXT_AMD] = cpuid.regs.edx; // edx
 	}
+	get_current_cpuid(&cpuid, 6);
+	cpu->arch.feature[FEATURE_6_EAX] = cpuid.regs.eax;
+	cpu->arch.feature[FEATURE_6_ECX] = cpuid.regs.ecx;
 
 #if DUMP_FEATURE_STRING
 	dump_feature_string(currentCPU, cpu);
@@ -658,8 +696,8 @@ x86_double_fault_get_cpu(void)
 status_t
 arch_cpu_preboot_init_percpu(kernel_args *args, int cpu)
 {
-	x86_write_cr0(x86_read_cr0() & ~(CR0_FPU_EMULATION | CR0_MONITOR_FPU));
-	gX86SwapFPUFunc = i386_fnsave_swap;
+	// A simple nop FPU call until x86_init_fpu
+	gX86SwapFPUFunc = i386_noop_swap;
 
 	// On SMP system we want to synchronize the CPUs' TSCs, so system_time()
 	// will return consistent values.
@@ -687,6 +725,40 @@ arch_cpu_preboot_init_percpu(kernel_args *args, int cpu)
 }
 
 
+static void
+halt_idle(void)
+{
+	asm("hlt");
+}
+
+
+static void
+amdc1e_noarat_idle(void)
+{
+	uint64 msr = x86_read_msr(K8_MSR_IPM);
+	if (msr & K8_CMPHALT)
+		x86_write_msr(K8_MSR_IPM, msr & ~K8_CMPHALT);
+	halt_idle();
+}
+
+
+static bool
+detect_amdc1e_noarat()
+{
+	cpu_ent *cpu = get_cpu_struct();
+
+	if (cpu->arch.vendor != VENDOR_AMD)
+		return false;
+
+	// Family 0x12 and higher processors support ARAT
+	// Family lower than 0xf processors doesn't support C1E
+	// Family 0xf with model <= 0x40 procssors doesn't support C1E
+	uint32 family = cpu->arch.family + cpu->arch.extended_family;
+	uint32 model = (cpu->arch.extended_model << 4) | cpu->arch.model;
+	return (family < 0x12 && family > 0xf) || (family == 0xf && model > 0x40);
+}
+
+
 status_t
 arch_cpu_init_percpu(kernel_args *args, int cpu)
 {
@@ -709,8 +781,15 @@ arch_cpu_init_percpu(kernel_args *args, int cpu)
 		asm volatile("lidt	%0" : : "m"(descriptor));
 	}
 
+	if (!gCpuIdleFunc) {
+		if (detect_amdc1e_noarat())
+			gCpuIdleFunc = amdc1e_noarat_idle;
+		else
+			gCpuIdleFunc = halt_idle;
+	}
 	return 0;
 }
+
 
 status_t
 arch_cpu_init(kernel_args *args)
@@ -791,8 +870,9 @@ arch_cpu_init_post_vm(kernel_args *args)
 			DT_DATA_WRITEABLE, DPL_USER);
 	}
 
-	// setup SSE2/3 support
-	init_sse();
+	if (!apic_available())
+		x86_init_fpu();
+	// else fpu gets set up in smp code
 
 	return B_OK;
 }
@@ -869,6 +949,7 @@ i386_set_tss_and_kstack(addr_t kstack)
 	get_cpu_struct()->arch.tss.sp0 = kstack;
 }
 
+
 void
 arch_cpu_global_TLB_invalidate(void)
 {
@@ -908,65 +989,6 @@ arch_cpu_invalidate_TLB_list(addr_t pages[], int num_pages)
 }
 
 
-ssize_t
-arch_cpu_user_strlcpy(char *to, const char *from, size_t size,
-	addr_t *faultHandler)
-{
-	int fromLength = 0;
-	addr_t oldFaultHandler = *faultHandler;
-
-	// this check is to trick the gcc4 compiler and have it keep the error label
-	if (to == NULL && size > 0)
-		goto error;
-
-	*faultHandler = (addr_t)&&error;
-
-	if (size > 0) {
-		to[--size] = '\0';
-		// copy
-		for ( ; size; size--, fromLength++, to++, from++) {
-			if ((*to = *from) == '\0')
-				break;
-		}
-	}
-	// count any leftover from chars
-	while (*from++ != '\0') {
-		fromLength++;
-	}
-
-	*faultHandler = oldFaultHandler;
-	return fromLength;
-
-error:
-	*faultHandler = oldFaultHandler;
-	return B_BAD_ADDRESS;
-}
-
-
-status_t
-arch_cpu_user_memset(void *s, char c, size_t count, addr_t *faultHandler)
-{
-	char *xs = (char *)s;
-	addr_t oldFaultHandler = *faultHandler;
-
-	// this check is to trick the gcc4 compiler and have it keep the error label
-	if (s == NULL)
-		goto error;
-
-	*faultHandler = (addr_t)&&error;
-
-	while (count--)
-		*xs++ = c;
-
-	*faultHandler = oldFaultHandler;
-	return 0;
-
-error:
-	*faultHandler = oldFaultHandler;
-	return B_BAD_ADDRESS;
-}
-
-
 status_t
 arch_cpu_shutdown(bool rebootSystem)
 {
@@ -995,7 +1017,7 @@ arch_cpu_shutdown(bool rebootSystem)
 void
 arch_cpu_idle(void)
 {
-	asm("hlt");
+	gCpuIdleFunc();
 }
 
 

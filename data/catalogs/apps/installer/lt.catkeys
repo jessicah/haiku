@@ -1,4 +1,4 @@
-1	lithuanian	x-vnd.Haiku-Installer	3852628561
+1	lithuanian	x-vnd.Haiku-Installer	2099988747
 So behind the other menu entries towards the bottom of the file, add something similar to these lines:\n\n	InstallerApp		Taigi, /boot/grub/menu.lst failo gale, po visų kitų meniu punktų aprašų, prirašykite kažką panašaus į šias eilutes:\n\n
 Are you sure you want to abort the installation and restart the system?	InstallerWindow		Ar tikrai norite nutraukti diegimą ir paleisti kompiuterį iš naujo?
 \t}\n\n	InstallerApp		\t}\n\n
@@ -11,7 +11,7 @@ Additional disk space required: 0.0 KiB	InstallerWindow		Papildomai reikės disk
 With GRUB it's: (hdN,n)\n\n	InstallerApp		„GRUB“ atveju jie įvardijami taip: (hdN,n)\n\n
 \tsudo update-grub\n\n\n	InstallerApp		\tsudo update-grub\n\n\n
 Stop	InstallerWindow	In alert after pressing Stop	Nutraukti
-Install progress:  	InstallerWindow		Diegimo eiga: 
+Install progress:  	InstallerWindow		Įdiegiama: 
 Starting Installation.	InstallProgress		Diegimas pradedamas.
 This is alpha-quality software! It means there is a high risk of losing important data. Make frequent backups! You have been warned.\n\n\n	InstallerApp		Ši programinė įranga kol kas yra alfa kokybės! Tai reškia, jog ją naudojant, yra nemaža rizika prarasti svarbius duomenis. Įspėjame – dažnai darykitės atsargines kopijas!\n\n\n
 Are you sure you want to abort the installation?	InstallerWindow		Ar tikrai norite nutraukti diegimą?
@@ -28,7 +28,6 @@ Install from:	InstallerWindow		Diegti iš:
 IMPORTANT INFORMATION BEFORE INSTALLING HAIKU\n\n	InstallerApp		SVARBI INFORMACIJA PRIEŠ ĮDIEGIANT „HAIKU“\n\n
 Continue	InstallerWindow	In alert after pressing Stop	Tęsti
 Write boot sector to '%s'	InstallerWindow		Įrašyti paleidimo sektorių į „%s“
-2.1) GRUB 1\n	InstallerApp		2.1) GRUB 1\n
 Collecting copy information.	InstallProgress		Renkami duomenys kopijavimui.
 Choose the source disk from the pop-up menu. Then click \"Begin\".	InstallerWindow		Pasirinkite šaltinio diską iš išskleidžiamojo meniu. Tada spustelėkite mygtuką „Pradėti“.
 Quit Boot Manager and DriveSetup	InstallerWindow		Užbaikite Paleidyklės ir Diskų ženklintuvo darbą
@@ -49,13 +48,12 @@ README	InstallerApp		Lydimoji instrukcija
 The destination disk may not have enough space. Try choosing a different disk or choose to not install optional items.	InstallProgress		Paskirties diske nepakanka vietos. Išsirinkite kitą diską arba pašalinkite žymėjimą nuo papildomų paketų, kad šie nebūtų diegiami.
 Please close the Boot Manager and DriveSetup windows before closing the Installer window.	InstallerWindow		Prieš užverdami įdiegimo programos langą, užverkite Paleidyklės ir Diskų ženklintuvo langus.
 Scanning for disks…	InstallerWindow		Apžvelgiami kaupikliai…
-2.2) GRUB 2\n	InstallerApp		2.2) GRUB 2\n
 The disk can't be mounted. Please choose a different disk.	InstallProgress		Šio disko prijungti negalima. Pasirinkite kitą diską.
 ?? of ??	InstallerWindow	Unknown progress	?? iš ??
 \tmenuentry \"Haiku Alpha\" {\n	InstallerApp		\tmenuentry \"Haiku\" {\n
 Launch the DriveSetup utility to partition\navailable hard drives and other media.\nPartitions can be initialized with the\nBe File System needed for a Haiku boot\npartition.	InstallerWindow		Paleisti Diskų ženklintuvą, kuriuo galima\nskaidyti standžiuosius diskus ir kitus kaupiklius.\nSkaidinius galima suženklinti „Be“ failų sistema,\nkurią būtina naudoti „Haiku“ paleidimo skaidinyje.
 Show optional packages	InstallerWindow		Rodyti papildomus paketus
-No partitions have been found that are suitable for installation. Please set up partitions and initialize at least one partition with the Be File System.	InstallerWindow		Nerasta įdiegimui tinkamų skaidinių. Paruoškite ir suženklinkite kaip „Be File System“ bent vieną tomą.
+No partitions have been found that are suitable for installation. Please set up partitions and initialize at least one partition with the Be File System.	InstallerWindow		Nerasta įdiegimui tinkamų tomų. Paruoškite ir suženklinkite kaip „Be File System“ bent vieną tomą.
 Additionally you have to edit another file to actually display the boot menu:\n\n	InstallerApp		Be to, Jums teks paredaguoti dar vieną failą, kad paleidyklės meniu apskritai būtų rodomas:\n\n
 Choose the disk you want to install onto from the pop-up menu. Then click \"Begin\".	InstallerWindow		Pasirinkite paskirties diską „Haiku“ įdiegimui iš išskleidžiamojo meniu. Tada spustelėkite mygtuką „Pradėti“.
 Unknown Type	InstallProgress	Partition content type	tipas nežinomas
@@ -99,7 +97,6 @@ DriveSetup, the application to configure disk partitions, could not be launched.
 No optional packages available.	PackagesView		Papildomų paketų nėra.
 All hard disks start with \"hd\".\n	InstallerApp		Visų standžiųjų diskų pavadinimas prasideda raidėmis „hd“.\n
 Continue	InstallerApp		Tęsti
-3)   When you successfully boot into Haiku for the first time, make sure to read our \"Welcome\" documentation, there is a link on the Desktop.\n\n	InstallerApp		3)   Pirmą kartą sėkmingai paleidę „Haiku“, nepamirškite paskaityti mūsų paruoštos dokumentacijos naujokams. Saitą į ją rasite darbalaukyje.\n\n
 BootManager, the application to configure the Haiku boot menu, could not be launched.	InstallerWindow		Paleidyklės – programos, įdiegiančios įjungus kompiuterį rodomą meniu, paleisti nepavyko.
 Configure your /boot/grub/menu.lst by launching your favorite editor from a Terminal like this:\n\n	InstallerApp		Atverkite /boot/grub/menu.lst failą savo mėgiamu tekstų redaktoriumi, terminale įrašydami tokią komandinę eilutę:\n\n
 Boot sector not written because of an internal error.	InstallProgress		Paleidimo sektoriaus nepavyko įrašyti dėl vidinės klaidos.

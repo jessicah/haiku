@@ -80,10 +80,12 @@ const struct supported_device {
 	// Marketing Names: Radeon HD 24xx - HD 42xx
 	// Introduced: 2006
 	// Codename: Pele
+	// Process: 55 nm
 	{0x94c7, 2, 0, RADEON_RV610, CHIP_STD, "Radeon HD 2350"},
 	{0x94c1, 2, 0, RADEON_RV610, CHIP_IGP, "Radeon HD 2400"},
 	{0x94c3, 2, 0, RADEON_RV610, CHIP_STD, "Radeon HD 2400"},
 	{0x94cc, 2, 0, RADEON_RV610, CHIP_STD, "Radeon HD 2400"},
+	{0x9519, 2, 0, RADEON_RV630, CHIP_STD, "AMD FireStream 9170"},
 	{0x9586, 2, 0, RADEON_RV630, CHIP_STD, "Radeon HD 2600"},
 	{0x9588, 2, 0, RADEON_RV630, CHIP_STD, "Radeon HD 2600"},
 	{0x958a, 2, 0, RADEON_RV630, CHIP_STD, "Radeon HD 2600 X2"},
@@ -131,17 +133,21 @@ const struct supported_device {
 	// Marketing Names: Radeon HD 4330 - HD 4890, HD 51xx, HD 5xxV
 	// Introduced: 2008
 	// Codename: Wekiva
+	// Process: 55 nm
 	//	Radeon 4330		- RV710
 	{0x954f, 3, 2, RADEON_RV710, CHIP_IGP, "Radeon HD 4300"},
 	{0x9552, 3, 2, RADEON_RV710, CHIP_IGP, "Radeon HD 4300"},
 	{0x9555, 3, 2, RADEON_RV710, CHIP_STD, "Radeon HD 4350"},
 	{0x9540, 3, 2, RADEON_RV710, CHIP_STD, "Radeon HD 4550"},
+	{0x9452, 3, 2, RADEON_RV730, CHIP_STD, "AMD FireStream 9250"},
 	{0x9480, 3, 2, RADEON_RV730, CHIP_STD, "Radeon HD 4650"},
+	{0x9488, 3, 2, RADEON_RV730, CHIP_MOBILE, "Radeon HD 4650"},
 	{0x9498, 3, 2, RADEON_RV730, CHIP_STD, "Radeon HD 4650"},
 	{0x94b4, 3, 2, RADEON_RV740, CHIP_STD, "Radeon HD 4700"},
 	{0x9490, 3, 2, RADEON_RV730, CHIP_STD, "Radeon HD 4710"},
 	{0x94b3, 3, 2, RADEON_RV740, CHIP_STD, "Radeon HD 4770"},
 	{0x94b5, 3, 2, RADEON_RV740, CHIP_STD, "Radeon HD 4770"},
+	{0x9450, 3, 1, RADEON_RV770, CHIP_STD, "AMD FireStream 9270"},
 	{0x944a, 3, 1, RADEON_RV770, CHIP_MOBILE, "Radeon HD 4850"},
 	{0x944e, 3, 1, RADEON_RV770, CHIP_STD, "Radeon HD 4810"},
 	{0x944c, 3, 1, RADEON_RV770, CHIP_STD, "Radeon HD 4830"},
@@ -157,6 +163,7 @@ const struct supported_device {
 	// Marketing Names: Radeon HD 54xx ~ HD 63xx
 	// Introduced: 2009
 	// Codename: Evergreen
+	// Process: 40 nm
 	//  Cedar
 	{0x68e1, 4, 0, RADEON_CEDAR, CHIP_STD, "Radeon HD 5430"},
 	{0x68f9, 4, 0, RADEON_CEDAR, CHIP_STD, "Radeon HD 5450"},
@@ -170,6 +177,9 @@ const struct supported_device {
 	//  Juniper
 	{0x68be, 4, 0, RADEON_JUNIPER, CHIP_STD, "Radeon HD 5700"},
 	{0x68b8, 4, 0, RADEON_JUNIPER, CHIP_STD, "Radeon HD 5770"},
+	//  Juniper LE / XT (67X0 is rebranded 57X0 + tweaks)
+	{0x68bf, 4, 0, RADEON_JUNIPER, CHIP_STD, "Radeon HD 6750"},
+	{0x68ba, 4, 0, RADEON_JUNIPER, CHIP_STD, "Radeon HD 6770"},
 	//  Cypress
 	{0x689e, 4, 0, RADEON_CYPRESS, CHIP_STD, "Radeon HD 5800"},
 	{0x6899, 4, 0, RADEON_CYPRESS, CHIP_STD, "Radeon HD 5850"},
@@ -180,8 +190,10 @@ const struct supported_device {
 	//  Palm
 	{0x9804, 4, 1, RADEON_PALM, CHIP_APU, "Radeon HD 6250"},
 	{0x9805, 4, 1, RADEON_PALM, CHIP_APU, "Radeon HD 6290"},
+	{0x9807, 4, 1, RADEON_PALM, CHIP_APU, "Radeon HD 6290"},
 	{0x9802, 4, 1, RADEON_PALM, CHIP_APU, "Radeon HD 6310"},
 	{0x9803, 4, 1, RADEON_PALM, CHIP_APU, "Radeon HD 6310"},
+	{0x9806, 4, 1, RADEON_PALM, CHIP_APU, "Radeon HD 6320"},
 	//  Sumo (no VGA / LVDS!, only DP)
 	{0x9640, 4, 1, RADEON_SUMO, CHIP_APU, "Radeon HD 6550D"},
 	{0x9641, 4, 1, RADEON_SUMO, CHIP_APU, "Radeon HD SUMO M"},
@@ -199,6 +211,7 @@ const struct supported_device {
 	// Radeon HD 64xx - HD 69xx
 	// Introduced: 2010
 	// Codename: Nothern Islands
+	// Process: 40 nm
 	//  Caicos
 	{0x6760, 5, 0, RADEON_CAICOS, CHIP_MOBILE, "Radeon HD 6470M"},
 	{0x6761, 5, 0, RADEON_CAICOS, CHIP_MOBILE, "Radeon HD 6430M"},
@@ -212,6 +225,10 @@ const struct supported_device {
 	{0x6770, 5, 0, RADEON_CAICOS, CHIP_STD, "Radeon HD 6400"},
 	{0x6778, 5, 0, RADEON_CAICOS, CHIP_STD, "Radeon HD CAICOS"},
 	{0x6779, 5, 0, RADEON_CAICOS, CHIP_STD, "Radeon HD 6450"},
+	{0x68fa, 5, 0, RADEON_CAICOS, CHIP_STD, "Radeon HD 7350"},
+	{0x68f9, 5, 0, RADEON_CAICOS, CHIP_STD, "Radeon HD 7350"},
+	{0x677b, 5, 0, RADEON_CAICOS, CHIP_STD, "Radeon HD 7400"},
+	{0x6772, 5, 0, RADEON_CAICOS, CHIP_APU, "Radeon HD 7400A"},
 	//  Turks
 	{0x6740, 5, 0, RADEON_TURKS, CHIP_MOBILE, "Radeon HD 6770M"},
 	{0x6741, 5, 0, RADEON_TURKS, CHIP_MOBILE, "Radeon HD 6650M"},
@@ -225,7 +242,7 @@ const struct supported_device {
 	{0x6749, 5, 0, RADEON_TURKS, CHIP_STD, "FirePro v4900"},
 	{0x6750, 5, 0, RADEON_TURKS, CHIP_STD, "Radeon HD 6500"},
 	{0x6758, 5, 0, RADEON_TURKS, CHIP_STD, "Radeon HD 6670"},
-	{0x6759, 5, 0, RADEON_TURKS, CHIP_STD, "Radeon HD 6570"},
+	{0x6759, 5, 0, RADEON_TURKS, CHIP_STD, "Radeon HD 6570/7570"},
 	//  Barts
 	{0x673e, 5, 0, RADEON_BARTS, CHIP_STD, "Radeon HD 6790"},
 	{0x6739, 5, 0, RADEON_BARTS, CHIP_STD, "Radeon HD 6850"},
@@ -243,18 +260,59 @@ const struct supported_device {
 	{0x6709, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD CAYMAN"},
 	{0x6718, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD 6970"},
 	{0x6719, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD 6950"},
-	{0x671C, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD CAYMAN"},
-	{0x671F, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD 6900"},
-	//  Antilles
-	{0x671d, 5, 0, RADEON_ANTILLES, CHIP_STD, "Radeon HD 6990"}
+	{0x671c, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD CAYMAN"},
+	{0x671f, 5, 0, RADEON_CAYMAN, CHIP_STD, "Radeon HD 6900"},
+	//  Antilles (Top, Dual GPU)
+	{0x671d, 5, 0, RADEON_ANTILLES, CHIP_STD, "Radeon HD 6990"},
 
 	// Marketing Names: Radeon HD 74xx - HD 79xx
-	// Introduced: 2011?
+	// Introduced: Late 2011
 	// Codename: Southern Islands
-	//  Lombok
-	//  Thames
-	//  Tahiti
-	//  New Zealand
+	// Process: 28 nm
+	//  Lombok?
+	{0x6850, 6, 0, RADEON_LOMBOK, CHIP_MOBILE, "Radeon HD 7570"},
+	//  Cape Verde (TODO: Need to find friendly names)
+	{0x6820, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6821, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6823, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6824, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6825, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6826, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6827, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6828, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6829, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x682d, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x682f, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6830, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6831, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6837, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6838, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x6839, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x683b, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD Verde"},
+	{0x683f, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD 7750"},
+	{0x683d, 6, 0, RADEON_CAPEVERDE, CHIP_STD, "Radeon HD 7770"},
+	//  Pitcairn (TODO: Need to find friendly names)
+	{0x6800, 6, 0, RADEON_PITCAIRN, CHIP_MOBILE, "Radeon HD 7970"},
+	{0x6801, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD Pitcairn"},
+	{0x6802, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD Pitcairn"},
+	{0x6808, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD Pitcairn"},
+	{0x6809, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD Pitcairn"},
+	{0x6810, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD Pitcairn"},
+	{0x6818, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD 7870"},
+	{0x6819, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD 7800"},
+	{0x684c, 6, 0, RADEON_PITCAIRN, CHIP_STD, "Radeon HD Pitcairn"},
+	//  Tahiti (TODO: Need to find friendly names)
+	{0x6780, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x6784, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x6788, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x678a, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x6790, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x679e, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x679f, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD Tahiti"},
+	{0x679a, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD 7950"},
+	{0x6798, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD 7970"},
+	//  New Zealand (Top, Dual GPU)
+	{0x6799, 6, 0, RADEON_TAHITI, CHIP_STD, "Radeon HD 7990"}
 };
 
 
@@ -268,7 +326,7 @@ mutex gLock;
 
 
 static status_t
-get_next_radeon_hd(int32 *_cookie, pci_info &info, uint32 &type)
+get_next_radeon_hd(int32* _cookie, pci_info &info, uint32 &type)
 {
 	int32 index = *_cookie;
 
@@ -296,11 +354,11 @@ get_next_radeon_hd(int32 *_cookie, pci_info &info, uint32 &type)
 }
 
 
-extern "C" const char **
+extern "C" const char**
 publish_devices(void)
 {
 	TRACE("%s\n", __func__);
-	return (const char **)gDeviceNames;
+	return (const char**)gDeviceNames;
 }
 
 
@@ -309,7 +367,7 @@ init_hardware(void)
 {
 	TRACE("%s\n", __func__);
 
-	status_t status = get_module(B_PCI_MODULE_NAME, (module_info **)&gPCI);
+	status_t status = get_module(B_PCI_MODULE_NAME, (module_info**)&gPCI);
 	if (status != B_OK) {
 		ERROR("%s: ERROR: pci module unavailable\n", __func__);
 		return status;
@@ -377,7 +435,7 @@ init_driver(void)
 		gDeviceInfo[found]->init_status = B_NO_INIT;
 		gDeviceInfo[found]->id = found;
 		gDeviceInfo[found]->pci = info;
-		gDeviceInfo[found]->registers = (uint8 *)info->u.h0.base_registers[0];
+		gDeviceInfo[found]->registers = (uint8*)info->u.h0.base_registers[0];
 		gDeviceInfo[found]->pciID = kSupportedDevices[type].pciID;
 		gDeviceInfo[found]->deviceName = kSupportedDevices[type].deviceName;
 		gDeviceInfo[found]->chipsetID = kSupportedDevices[type].chipsetID;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2003-2010, Haiku. All rights reserved.
+ * Copyright 2003-2012, Haiku. All rights reserved.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
@@ -67,8 +67,8 @@ CatalogAddOnInfo::~CatalogAddOnInfo()
 {
 	int32 count = fLoadedCatalogs.CountItems();
 	for (int32 i = 0; i < count; ++i) {
-		BCatalogAddOn* cat
-			= static_cast<BCatalogAddOn*>(fLoadedCatalogs.ItemAt(i));
+		BCatalogData* cat
+			= static_cast<BCatalogData*>(fLoadedCatalogs.ItemAt(i));
 		delete cat;
 	}
 	fLoadedCatalogs.MakeEmpty();
@@ -131,7 +131,6 @@ static const char* kPriorityAttr = "ADDON:priority";
 
 static const char* kLanguageField = "language";
 static const char* kTimezoneField = "timezone";
-static const char* kOffsetField = "offset";
 static const char* kTranslateFilesystemField = "filesys";
 
 
@@ -502,7 +501,7 @@ RosterData::_LoadLocaleSettings()
 		fDefaultLocale.SetFormattingConventions(conventions);
 
 		_SetPreferredLanguages(&settings);
-		
+
 		bool preferred;
 		if (settings.FindBool(kTranslateFilesystemField, &preferred) == B_OK)
 			_SetFilesystemTranslationPreferred(preferred);
@@ -687,16 +686,7 @@ RosterData::_AddDefaultFormattingConventionsToMessage(BMessage* message) const
 status_t
 RosterData::_AddDefaultTimeZoneToMessage(BMessage* message) const
 {
-	status_t status = message->AddString(kTimezoneField, fDefaultTimeZone.ID());
-
-	// add the offset, too, since that is used by clockconfig when setting
-	// up timezone state during boot
-	if (status == B_OK) {
-		status = message->AddInt32(kOffsetField,
-			fDefaultTimeZone.OffsetFromGMT());
-	}
-
-	return status;
+	return message->AddString(kTimezoneField, fDefaultTimeZone.ID());
 }
 
 
@@ -785,7 +775,7 @@ MutableLocaleRoster::SetFilesystemTranslationPreferred(bool preferred)
 
 
 status_t
-MutableLocaleRoster::GetSystemCatalog(BCatalogAddOn** catalog) const
+MutableLocaleRoster::LoadSystemCatalog(BCatalog* catalog) const
 {
 	if (!catalog)
 		return B_BAD_VALUE;
@@ -809,13 +799,13 @@ MutableLocaleRoster::GetSystemCatalog(BCatalogAddOn** catalog) const
 		return B_ERROR;
 	}
 
-	// load the catalog for libbe and return it to the app
+	// load the catalog for libbe into the given catalog
 	entry_ref ref;
-	BEntry(info.name).GetRef(&ref);
+	status_t status = BEntry(info.name).GetRef(&ref);
+	if (status != B_OK)
+		return status;
 
-	*catalog = LoadCatalog(ref);
-
-	return B_OK;
+	return catalog->SetTo(ref);
 }
 
 
@@ -827,7 +817,7 @@ MutableLocaleRoster::GetSystemCatalog(BCatalogAddOn** catalog) const
  * Any created catalog will be initialized with the given signature and
  * language-name.
  */
-BCatalogAddOn*
+BCatalogData*
 MutableLocaleRoster::CreateCatalog(const char* type, const char* signature,
 	const char* language)
 {
@@ -846,7 +836,7 @@ MutableLocaleRoster::CreateCatalog(const char* type, const char* signature,
 			|| !info->fCreateFunc)
 			continue;
 
-		BCatalogAddOn* catalog = info->fCreateFunc(signature, language);
+		BCatalogData* catalog = info->fCreateFunc(signature, language);
 		if (catalog) {
 			info->fLoadedCatalogs.AddItem(catalog);
 			info->UnloadIfPossible();
@@ -868,9 +858,9 @@ MutableLocaleRoster::CreateCatalog(const char* type, const char* signature,
  * instead of a single catalog.
  * NULL is returned if no matching catalog could be found.
  */
-BCatalogAddOn*
-MutableLocaleRoster::LoadCatalog(const entry_ref& catalogOwner, const char* language,
-	int32 fingerprint) const
+BCatalogData*
+MutableLocaleRoster::LoadCatalog(const entry_ref& catalogOwner,
+	const char* language, int32 fingerprint) const
 {
 	BAutolock lock(RosterData::Default()->fLock);
 	if (!lock.IsLocked())
@@ -891,7 +881,7 @@ MutableLocaleRoster::LoadCatalog(const entry_ref& catalogOwner, const char* lang
 			// try to load catalogs for one of the preferred languages:
 			GetPreferredLanguages(&languages);
 
-		BCatalogAddOn* catalog = NULL;
+		BCatalogData* catalog = NULL;
 		const char* lang;
 		for (int32 l=0; languages.FindString("language", l, &lang)==B_OK; ++l) {
 			catalog = info->fInstantiateFunc(catalogOwner, lang, fingerprint);
@@ -905,8 +895,8 @@ MutableLocaleRoster::LoadCatalog(const entry_ref& catalogOwner, const char* lang
 			// to "english"):
 			int32 pos;
 			BString langName(lang);
-			BCatalogAddOn* currCatalog = catalog;
-			BCatalogAddOn* nextCatalog = NULL;
+			BCatalogData* currCatalog = catalog;
+			BCatalogData* nextCatalog = NULL;
 			while ((pos = langName.FindLast('_')) >= 0) {
 				// language is based on parent, so we load that, too:
 				// (even if the parent catalog was not found)
@@ -938,7 +928,7 @@ MutableLocaleRoster::LoadCatalog(const entry_ref& catalogOwner, const char* lang
  * Add-ons that have no more current catalogs are unloaded, too.
  */
 status_t
-MutableLocaleRoster::UnloadCatalog(BCatalogAddOn* catalog)
+MutableLocaleRoster::UnloadCatalog(BCatalogData* catalog)
 {
 	if (!catalog)
 		return B_BAD_VALUE;
@@ -948,7 +938,7 @@ MutableLocaleRoster::UnloadCatalog(BCatalogAddOn* catalog)
 		return B_ERROR;
 
 	status_t res = B_ERROR;
-	BCatalogAddOn* nextCatalog;
+	BCatalogData* nextCatalog;
 
 	while (catalog != NULL) {
 		nextCatalog = catalog->Next();

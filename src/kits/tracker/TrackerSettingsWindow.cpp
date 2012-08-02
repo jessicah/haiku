@@ -32,30 +32,30 @@ names are registered trademarks or trademarks of their respective holders.
 All rights reserved.
 */
 
+
 #include <Catalog.h>
 #include <ControlLook.h>
 #include <LayoutBuilder.h>
 #include <Locale.h>
+#include <ScrollView.h>
 
 #include "SettingsViews.h"
 #include "TrackerSettings.h"
 #include "TrackerSettingsWindow.h"
-
-#include <ScrollView.h>
 
 
 namespace BPrivate {
 
 class SettingsItem : public BStringItem {
 	public:
-		SettingsItem(const char *label, SettingsView *view);
+		SettingsItem(const char* label, SettingsView* view);
 
-		void DrawItem(BView *owner, BRect rect, bool drawEverything);
+		void DrawItem(BView* owner, BRect rect, bool drawEverything);
 
-		SettingsView *View();
+		SettingsView* View();
 
 	private:
-		SettingsView *fSettingsView;
+		SettingsView* fSettingsView;
 };
 
 }	// namespace BPrivate
@@ -66,17 +66,19 @@ const uint32 kDefaultsButtonPressed = 'Apbp';
 const uint32 kRevertButtonPressed = 'Rebp';
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "TrackerSettingsWindow"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "TrackerSettingsWindow"
 
 TrackerSettingsWindow::TrackerSettingsWindow()
 	:
 	BWindow(BRect(80, 80, 450, 350), B_TRANSLATE("Tracker preferences"),
 		B_TITLED_WINDOW, B_NOT_MINIMIZABLE | B_NOT_RESIZABLE
 		| B_NO_WORKSPACE_ACTIVATION	| B_NOT_ANCHORED_ON_ACTIVATE
-		| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS)
+		| B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE
+		| B_AUTO_UPDATE_SIZE_LIMITS)
 {
-	fSettingsTypeListView = new BListView("List View", B_SINGLE_SELECTION_LIST);
+	fSettingsTypeListView = new BListView("List View",
+		B_SINGLE_SELECTION_LIST);
 
 	BScrollView* scrollView = new BScrollView("scrollview",
 		fSettingsTypeListView, B_FRAME_EVENTS | B_WILL_DRAW, false, true);
@@ -90,7 +92,7 @@ TrackerSettingsWindow::TrackerSettingsWindow()
 	fRevertButton->SetEnabled(false);
 
 	fSettingsContainerBox = new BBox("SettingsContainerBox");
-	
+
 	const float spacing = be_control_look->DefaultItemSpacing();
 
 	BLayoutBuilder::Group<>(this)
@@ -113,8 +115,8 @@ TrackerSettingsWindow::TrackerSettingsWindow()
 		new WindowsSettingsView()));
 	fSettingsTypeListView->AddItem(new SettingsItem(B_TRANSLATE("Trash"),
 		new TrashSettingsView()));
-	fSettingsTypeListView->AddItem(new SettingsItem(B_TRANSLATE("Volume icons"),
-		new SpaceBarSettingsView()));
+	fSettingsTypeListView->AddItem(new SettingsItem(
+		B_TRANSLATE("Volume icons"), new SpaceBarSettingsView()));
 
 	// constraint the listview width so that the longest item fits
 	float width = 0;
@@ -123,7 +125,8 @@ TrackerSettingsWindow::TrackerSettingsWindow()
 	fSettingsTypeListView->SetExplicitMinSize(BSize(width, 0));
 	fSettingsTypeListView->SetExplicitMaxSize(BSize(width, B_SIZE_UNLIMITED));
 
-	fSettingsTypeListView->SetSelectionMessage(new BMessage(kSettingsViewChanged));
+	fSettingsTypeListView->SetSelectionMessage(
+		new BMessage(kSettingsViewChanged));
 	fSettingsTypeListView->Select(0);
 }
 
@@ -149,7 +152,7 @@ TrackerSettingsWindow::QuitRequested()
 
 
 void
-TrackerSettingsWindow::MessageReceived(BMessage *message)
+TrackerSettingsWindow::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
 		case kSettingsContentsModified:
@@ -195,13 +198,14 @@ TrackerSettingsWindow::Show()
 }
 
 
-SettingsView *
+SettingsView*
 TrackerSettingsWindow::_ViewAt(int32 i)
 {
 	if (!Lock())
 		return NULL;
 		
-	SettingsItem *item = dynamic_cast<SettingsItem*>(fSettingsTypeListView->ItemAt(i));
+	SettingsItem* item = dynamic_cast<SettingsItem*>
+		(fSettingsTypeListView->ItemAt(i));
 	
 	Unlock();
 	
@@ -212,7 +216,7 @@ TrackerSettingsWindow::_ViewAt(int32 i)
 void
 TrackerSettingsWindow::_HandleChangedContents()
 {
-	fSettingsTypeListView->Invalidate();	
+	fSettingsTypeListView->Invalidate();
 	_UpdateButtons();
 
 	TrackerSettings().SaveSettings(false);
@@ -272,18 +276,19 @@ TrackerSettingsWindow::_HandleChangedSettingsView()
 	if (currentSelection < 0)
 		return;
 
-	BView *oldView = fSettingsContainerBox->ChildAt(0);
+	BView* oldView = fSettingsContainerBox->ChildAt(0);
 
 	if (oldView)
 		oldView->RemoveSelf();
 
-	SettingsItem *selectedItem =
-		dynamic_cast<SettingsItem*>(fSettingsTypeListView->ItemAt(currentSelection));
+	SettingsItem* selectedItem =
+		dynamic_cast<SettingsItem*>
+			(fSettingsTypeListView->ItemAt(currentSelection));
 
 	if (selectedItem) {
 		fSettingsContainerBox->SetLabel(selectedItem->Text());
 
-		BView *view = selectedItem->View();
+		BView* view = selectedItem->View();
 		view->SetViewColor(fSettingsContainerBox->ViewColor());
 		view->Hide();
 		fSettingsContainerBox->AddChild(view);
@@ -296,7 +301,7 @@ TrackerSettingsWindow::_HandleChangedSettingsView()
 //	#pragma mark -
 
 
-SettingsItem::SettingsItem(const char *label, SettingsView *view)
+SettingsItem::SettingsItem(const char* label, SettingsView* view)
 	: BStringItem(label),
 	fSettingsView(view)
 {
@@ -304,7 +309,7 @@ SettingsItem::SettingsItem(const char *label, SettingsView *view)
 
 
 void
-SettingsItem::DrawItem(BView *owner, BRect rect, bool drawEverything)
+SettingsItem::DrawItem(BView* owner, BRect rect, bool drawEverything)
 {
 	const rgb_color kModifiedColor = {0, 0, 255, 0};
 	const rgb_color kBlack = {0, 0, 0, 0};
@@ -314,27 +319,27 @@ SettingsItem::DrawItem(BView *owner, BRect rect, bool drawEverything)
 		bool isRevertable = fSettingsView->IsRevertable();
 		bool isSelected = IsSelected();
 
-		if (isSelected || drawEverything) { 
-			rgb_color color; 
-			if (isSelected) 
-				color = kSelectedColor; 
-			else 
-				color = owner->ViewColor(); 
+		if (isSelected || drawEverything) {
+			rgb_color color;
+			if (isSelected)
+				color = kSelectedColor;
+			else
+				color = owner->ViewColor();
 
-			owner->SetHighColor(color); 
-			owner->SetLowColor(color); 
-			owner->FillRect(rect); 
+			owner->SetHighColor(color);
+			owner->SetLowColor(color);
+			owner->FillRect(rect);
 		}
 
 		if (isRevertable)
 			owner->SetHighColor(kModifiedColor);
-		else			
+		else
 			owner->SetHighColor(kBlack);
 
 		font_height fheight;
 		owner->GetFontHeight(&fheight);
 
-		owner->DrawString(Text(), BPoint(rect.left + 4, rect.top 
+		owner->DrawString(Text(), BPoint(rect.left + 4, rect.top
 			+ fheight.ascent + 2 + floorf(fheight.leading / 2)));
 
 		owner->SetHighColor(kBlack);
@@ -343,7 +348,7 @@ SettingsItem::DrawItem(BView *owner, BRect rect, bool drawEverything)
 }
 
 
-SettingsView *
+SettingsView*
 SettingsItem::View()
 {
 	return fSettingsView;

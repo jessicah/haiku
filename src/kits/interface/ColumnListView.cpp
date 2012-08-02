@@ -728,9 +728,10 @@ BColumnListView::BColumnListView(BRect rect, const char* name,
 	fSelectionMessage(NULL),
 	fSortingEnabled(true),
 	fLatchWidth(kLatchWidth),
-	fBorderStyle(border)
+	fBorderStyle(border),
+	fShowingHorizontalScrollBar(showHorizontalScrollbar)
 {
-	_Init(showHorizontalScrollbar);
+	_Init();
 }
 
 
@@ -742,9 +743,10 @@ BColumnListView::BColumnListView(const char* name, uint32 flags,
 	fSelectionMessage(NULL),
 	fSortingEnabled(true),
 	fLatchWidth(kLatchWidth),
-	fBorderStyle(border)
+	fBorderStyle(border),
+	fShowingHorizontalScrollBar(showHorizontalScrollbar)
 {
-	_Init(showHorizontalScrollbar);
+	_Init();
 }
 
 
@@ -1857,8 +1859,8 @@ BColumnListView::PreferredSize()
 		BRect outlineRect;
 		BRect vScrollBarRect;
 		BRect hScrollBarRect;
-		_GetChildViewRects(Bounds(), !fHorizontalScrollBar->IsHidden(),
-			titleRect, outlineRect, vScrollBarRect, hScrollBarRect);
+		_GetChildViewRects(Bounds(), titleRect, outlineRect, vScrollBarRect,
+			hScrollBarRect);
 		// Start with the extra width for border and scrollbars etc.
 		size.width = titleRect.left - Bounds().left;
 		size.width += Bounds().right - titleRect.right;
@@ -1886,9 +1888,8 @@ BColumnListView::MaxSize()
 
 
 void
-BColumnListView::InvalidateLayout(bool descendants)
+BColumnListView::LayoutInvalidated(bool descendants)
 {
-	BView::InvalidateLayout(descendants);
 }
 
 
@@ -1902,8 +1903,8 @@ BColumnListView::DoLayout()
 	BRect outlineRect;
 	BRect vScrollBarRect;
 	BRect hScrollBarRect;
-	_GetChildViewRects(Bounds(), !fHorizontalScrollBar->IsHidden(),
-		titleRect, outlineRect, vScrollBarRect, hScrollBarRect);
+	_GetChildViewRects(Bounds(), titleRect, outlineRect, vScrollBarRect,
+		hScrollBarRect);
 
 	fTitleView->MoveTo(titleRect.LeftTop());
 	fTitleView->ResizeTo(titleRect.Width(), titleRect.Height());
@@ -1924,7 +1925,7 @@ BColumnListView::DoLayout()
 
 
 void
-BColumnListView::_Init(bool showHorizontalScrollbar)
+BColumnListView::_Init()
 {
 	SetViewColor(B_TRANSPARENT_32_BIT);
 
@@ -1941,8 +1942,8 @@ BColumnListView::_Init(bool showHorizontalScrollbar)
 	BRect outlineRect;
 	BRect vScrollBarRect;
 	BRect hScrollBarRect;
-	_GetChildViewRects(bounds, showHorizontalScrollbar, titleRect, outlineRect,
-		vScrollBarRect, hScrollBarRect);
+	_GetChildViewRects(bounds, titleRect, outlineRect, vScrollBarRect,
+		hScrollBarRect);
 
 	fOutlineView = new OutlineView(outlineRect, &fColumns, &fSortColumns, this);
 	AddChild(fOutlineView);
@@ -1960,7 +1961,7 @@ BColumnListView::_Init(bool showHorizontalScrollbar)
 		"horizontal_scroll_bar", fTitleView, 0.0, bounds.Width(), B_HORIZONTAL);
 	AddChild(fHorizontalScrollBar);
 
-	if (!showHorizontalScrollbar)
+	if (!fShowingHorizontalScrollBar)
 		fHorizontalScrollBar->Hide();
 
 	fOutlineView->FixScrollBar(true);
@@ -1968,9 +1969,8 @@ BColumnListView::_Init(bool showHorizontalScrollbar)
 
 
 void
-BColumnListView::_GetChildViewRects(const BRect& bounds,
-	bool showHorizontalScrollbar, BRect& titleRect, BRect& outlineRect,
-	BRect& vScrollBarRect, BRect& hScrollBarRect)
+BColumnListView::_GetChildViewRects(const BRect& bounds, BRect& titleRect,
+	BRect& outlineRect, BRect& vScrollBarRect, BRect& hScrollBarRect)
 {
 	titleRect = bounds;
 	titleRect.bottom = titleRect.top + kTitleHeight;
@@ -1981,7 +1981,7 @@ BColumnListView::_GetChildViewRects(const BRect& bounds,
 	outlineRect = bounds;
 	outlineRect.top = titleRect.bottom + 1.0;
 	outlineRect.right -= B_V_SCROLL_BAR_WIDTH;
-	if (showHorizontalScrollbar)
+	if (fShowingHorizontalScrollBar)
 		outlineRect.bottom -= B_H_SCROLL_BAR_HEIGHT;
 
 	vScrollBarRect = bounds;
@@ -1990,7 +1990,7 @@ BColumnListView::_GetChildViewRects(const BRect& bounds,
 #endif
 
 	vScrollBarRect.left = vScrollBarRect.right - B_V_SCROLL_BAR_WIDTH;
-	if (showHorizontalScrollbar)
+	if (fShowingHorizontalScrollBar)
 		vScrollBarRect.bottom -= B_H_SCROLL_BAR_HEIGHT;
 
 	hScrollBarRect = bounds;
@@ -3513,8 +3513,11 @@ OutlineView::MouseDown(BPoint position)
 			fCurrentRow = new_row;
 			fCurrentField = new_field;
 			fCurrentCode = B_INSIDE_VIEW;
+			BMessage* message = Window()->CurrentMessage();
+			int32 buttons = 1;
+			message->FindInt32("buttons", &buttons);
 			fCurrentColumn->MouseDown(fMasterView, fCurrentRow,
-				fCurrentField, fFieldRect, position, 1);
+				fCurrentField, fFieldRect, position, buttons);
 		}
 
 		if (!fEditMode) {
@@ -4091,6 +4094,16 @@ OutlineView::RemoveRow(BRow* row)
 	fItemsHeight -= subTreeHeight;
 
 	FixScrollBar(false);
+	int32 indent = 0;
+	float top = 0.0;
+	if (FindRow(fVisibleRect.top, &indent, &top) == NULL && ScrollBar(B_VERTICAL) != NULL) {
+		// after removing this row, no rows are actually visible any more,
+		// force a scroll to make them visible again
+		if (fItemsHeight > fVisibleRect.Height())
+			ScrollBy(0.0, fItemsHeight - fVisibleRect.Height() - Bounds().top);
+		else
+			ScrollBy(0.0, -Bounds().top);
+	}
 	if (parentRow != NULL) {
 		parentRow->fChildList->RemoveItem(row);
 		if (parentRow->fChildList->CountItems() == 0) {
@@ -4295,7 +4308,7 @@ OutlineView::FixScrollBar(bool scrollToFit)
 			float maxScrollBarValue = fItemsHeight - fVisibleRect.Height();
 			vScrollBar->SetProportion(fVisibleRect.Height() / fItemsHeight);
 
-			// If the user is scrolled down too far when makes the range smaller, the list
+			// If the user is scrolled down too far when making the range smaller, the list
 			// will jump suddenly, which is undesirable.  In this case, don't fix the scroll
 			// bar here. In ScrollTo, it checks to see if this has occured, and will
 			// fix the scroll bars sneakily if the user has scrolled up far enough.

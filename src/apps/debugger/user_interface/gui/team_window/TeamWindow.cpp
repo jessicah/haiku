@@ -1,6 +1,6 @@
 /*
  * Copyright 2009, Ingo Weinhold, ingo_weinhold@gmx.de.
- * Copyright 2010-2011, Rene Gollent, rene@gollent.com.
+ * Copyright 2010-2012, Rene Gollent, rene@gollent.com.
  * Distributed under the terms of the MIT License.
  */
 
@@ -30,8 +30,8 @@
 #include "CpuState.h"
 #include "DisassembledCode.h"
 #include "FileSourceCode.h"
-#include "GUISettingsUtils.h"
-#include "GUITeamUISettings.h"
+#include "GuiSettingsUtils.h"
+#include "GuiTeamUiSettings.h"
 #include "Image.h"
 #include "ImageDebugInfo.h"
 #include "InspectorWindow.h"
@@ -109,6 +109,7 @@ TeamWindow::TeamWindow(::Team* team, UserInterfaceListener* listener)
 	fStepOverButton(NULL),
 	fStepIntoButton(NULL),
 	fStepOutButton(NULL),
+	fInspectorWindow(NULL),
 	fSourceLocatePanel(NULL)
 {
 	fTeam->Lock();
@@ -217,26 +218,33 @@ TeamWindow::MessageReceived(BMessage* message)
 		{
 			if (fInspectorWindow) {
 				fInspectorWindow->Activate(true);
-				break;
+			} else {
+				try {
+					fInspectorWindow = InspectorWindow::Create(fTeam,
+						fListener, this);
+					if (fInspectorWindow != NULL) {
+						BMessage settings;
+						fInspectorWindow->LoadSettings(fUiSettings);
+						fInspectorWindow->Show();
+					}
+	           	} catch (...) {
+	           		// TODO: notify user
+	           	}
 			}
 
-			try {
-				fInspectorWindow = InspectorWindow::Create(fTeam, fListener,
-					this);
-				if (fInspectorWindow != NULL) {
-					BMessage settings;
-					fInspectorWindow->LoadSettings(fUISettings);
-					fInspectorWindow->Show();
-				}
-           	} catch (...) {
-           		// TODO: notify user
-           	}
+			target_addr_t address;
+			if (message->FindUInt64("address", &address) == B_OK) {
+				BMessage addressMessage(MSG_INSPECT_ADDRESS);
+				addressMessage.AddUInt64("address", address);
+				fInspectorWindow->PostMessage(&addressMessage);
+			}
            	break;
 		}
 		case MSG_INSPECTOR_WINDOW_CLOSED:
 		{
 			_SaveInspectorSettings(CurrentMessage());
 			fInspectorWindow = NULL;
+			break;
 
 		}
 		case B_REFS_RECEIVED:
@@ -349,7 +357,7 @@ TeamWindow::QuitRequested()
 
 
 status_t
-TeamWindow::LoadSettings(const GUITeamUISettings* settings)
+TeamWindow::LoadSettings(const GuiTeamUiSettings* settings)
 {
 	AutoLocker<BWindow> lock(this);
 	if (!lock.IsLocked())
@@ -368,16 +376,16 @@ TeamWindow::LoadSettings(const GUITeamUISettings* settings)
 
 	BMessage archive;
 	if (teamWindowSettings.FindMessage("sourceSplit", &archive) == B_OK)
-		GUISettingsUtils::UnarchiveSplitView(archive, fSourceSplitView);
+		GuiSettingsUtils::UnarchiveSplitView(archive, fSourceSplitView);
 
 	if (teamWindowSettings.FindMessage("functionSplit", &archive) == B_OK)
-		GUISettingsUtils::UnarchiveSplitView(archive, fFunctionSplitView);
+		GuiSettingsUtils::UnarchiveSplitView(archive, fFunctionSplitView);
 
 	if (teamWindowSettings.FindMessage("imageSplit", &archive) == B_OK)
-		GUISettingsUtils::UnarchiveSplitView(archive, fImageSplitView);
+		GuiSettingsUtils::UnarchiveSplitView(archive, fImageSplitView);
 
 	if (teamWindowSettings.FindMessage("threadSplit", &archive) == B_OK)
-		GUISettingsUtils::UnarchiveSplitView(archive, fThreadSplitView);
+		GuiSettingsUtils::UnarchiveSplitView(archive, fThreadSplitView);
 
 	if (teamWindowSettings.FindMessage("imageListView", &archive) == B_OK)
 		fImageListView->LoadSettings(archive);
@@ -400,21 +408,21 @@ TeamWindow::LoadSettings(const GUITeamUISettings* settings)
 	if (teamWindowSettings.FindMessage("breakpointsView", &archive) == B_OK)
 		fBreakpointsView->LoadSettings(archive);
 
-	fUISettings = *settings;
+	fUiSettings = *settings;
 
 	return B_OK;
 }
 
 
 status_t
-TeamWindow::SaveSettings(GUITeamUISettings* settings)
+TeamWindow::SaveSettings(GuiTeamUiSettings* settings)
 {
 	AutoLocker<BWindow> lock(this);
 	if (!lock.IsLocked())
 		return B_ERROR;
 
 	BMessage inspectorSettings;
-	if (fUISettings.Settings("inspectorWindow", inspectorSettings) == B_OK) {
+	if (fUiSettings.Settings("inspectorWindow", inspectorSettings) == B_OK) {
 		if (!settings->AddSettings("inspectorWindow", inspectorSettings))
 			return B_NO_MEMORY;
 	}
@@ -424,22 +432,22 @@ TeamWindow::SaveSettings(GUITeamUISettings* settings)
 	if (teamWindowSettings.AddRect("frame", Frame()) != B_OK)
 		return B_NO_MEMORY;
 
-	if (GUISettingsUtils::ArchiveSplitView(archive, fSourceSplitView) != B_OK)
+	if (GuiSettingsUtils::ArchiveSplitView(archive, fSourceSplitView) != B_OK)
 		return B_NO_MEMORY;
 	if (teamWindowSettings.AddMessage("sourceSplit", &archive) != B_OK)
 		return B_NO_MEMORY;
 
-	if (GUISettingsUtils::ArchiveSplitView(archive, fFunctionSplitView) != B_OK)
+	if (GuiSettingsUtils::ArchiveSplitView(archive, fFunctionSplitView) != B_OK)
 		return B_NO_MEMORY;
 	if (teamWindowSettings.AddMessage("functionSplit", &archive) != B_OK)
 		return B_NO_MEMORY;
 
-	if (GUISettingsUtils::ArchiveSplitView(archive, fImageSplitView) != B_OK)
+	if (GuiSettingsUtils::ArchiveSplitView(archive, fImageSplitView) != B_OK)
 		return B_NO_MEMORY;
 	if (teamWindowSettings.AddMessage("imageSplit", &archive))
 		return B_NO_MEMORY;
 
-	if (GUISettingsUtils::ArchiveSplitView(archive, fThreadSplitView) != B_OK)
+	if (GuiSettingsUtils::ArchiveSplitView(archive, fThreadSplitView) != B_OK)
 		return B_NO_MEMORY;
 	if (teamWindowSettings.AddMessage("threadSplit", &archive))
 		return B_NO_MEMORY;
@@ -698,6 +706,7 @@ TeamWindow::_Init()
 	fStepIntoButton->SetTarget(this);
 	fStepOutButton->SetTarget(this);
 
+	fSourcePathView->SetExplicitMinSize(BSize(100.0, B_SIZE_UNSET));
 	fSourcePathView->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED, B_SIZE_UNSET));
 	BMessageFilter* filter = new(std::nothrow) PathViewMessageFilter(
 		BMessenger(this));
@@ -989,6 +998,7 @@ TeamWindow::_SetActiveSourceCode(SourceCode* sourceCode)
 
 	fSourceView->SetSourceCode(fActiveSourceCode);
 
+	_UpdateSourcePathState();
 	_ScrollToActiveFunction();
 }
 
@@ -1045,6 +1055,38 @@ TeamWindow::_UpdateRunButtons()
 			fStepOutButton->SetEnabled(true);
 			break;
 	}
+}
+
+
+void
+TeamWindow::_UpdateSourcePathState()
+{
+	LocatableFile* sourceFile = NULL;
+	BString sourceText = "Source file unavailable.";
+	BString truncatedText;
+
+	if (fActiveSourceCode != NULL) {
+		sourceFile = fActiveFunction->GetFunctionDebugInfo()->SourceFile();
+
+		if (sourceFile != NULL && !sourceFile->GetLocatedPath(sourceText))
+			sourceFile->GetPath(sourceText);
+
+		if (fActiveSourceCode->GetSourceFile() == NULL && sourceFile != NULL) {
+			sourceText.Prepend("Click to locate source file '");
+			sourceText += "'";
+			truncatedText = sourceText;
+			fSourcePathView->TruncateString(&truncatedText, B_TRUNCATE_MIDDLE,
+				fSourcePathView->Bounds().Width());
+		} else if (sourceFile != NULL) {
+			sourceText.Prepend("File: ");
+		}
+	}
+
+	if (!truncatedText.IsEmpty() && truncatedText != sourceText) {
+		fSourcePathView->SetToolTip(sourceText);
+		fSourcePathView->SetText(truncatedText);
+	} else
+		fSourcePathView->SetText(sourceText);
 }
 
 
@@ -1182,33 +1224,8 @@ TeamWindow::_HandleSourceCodeChanged()
 	AutoLocker< ::Team> locker(fTeam);
 
 	SourceCode* sourceCode = fActiveFunction->GetFunction()->GetSourceCode();
-	LocatableFile* sourceFile = NULL;
-	BString sourceText;
-	BString truncatedText;
 	if (sourceCode == NULL)
 		sourceCode = fActiveFunction->GetSourceCode();
-
-	if (sourceCode != NULL)
-		sourceFile = fActiveFunction->GetFunctionDebugInfo()->SourceFile();
-
-	if (sourceFile != NULL && !sourceFile->GetLocatedPath(sourceText))
-		sourceFile->GetPath(sourceText);
-
-	if (sourceCode != NULL && sourceCode->GetSourceFile() == NULL
-		&& sourceFile != NULL) {
-		sourceText.Prepend("Click to locate source file '");
-		sourceText += "'";
-		truncatedText = sourceText;
-		fSourcePathView->TruncateString(&truncatedText, B_TRUNCATE_MIDDLE,
-			fSourcePathView->Bounds().Width());
-		if (sourceText != truncatedText)
-			fSourcePathView->SetToolTip(sourceText.String());
-		fSourcePathView->SetText(truncatedText.String());
-	} else if (sourceFile != NULL) {
-		sourceText.Prepend("File: ");
-		fSourcePathView->SetText(sourceText.String());
-	} else
-		fSourcePathView->SetText("Source file unavailable.");
 
 	BReference<SourceCode> sourceCodeReference(sourceCode);
 
@@ -1248,7 +1265,7 @@ TeamWindow::_HandleResolveMissingSourceFile(entry_ref& locatedPath)
 status_t
 TeamWindow::_SaveInspectorSettings(const BMessage* settings)
 {
-	if (fUISettings.AddSettings("inspectorWindow", *settings) != B_OK)
+	if (fUiSettings.AddSettings("inspectorWindow", *settings) != B_OK)
 		return B_NO_MEMORY;
 
 	return B_OK;

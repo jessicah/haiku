@@ -13,8 +13,8 @@
 
 #include "TeapotWindow.h"
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "TeapotWindow"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "TeapotWindow"
 
 TeapotWindow::TeapotWindow(BRect rect, const char* name, window_type wt,
 	ulong something)
@@ -213,10 +213,15 @@ TeapotWindow::QuitRequested()
 void
 TeapotWindow::DirectConnected(direct_buffer_info* info)
 {
+	// TODO: Direct rendering causes the mouse to flicker due
+	// to the lack of a Hardware Cursor, however without
+	// it the teapot freezes on mouse move. (bug?)
+	#if 1
 	if (fObjectView != NULL) {
 		fObjectView->DirectConnected(info);
 		fObjectView->EnableDirectMode(true);
 	}
+	#endif
 }
 
 

@@ -33,12 +33,12 @@ holders.
 All rights reserved.
 */
 
-#include <Debug.h>
 
 #include "BarMenuTitle.h"
 
 #include <Bitmap.h>
 #include <ControlLook.h>
+#include <Debug.h>
 
 #include "BarApp.h"
 #include "BarView.h"
@@ -123,7 +123,7 @@ TBarMenuTitle::DrawContent()
 			dstRect.OffsetTo(frame.LeftTop());
 			dstRect.OffsetBy(rintf(((frame.Width() - dstRect.Width()) / 2)
 				- 1.0f), rintf(((frame.Height() - dstRect.Height()) / 2)
-				- 0.0f));
+				+ 2.0f));
 
 			menu->DrawBitmapAsync(fIcon, dstRect);
 		}
@@ -208,4 +208,3 @@ TBarMenuTitle::Invoke(BMessage* message)
 
 	return BMenuItem::Invoke(message);
 }
-

@@ -55,7 +55,7 @@ Playlist::Listener::~Listener() {}
 void Playlist::Listener::ItemAdded(PlaylistItem* item, int32 index) {}
 void Playlist::Listener::ItemRemoved(int32 index) {}
 void Playlist::Listener::ItemsSorted() {}
-void Playlist::Listener::CurrentItemChanged(int32 newIndex) {}
+void Playlist::Listener::CurrentItemChanged(int32 newIndex, bool play) {}
 void Playlist::Listener::ImportFailed() {}
 
 
@@ -277,7 +277,7 @@ Playlist::AddItem(PlaylistItem* item, int32 index)
 		return false;
 
 	if (index <= fCurrentIndex)
-		SetCurrentItemIndex(fCurrentIndex + 1);
+		SetCurrentItemIndex(fCurrentIndex + 1, false);
 
 	_NotifyItemAdded(item, index);
 
@@ -325,10 +325,10 @@ Playlist::RemoveItem(int32 index, bool careAboutCurrentIndex)
 	_NotifyItemRemoved(index);
 
 	if (careAboutCurrentIndex) {
-		if (index == fCurrentIndex && index >= CountItems())
+		if (index >= CountItems())
 			SetCurrentItemIndex(CountItems() - 1);
-		else if (index < fCurrentIndex)
-			SetCurrentItemIndex(fCurrentIndex - 1);
+		else if (index <= fCurrentIndex)
+			SetCurrentItemIndex(index - 1);
 	}
 
 	return item;
@@ -360,22 +360,23 @@ Playlist::ItemAtFast(int32 index) const
 
 
 bool
-Playlist::SetCurrentItemIndex(int32 index)
+Playlist::SetCurrentItemIndex(int32 index, bool notify)
 {
 	bool result = true;
 	if (index >= CountItems()) {
 		index = CountItems() - 1;
 		result = false;
+		notify = false;
 	}
 	if (index < 0) {
 		index = -1;
 		result = false;
 	}
-	if (index == fCurrentIndex)
+	if (index == fCurrentIndex && !notify)
 		return result;
 
 	fCurrentIndex = index;
-	_NotifyCurrentItemChanged(fCurrentIndex);
+	_NotifyCurrentItemChanged(fCurrentIndex, notify);
 	return result;
 }
 
@@ -457,7 +458,7 @@ Playlist::AppendRefs(const BMessage* refsReceivedMessage, int32 appendIndex)
 			if (_IsQuery(type))
 				AppendQueryToPlaylist(ref, &subPlaylist);
 			else {
-				if ( !ExtraMediaExists(this, ref) ) {
+				if (!ExtraMediaExists(this, ref)) {
 					AppendToPlaylistRecursive(ref, &subPlaylist);
 				}
 			}
@@ -804,13 +805,13 @@ Playlist::_NotifyItemsSorted() const
 
 
 void
-Playlist::_NotifyCurrentItemChanged(int32 newIndex) const
+Playlist::_NotifyCurrentItemChanged(int32 newIndex, bool play) const
 {
 	BList listeners(fListeners);
 	int32 count = listeners.CountItems();
 	for (int32 i = 0; i < count; i++) {
 		Listener* listener = (Listener*)listeners.ItemAtFast(i);
-		listener->CurrentItemChanged(newIndex);
+		listener->CurrentItemChanged(newIndex, play);
 	}
 }
 

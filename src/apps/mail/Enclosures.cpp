@@ -64,7 +64,7 @@ of their respective holders. All rights reserved.
 #include "Messages.h"
 
 
-#define B_TRANSLATE_CONTEXT "Mail"
+#define B_TRANSLATION_CONTEXT "Mail"
 
 
 static const float kPlainFontSizeScale = 0.9;
@@ -426,7 +426,9 @@ TListView::MouseDown(BPoint point)
 	int32 buttons;
 	Looper()->CurrentMessage()->FindInt32("buttons", &buttons);
 
-	if ((buttons & B_SECONDARY_MOUSE_BUTTON) != 0) {
+	BListView::MouseDown(point);
+
+	if ((buttons & B_SECONDARY_MOUSE_BUTTON) != 0 && IndexOf(point) >= 0) {
 		BPopUpMenu menu("enclosure", false, false);
 		menu.SetFont(be_plain_font);
 		menu.AddItem(new BMenuItem(B_TRANSLATE("Open attachment"),
@@ -448,8 +450,7 @@ TListView::MouseDown(BPoint point)
 				Window()->PostMessage(item->Command(),fParent);
 			}
 		}
-	} else
-		BListView::MouseDown(point);
+	}
 }
 
 

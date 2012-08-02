@@ -33,7 +33,6 @@ holders.
 All rights reserved.
 */
 
-#include <Debug.h>
 
 #include "TeamMenuItem.h"
 
@@ -43,6 +42,7 @@ All rights reserved.
 
 #include <Bitmap.h>
 #include <ControlLook.h>
+#include <Debug.h>
 #include <Font.h>
 #include <Region.h>
 #include <Roster.h>
@@ -107,8 +107,8 @@ TTeamMenuItem::InitData(BList* team, BBitmap* icon, char* name, char* sig,
 	fOverrideHeight = height;
 	fOverriddenSelected = false;
 
-	fDrawLabel = drawLabel;
 	fVertical = vertical;
+	fDrawLabel = drawLabel;
 
 	fExpanded = false;
 }
@@ -127,21 +127,21 @@ status_t
 TTeamMenuItem::Invoke(BMessage* message)
 {
 	if ((static_cast<TBarApp*>(be_app))->BarView()->InvokeItem(Signature()))
-		//	handles drop on application
+		// handles drop on application
 		return B_OK;
 
-	//	if the app could not handle the drag message
-	//	and we were dragging, then kill the drag
-	//	should never get here, disabled item will not invoke
-	TBarView* barview = (static_cast<TBarApp*>(be_app))->BarView();
-	if (barview && barview->Dragging())
-		barview->DragStop();
+	// if the app could not handle the drag message
+	// and we were dragging, then kill the drag
+	// should never get here, disabled item will not invoke
+	TBarView* barView = (static_cast<TBarApp*>(be_app))->BarView();
+	if (barView && barView->Dragging())
+		barView->DragStop();
 
 	// bring to front or minimize shortcuts
 	uint32 mods = modifiers();
 	if (mods & B_CONTROL_KEY) {
 		TShowHideMenuItem::TeamShowHideCommon((mods & B_SHIFT_KEY)
-				? B_MINIMIZE_WINDOW : B_BRING_TO_FRONT, Teams());
+			? B_MINIMIZE_WINDOW : B_BRING_TO_FRONT, Teams());
 	}
 
 	return BMenuItem::Invoke(message);
@@ -167,6 +167,20 @@ TTeamMenuItem::SetOverrideSelected(bool selected)
 {
 	fOverriddenSelected = selected;
 	Highlight(selected);
+}
+
+
+bool
+TTeamMenuItem::HasLabel() const
+{
+	return fDrawLabel;
+}
+
+
+void
+TTeamMenuItem::SetHasLabel(bool drawLabel)
+{
+	fDrawLabel = drawLabel;
 }
 
 
@@ -206,24 +220,28 @@ TTeamMenuItem::GetContentSize(float* width, float* height)
 	if (fIcon)
 		iconBounds = fIcon->Bounds();
 	else
-		iconBounds = BRect(0, 0, 15, 15);
+		iconBounds = BRect(0, 0, kMinimumIconSize - 1, kMinimumIconSize - 1);
 
 	BMenuItem::GetContentSize(width, height);
 
 	if (fOverrideWidth != -1.0f)
 		*width = fOverrideWidth;
-	else
-		*width = kHPad + iconBounds.Width() + kLabelOffset + fLabelWidth + kHPad
-			+ 20;
+	else {
+		*width = kHPad + iconBounds.Width() + kHPad;
+		if (iconBounds.Width() <= 32 && fDrawLabel)
+			*width += LabelWidth() + kHPad;
+	}
 
 	if (fOverrideHeight != -1.0f)
 		*height = fOverrideHeight;
 	else {
-		*height = iconBounds.Height();
-		float labelHeight = fLabelAscent + fLabelDescent;
-		if (labelHeight > *height)
-			*height = labelHeight;
-		*height += (kVPad * 2) + 2;
+		if (fVertical) {
+			*height = iconBounds.Height() + kVPad * 4;
+			if (fDrawLabel && iconBounds.Width() > 32)
+				*height += fLabelAscent + fLabelDescent;
+		} else {
+			*height = iconBounds.Height() - kVPad * 8;
+		}
 	}
 	*height += 2;
 }
@@ -236,10 +254,10 @@ TTeamMenuItem::Draw()
 	BMenu* menu = Menu();
 	menu->PushState();
 	rgb_color menuColor = menu->LowColor();
-	TBarView* barview = (static_cast<TBarApp*>(be_app))->BarView();
+	TBarView* barView = (static_cast<TBarApp*>(be_app))->BarView();
 
-	bool canHandle = !barview->Dragging()
-		|| barview->AppCanHandleTypes(Signature());
+	bool canHandle = !barView->Dragging()
+		|| barView->AppCanHandleTypes(Signature());
 
 	if (be_control_look != NULL) {
 		uint32 flags = 0;
@@ -275,7 +293,7 @@ TTeamMenuItem::Draw()
 		return;
 	}
 
-	//	if not selected or being tracked on, fill with gray
+	// if not selected or being tracked on, fill with gray
 	if ((!_IsSelected() && !menu->IsRedrawAfterSticky()) || !canHandle
 		|| !IsEnabled()) {
 		frame.InsetBy(1, 1);
@@ -283,7 +301,7 @@ TTeamMenuItem::Draw()
 		menu->FillRect(frame);
 	}
 
-	//	draw the gray, unselected item, border
+	// draw the gray, unselected item, border
 	if (!_IsSelected() || !IsEnabled()) {
 		rgb_color shadow = tint_color(menuColor, B_DARKEN_1_TINT);
 		rgb_color light = tint_color(menuColor, B_LIGHTEN_2_TINT);
@@ -308,7 +326,7 @@ TTeamMenuItem::Draw()
 			menu->StrokeLine(frame.LeftTop(), frame.LeftBottom());
 	}
 
-	//	if selected or being tracked on, fill with the hilite gray color
+	// if selected or being tracked on, fill with the hilite gray color
 	if (IsEnabled() && _IsSelected() && !menu->IsRedrawAfterSticky()
 		&& canHandle) {
 		// fill
@@ -337,7 +355,7 @@ void
 TTeamMenuItem::DrawContent()
 {
 	BMenu* menu = Menu();
-	if (fIcon) {
+	if (fIcon != NULL) {
 		if (fIcon->ColorSpace() == B_RGBA32) {
 			menu->SetDrawingMode(B_OP_ALPHA);
 			menu->SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
@@ -347,17 +365,33 @@ TTeamMenuItem::DrawContent()
 		BRect frame(Frame());
 		BRect iconBounds(fIcon->Bounds());
 		BRect dstRect(iconBounds);
-		float extra = fVertical ? 0.0f : 1.0f;
+		float extra = fVertical ? 0.0f : -1.0f;
 		BPoint contLoc = ContentLocation();
-
-		dstRect.OffsetTo(BPoint(contLoc.x + kHPad, contLoc.y + 
-			((frame.Height() - iconBounds.Height()) / 2) + extra));
-		menu->DrawBitmapAsync(fIcon, dstRect);
-
-		float labelHeight = fLabelAscent + fLabelDescent;
 		BPoint drawLoc = contLoc + BPoint(kHPad, kVPad);
-		drawLoc.x += iconBounds.Width() + kLabelOffset;
-		drawLoc.y = frame.top + ((frame.Height() - labelHeight) / 2) + 1.0f;
+
+		if (!fDrawLabel || (fVertical && iconBounds.Width() > 32)) {
+			float offsetx = contLoc.x
+				+ ((frame.Width() - iconBounds.Width()) / 2) + extra;
+			float offsety = contLoc.y + 3.0f + extra;
+
+			dstRect.OffsetTo(BPoint(offsetx, offsety));
+			menu->DrawBitmapAsync(fIcon, dstRect);
+
+			drawLoc.x = ((frame.Width() - LabelWidth()) / 2);
+			drawLoc.y = frame.top + iconBounds.Height() + 4.0f;
+		} else {
+			float offsetx = contLoc.x + kHPad;
+			float offsety = contLoc.y + 
+				((frame.Height() - iconBounds.Height()) / 2) + extra;
+
+			dstRect.OffsetTo(BPoint(offsetx, offsety));
+			menu->DrawBitmapAsync(fIcon, dstRect);
+
+			float labelHeight = fLabelAscent + fLabelDescent;
+			drawLoc.x += iconBounds.Width() + kLabelOffset;
+			drawLoc.y = frame.top + ((frame.Height() - labelHeight) / 2) + extra;
+		}
+
 		menu->MovePenTo(drawLoc);
 	}
 
@@ -377,7 +411,7 @@ TTeamMenuItem::DrawContent()
 	// Draw the expandable icon.
 	TBarView* barView = (static_cast<TBarApp*>(be_app))->BarView();
 	if (fVertical && static_cast<TBarApp*>(be_app)->Settings()->superExpando
-		&& barView->Expando()) {
+		&& barView->ExpandoState()) {
 		BRect frame(Frame());
 		BRect rect(0, 0, kSwitchWidth, 10);
 		rect.OffsetTo(BPoint(frame.right - rect.Width(),
@@ -449,10 +483,10 @@ TTeamMenuItem::DrawContentLabel()
 	char* truncLabel = NULL;
 	float max = 0;
 
-	if (static_cast<TBarApp*>(be_app)->Settings()->superExpando && fVertical)
+	if (fVertical && static_cast<TBarApp*>(be_app)->Settings()->superExpando)
 		max = menu->MaxContentWidth() - kSwitchWidth;
 	else
-		max = menu->MaxContentWidth();
+		max = menu->MaxContentWidth() - 4.0f;
 
 	if (max > 0) {
 		BPoint penloc = menu->PenLocation();
@@ -591,4 +625,3 @@ TTeamMenuItem::_IsSelected() const
 {
 	return IsSelected() || fOverriddenSelected;
 }
-

@@ -13,18 +13,23 @@
  *		Adrien Destugues <pulkomandy@pulkomandy.ath.cx>
  */
 
-#include <ControlLook.h>
+
+#include "NotificationView.h"
+
+
+#include <Bitmap.h>
 #include <GroupLayout.h>
-#include <GroupLayoutBuilder.h>
-#include <Layout.h>
 #include <LayoutUtils.h>
+#include <MessageRunner.h>
 #include <Messenger.h>
+#include <Notification.h>
 #include <Path.h>
+#include <PropertyInfo.h>
 #include <Roster.h>
 #include <StatusBar.h>
 
-#include "NotificationView.h"
 #include "NotificationWindow.h"
+
 
 static const int kIconStripeWidth = 32;
 
@@ -364,31 +369,6 @@ NotificationView::MouseDown(BPoint point)
 }
 
 
-/*
-BSize
-NotificationView::MinSize()
-{
-//	return BLayoutUtils::ComposeSize(ExplicitMinSize(), _CalculateSize());
-	return _CalculateSize();
-}
-
-
-BSize
-NotificationView::MaxSize()
-{
-	return _CalculateSize();
-}
-
-
-BSize
-NotificationView::PreferredSize()
-{
-	return BLayoutUtils::ComposeSize(ExplicitPreferredSize(),
-		_CalculateSize());
-}
-*/
-
-
 BHandler*
 NotificationView::ResolveSpecifier(BMessage* msg, int32 index, BMessage* spec,
 	int32 form, const char* prop)
@@ -536,24 +516,19 @@ NotificationView::MessageID() const
 }
 
 
-BSize
+void
 NotificationView::_CalculateSize()
 {
-	BSize size;
-
-	size.width = 300;
-	size.height = fHeight;
+	float height = fHeight;
 
 	if (fNotification->Type() == B_PROGRESS_NOTIFICATION) {
 		font_height fh;
 		be_plain_font->GetHeight(&fh);
 		float fontHeight = fh.ascent + fh.descent + fh.leading;
-		size.height += 9 + (kSmallPadding * 2) + (kEdgePadding * 1)
+		height += 9 + (kSmallPadding * 2) + (kEdgePadding * 1)
 			+ fontHeight * 2;
 	}
 
-	SetExplicitMinSize(size);
-	SetExplicitMaxSize(size);
-
-	return size;
+	SetExplicitMinSize(BSize(0, height));
+	SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED, height));
 }

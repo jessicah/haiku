@@ -17,8 +17,8 @@
 #include <Catalog.h>
 #include <Debug.h>
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Chart"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Chart"
 
 int
 main()
@@ -33,7 +33,7 @@ main()
 
 ChartApp::ChartApp() : BApplication("application/x-vnd.Be.ChartDemo")
 {
-	fWindow = new ChartWindow(BRect(120, 150, 629, 591),
+	fWindow = new ChartWindow(BRect(120, 150, 965, 591),
 		B_TRANSLATE_SYSTEM_NAME("Chart"));
 
 	// showing the window will also start the direct connection. If you

@@ -701,11 +701,11 @@ BStatusBar::Perform(perform_code code, void* _data)
 			BStatusBar::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BStatusBar::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BStatusBar::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
@@ -772,14 +772,7 @@ BStatusBar::_SetTextData(BString& text, const char* source,
 	if (text == source)
 		return;
 
-	float oldWidth;
-	if (rightAligned)
-		oldWidth = Bounds().right - fTextDivider;
-	else
-		oldWidth = fTextDivider;
-
 	bool oldHasText = _HasText();
-
 	text = source;
 
 	BString newString;
@@ -787,17 +780,6 @@ BStatusBar::_SetTextData(BString& text, const char* source,
 		newString << text << combineWith;
 	else
 		newString << combineWith << text;
-
-	float newWidth = ceilf(StringWidth(newString.String()));
-		// might still be smaller in Draw(), but we use it
-		// only for the invalidation rect here
-
-	// determine which part of the view needs an update
-	float invalidateWidth = max_c(newWidth, oldWidth);
-
-	float position = 0.0;
-	if (rightAligned)
-		position = Bounds().right - invalidateWidth;
 
 	if (oldHasText != _HasText())
 		InvalidateLayout();

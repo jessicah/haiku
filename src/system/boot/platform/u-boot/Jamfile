@@ -8,6 +8,7 @@ UsePrivateHeaders [ FDirName kernel disk_device_manager ] ;
 UsePrivateHeaders [ FDirName graphics common ] ;
 UsePrivateHeaders [ FDirName graphics vesa ] ;
 UsePrivateHeaders [ FDirName storage ] ;
+UsePrivateHeaders [ FDirName kernel arch generic ] ;
 
 # TODO: move this to arch/arm !
 
@@ -29,7 +30,7 @@ SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src add-ons accelerants common ] ;
 
 # First build the non arch dependent parts
 KernelMergeObject boot_platform_u-boot_common.o :
-	start2.cpp
+	start.cpp
 	debug.cpp
 	console.cpp
 	serial.cpp
@@ -181,13 +182,19 @@ actions BuildUBootSDImage1
 BuildUImage haiku_loader.ub : haiku_loader :
 	-A $(TARGET_ARCH) -O $(uImageFakeOS) -T kernel -C none
 	-a $(HAIKU_BOARD_LOADER_BASE) -e $(HAIKU_BOARD_LOADER_ENTRY_RAW)
-		-n 'haiku_loader' ;
+		-n 'haiku_loader $(TARGET_BOOT_BOARD)' ;
 
 local tgzArchive = haiku-floppyboot.tgz ;
+
+BuildUImage haiku_loader_linux.ub : haiku_loader :
+	-A $(TARGET_ARCH) -O linux -T kernel -C none
+	-a $(HAIKU_BOARD_LOADER_BASE) -e $(HAIKU_BOARD_LOADER_ENTRY_LINUX)
+		-n 'haiku_loader $(TARGET_BOOT_BOARD)' ;
+
 BuildUImage haiku_loader_nbsd.ub : haiku_loader $(tgzArchive) :
 	-A $(TARGET_ARCH) -O $(uImageFakeOS) -T multi -C none
 	-a $(HAIKU_BOARD_LOADER_BASE) -e $(HAIKU_BOARD_LOADER_ENTRY_NBSD)
-		-n 'haiku_loader' ;
+		-n 'haiku_loader $(TARGET_BOOT_BOARD)' ;
 
 if $(HAIKU_BOARD_SDIMAGE_UBOOT_SCRIPT_NAME) {
 	BuildUImageScript $(HAIKU_BOARD_SDIMAGE_UBOOT_SCRIPT_NAME) :

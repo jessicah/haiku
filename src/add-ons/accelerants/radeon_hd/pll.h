@@ -48,6 +48,9 @@ struct pll_info {
 	/* pixel clock to be programmed (kHz)*/
 	uint32 pixelClock;
 
+	/* external DisplayPort clock freq */
+	uint32 dpExternalClock;
+
 	/* flags for the current clock */
 	uint32 flags;
 
@@ -81,6 +84,18 @@ struct pll_info {
 	uint32 maxFeedbackDiv;
 	uint32 minFeedbackDivFrac;
 	uint32 maxFeedbackDivFrac;
+
+	/* spread spectrum info */
+	uint8 ssType;
+	uint8 ssDelay;
+	uint8 ssRange;
+	uint8 ssReferenceDiv;
+	uint16 ssPercentage;
+	uint16 ssStep;
+	/* asic spread spectrum */
+	uint16 ssRate;
+	uint16 ssAmount;
+
 };
 
 
@@ -88,6 +103,8 @@ status_t pll_adjust(pll_info* pll, uint8 crtcID);
 status_t pll_compute(pll_info* pll);
 void pll_setup_flags(pll_info* pll, uint8 crtcID);
 status_t pll_limit_probe(pll_info* pll);
+status_t pll_dp_ss_probe(pll_info* pll);
+status_t pll_asic_ss_probe(pll_info* pll);
 status_t pll_set(uint8 pllID, uint32 pixelClock, uint8 crtcID);
 
 

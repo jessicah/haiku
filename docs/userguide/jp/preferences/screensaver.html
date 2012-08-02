@@ -11,18 +11,19 @@
  *		Humdinger <humdingerb@gmail.com>
  * Translators:
  *		hiromu1996
+ *		mt
  *
 -->
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
 	<meta http-equiv="Content-Style-Type" content="text/css" />
 	<meta name="robots" content="all" />
-	<title>ScreenSaver</title>
+	<title>スクリーンセーバー</title>
 	<link rel="stylesheet" type="text/css" href="../../Haiku-doc.css" />
 </head>
 <body>
 
 <div id="banner">
-<div><span>ユーザーガイド</span></div>
+<div><span>User guide</span></div>
 </div>
 
 <div class="nav">
@@ -43,45 +44,42 @@
 <li><a href="../../en/preferences/screensaver.html"><img src="../../images/flags/gb.png" alt="" />English</a></li>
 </ul>
 <span>
- «  <a href="screen.html">スクリーン</a> 
-::  <a href="../preferences.html" class="uplink">Preferences</a> 
-::  <a href="sounds.html">Sounds</a>  »
+ «  <a href="screen.html">画面</a> 
+::  <a href="../preferences.html" class="uplink">Preferences (プレファレンス)</a> 
+::  <a href="sounds.html">サウンド</a>  »
 </span></div>
 </div>
 
 <div id="content">
 <div>
-<div class="box-info">このページの翻訳はまだ完全ではありません。完成するまでは、未完成の部分はオリジナルの英文を使用します。</div>
-<h2><img src="../../images/prefs-images/screensaver-icon_64.png" alt="screensaver-icon_64.png" width="64" height="64" />ScreenSaver</h2>
+<h2><img src="../../images/prefs-images/screensaver-icon_64.png" alt="screensaver-icon_64.png" width="64" height="64" />スクリーンセーバー (ScreenSaver)</h2>
 <table summary="layout" border="0" cellspacing="0" cellpadding="2">
-<tr><td>Deskbar メニュー：</td><td style="width:15px;"></td><td><span class="menu">Preferences</span></td></tr>
-<tr><td>場所：</td><td></td><td><span class="path">/boot/system/preferences/Screensaver</span></td></tr>
-<tr><td>設定ファイル：</td><td></td><td><span class="path">~/config/settings/ScreenSaver_settings</span></td></tr>
+<tr><td>Deskbar メニュー:</td><td style="width:15px;"></td><td><span class="menu">Preferences</span></td></tr>
+<tr><td>場所:</td><td></td><td><span class="path">/boot/system/preferences/Screensaver</span></td></tr>
+<tr><td>設定ファイル:</td><td></td><td><span class="path">~/config/settings/ScreenSaver_settings</span></td></tr>
 </table>
 
-<p>この設定はFadeとModulesの2つのタブに分けられています。
-</p>
+<p>スクリーンセーバー設定のパネルは 2 つのタブに分かれています。</p>
 
 <h2>
 <a href="#"><img src="../../images/up.png" style="border:none;float:right" alt="index" /></a>
-<a name="fade" id="fade">Fade</a></h2>
+<a name="fade" id="fade">一般 (General)</a></h2>
 <img src="../images/prefs-images/screensaver-fade.png" alt="screensaver-fade.png" />
 <br />
-<p>1つ目のチェックボックスでスクリーンセーバーを有効にするかを選択します。<br />
+<p>一番上のチェックボックスでスクリーンセーバーを有効にするかを選択します。<br />
 その下のスライドバーでスクリーンセーバーが起動するまでの時間を変更できます。</p>
-<p>2つ目では一定時間経過後にディスプレイの電源を切るかを選択します。<br />
-チェックボックスが選択されているなら、横のスライドバーでディスプレイの電源が切られるまでの時間を設定できます。<br />
-3つ目ではパスワードロックをするかを選択できます。<br />
-パスワードロックが有効にされているなら、その横のスライドバーでパスワードロックをかけるまでの時間を設定できます。
+<p>次の2 つのスライダーは、チェック母ックを有効にしたときにのみ未使用できます。<br />
+1 つは、ディスプレイの電源が切れるまでの時間を設定します。<br />
+もう 1 つは、アンロックのためにパスワードが必要となるまでの時間を設定します。
 </p>
 <p>下部の画面のイラストをクリックすることで、どの角にマウスをおいたときにスクリーンセーバーを起動するかを設定できます。この機能を無効化したいときは、イラストの真ん中をクリックしてください。</p>
 
 <h2>
 <a href="#"><img src="../../images/up.png" style="border:none;float:right" alt="index" /></a>
-<a name="screensavers" id="modules">Screensavers</a></h2>
+<a name="screensavers" id="modules">スクリーンセーバー (Screensavers)</a></h2>
 <img src="../images/prefs-images/screensaver-modules.png" alt="screensaver-modules.png" />
 <br />
-<p>The second tab shows a list of all installed screen savers and their individual settings. You can test your settings with the <span class="button">Test</span> button below the list and add more screen savers with the <span class="button">Add...</span> button beside it. Another way to install new screen savers is by a simple drag&amp;drop into the list. Of course, you can also copy/delete its file in its respective user folder, i.e. <span class="path">/boot/common/add-ons/Screen Savers/</span> or <span class="path">/boot/home/config/add-ons/Screen Savers/</span> (see topic <a href="../filesystem-layout.html">Filesystem layout</a>).
+<p>2 つめのタブには、インストールされたすべてのスクリーンセーバーのリストとそれぞれの設定が表示されます。リストの下にある<span class="button">テスト (Test)</span> ボタンで選択しているスクリーンセーバーを試すことができます。また、<span class="button">追加… (Add...)</span> ボタンでスクリーンセーバーの追加ができます。別のやり方としては、スクリーンセーバーをリストにドラッグアンドドロップしても追加できます。もちろん、それぞれのユーザーのフォルダー (すなわち<span class="path">/boot/common/add-ons/Screen Savers/</span>、もしくは<span class="path">/boot/home/config/add-ons/Screen Savers/</span>) で、ファイルのコピーや削除ができます (<a href="../filesystem-layout.html">ファイルシステムレイアウト</a>のトピックをご覧ください)。
 </p>
 
 </div>
@@ -89,9 +87,9 @@
 
 <div class="nav">
 <div class="inner"><span>
- «  <a href="screen.html">スクリーン</a> 
-::  <a href="../preferences.html" class="uplink">Preferences</a> 
-::  <a href="sounds.html">Sounds</a>  »
+ «  <a href="screen.html">画面</a> 
+::  <a href="../preferences.html" class="uplink">Preferences (プレファレンス)</a> 
+::  <a href="sounds.html">サウンド</a>  »
 </span></div>
 </div>
 

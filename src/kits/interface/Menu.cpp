@@ -17,14 +17,12 @@
 #include <string.h>
 
 #include <Bitmap.h>
-#include <Catalog.h>
 #include <ControlLook.h>
 #include <Debug.h>
 #include <File.h>
 #include <FindDirectory.h>
 #include <Layout.h>
 #include <LayoutUtils.h>
-#include <LocaleBackend.h>
 #include <MenuBar.h>
 #include <MenuItem.h>
 #include <Messenger.h>
@@ -32,6 +30,7 @@
 #include <PropertyInfo.h>
 #include <Screen.h>
 #include <ScrollBar.h>
+#include <SystemCatalog.h>
 #include <Window.h>
 
 #include <AppServerLink.h>
@@ -46,15 +45,14 @@
 
 #define USE_CACHED_MENUWINDOW 1
 
-using BPrivate::gLocaleBackend;
-using BPrivate::LocaleBackend;
+using BPrivate::gSystemCatalog;
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Menu"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Menu"
 
 #undef B_TRANSLATE
 #define B_TRANSLATE(str) \
-	gLocaleBackend->GetString(B_TRANSLATE_MARK(str), "Menu")
+	gSystemCatalog.GetString(B_TRANSLATE_MARK(str), "Menu")
 
 
 using std::nothrow;
@@ -523,9 +521,9 @@ BMenu::KeyDown(const char* bytes, int32 numBytes)
 			else {
 				if (fSelected && fSelected->Submenu()) {
 					fSelected->Submenu()->_SetStickyMode(true);
-						// fix me: this shouldn't be needed but dynamic menus 
-						// aren't getting it set correctly when keyboard 
-						// navigating, which aborts the attach 
+						// fix me: this shouldn't be needed but dynamic menus
+						// aren't getting it set correctly when keyboard
+						// navigating, which aborts the attach
 					fState = MENU_STATE_KEY_TO_SUBMENU;
 					_SelectItem(fSelected, true, true, true);
 				} else if (dynamic_cast<BMenuBar*>(Supermenu())) {
@@ -678,17 +676,11 @@ BMenu::FrameResized(float new_width, float new_height)
 void
 BMenu::InvalidateLayout()
 {
-	InvalidateLayout(false);
-}
-
-
-void
-BMenu::InvalidateLayout(bool descendants)
-{
 	fUseCachedMenuLayout = false;
-	fLayoutData->preferred.Set(B_SIZE_UNSET, B_SIZE_UNSET);
-
-	BView::InvalidateLayout(descendants);
+	// This method exits for backwards compatibility reasons, it is used to
+	// invalidate the menu layout, but we also use call
+	// BView::InvalidateLayout() for good measure. Don't delete this method!
+	BView::InvalidateLayout(false);
 }
 
 
@@ -1237,18 +1229,18 @@ BMenu::Perform(perform_code code, void* _data)
 			BMenu::GetHeightForWidth(data->width, &data->min, &data->max,
 				&data->preferred);
 			return B_OK;
-}
+		}
 		case PERFORM_CODE_SET_LAYOUT:
 		{
 			perform_data_set_layout* data = (perform_data_set_layout*)_data;
 			BMenu::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BMenu::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BMenu::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
@@ -1435,11 +1427,6 @@ void BMenu::_ReservedMenu6() {}
 void
 BMenu::_InitData(BMessage* archive)
 {
-	// we need to translate some strings, and in order to do so, we need
-	// to use the LocaleBackend to reach liblocale.so
-	if (gLocaleBackend == NULL)
-		LocaleBackend::LoadBackend();
-
 	BPrivate::kEmptyMenuLabel = B_TRANSLATE("<empty>");
 
 	// TODO: Get _color, _fname, _fflt from the message, if present
@@ -1472,7 +1459,7 @@ BMenu::_InitData(BMessage* archive)
 		archive->FindFloat("_maxwidth", &fMaxContentWidth);
 
 		BMessage msg;
-			for (int32 i = 0; archive->FindMessage("_items", i, &msg) == B_OK; i++) {
+		for (int32 i = 0; archive->FindMessage("_items", i, &msg) == B_OK; i++) {
 			BArchivable* object = instantiate_object(&msg);
 			if (BMenuItem* item = dynamic_cast<BMenuItem*>(object)) {
 				BRect bounds;
@@ -1514,8 +1501,8 @@ BMenu::_Show(bool selectFirstItem, bool keyDown)
 	if (window->Lock()) {
 		bool addAborted = false;
 		if (keyDown)
-			addAborted = _AddDynamicItems(keyDown);	
-		
+			addAborted = _AddDynamicItems(keyDown);
+
 		if (addAborted) {
 			if (ourWindow)
 				window->Quit();
@@ -1524,7 +1511,7 @@ BMenu::_Show(bool selectFirstItem, bool keyDown)
 			return false;
 		}
 		fAttachAborted = false;
-		
+
 		window->AttachMenu(this);
 
 		if (ItemAt(0) != NULL) {
@@ -1635,9 +1622,8 @@ BMenu::_Track(int* action, long start)
 		// first we check if mouse is inside a submenu,
 		// then if the mouse is inside this menu,
 		// then if it's over a super menu.
-		bool overSub = _OverSubmenu(fSelected, screenLocation);
-		item = _HitTestItems(location, B_ORIGIN);
-		if (overSub || fState == MENU_STATE_KEY_TO_SUBMENU) {
+		if (_OverSubmenu(fSelected, screenLocation)
+				|| fState == MENU_STATE_KEY_TO_SUBMENU) {
 			if (fState == MENU_STATE_TRACKING) {
 				// not if from R.Arrow
 				fState = MENU_STATE_TRACKING_SUBMENU;
@@ -1677,7 +1663,7 @@ BMenu::_Track(int* action, long start)
 				fState = MENU_STATE_TRACKING;
 			if (!LockLooper())
 				break;
-		} else if (item != NULL) {
+		} else if ((item = _HitTestItems(location, B_ORIGIN)) != NULL) {
 			_UpdateStateOpenSelect(item, location, navAreaRectAbove,
 				navAreaRectBelow, selectedTime, navigationAreaTime);
 			if (!releasedOnce)
@@ -1745,7 +1731,7 @@ BMenu::_Track(int* action, long start)
 
 	if (action != NULL)
 		*action = fState;
-		
+
 	// keyboard Enter will set this
 	if (fChosenItem != NULL)
 		item = fChosenItem;
@@ -1757,7 +1743,7 @@ BMenu::_Track(int* action, long start)
 		_SelectItem(NULL);
 		UnlockLooper();
 	}
-	
+
 	// delete the menu window recycled for all the child menus
 	_DeleteMenuWindow();
 
@@ -2276,6 +2262,14 @@ BMenu::_ComputeMatrixLayout(BRect &frame)
 			frame.bottom = max_c(frame.bottom, item->Frame().bottom);
 		}
 	}
+}
+
+
+void
+BMenu::LayoutInvalidated(bool descendants)
+{
+	fUseCachedMenuLayout = false;
+	fLayoutData->preferred.Set(B_SIZE_UNSET, B_SIZE_UNSET);
 }
 
 
@@ -2880,7 +2874,7 @@ BMenu::_AddDynamicItems(bool keyDown)
 			}
 		} while (AddDynamicItem(B_PROCESSING));
 	}
-	
+
 	return addAborted;
 }
 
@@ -2979,3 +2973,12 @@ get_menu_info(menu_info* info)
 
 	return status;
 }
+
+
+extern "C" void
+B_IF_GCC_2(InvalidateLayout__5BMenub,_ZN5BMenu16InvalidateLayoutEb)(
+	BMenu* menu, bool descendants)
+{
+	menu->InvalidateLayout();
+}
+

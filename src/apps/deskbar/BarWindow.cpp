@@ -39,6 +39,7 @@ All rights reserved.
 #include <stdio.h>
 
 #include <Application.h>
+#include <Catalog.h>
 #include <Directory.h>
 #include <FindDirectory.h>
 #include <Path.h>
@@ -47,6 +48,7 @@ All rights reserved.
 #include <Locale.h>
 #include <MenuItem.h>
 #include <MessageFilter.h>
+#include <MessagePrivate.h>
 #include <Screen.h>
 
 #include "BarApp.h"
@@ -57,11 +59,9 @@ All rights reserved.
 #include "StatusView.h"
 #include "tracker_private.h"
 
-#include <MessagePrivate.h>
 
-
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "MainWindow"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "MainWindow"
 
 
 // This is a very ugly hack to be able to call the private
@@ -90,14 +90,14 @@ TBarWindow::TBarWindow()
 		B_WILL_ACCEPT_FIRST_CLICK | B_NOT_ZOOMABLE | B_NOT_CLOSABLE
 		| B_NOT_MINIMIZABLE | B_NOT_MOVABLE | B_NOT_RESIZABLE
 		| B_AVOID_FRONT | B_ASYNCHRONOUS_CONTROLS,
-		B_ALL_WORKSPACES)
+		B_ALL_WORKSPACES),
+	fShowingMenu(false)
 {
 	desk_settings* settings = ((TBarApp*)be_app)->Settings();
 	if (settings->alwaysOnTop)
 		SetFeel(B_FLOATING_ALL_WINDOW_FEEL);
 	fBarView = new TBarView(Bounds(), settings->vertical, settings->left,
-		settings->top, settings->ampmMode, settings->state, settings->width,
-		settings->showTime);
+		settings->top, settings->state, settings->width);
 	AddChild(fBarView);
 
 	RemoveShortcut('H', B_COMMAND_KEY | B_CONTROL_KEY);
@@ -140,10 +140,7 @@ TBarWindow::MenusBeginning()
 	sDeskbarMenu->NeedsToRebuild();
 	sDeskbarMenu->ResetTargets();
 
-	fBarView->SetEventMask(0);
-		// This works around a BeOS bug - the menu is quit with every
-		// B_MOUSE_DOWN the window receives...
-
+	fShowingMenu = true;
 	BWindow::MenusBeginning();
 }
 
@@ -151,6 +148,7 @@ TBarWindow::MenusBeginning()
 void
 TBarWindow::MenusEnded()
 {
+	fShowingMenu = false;
 	BWindow::MenusEnded();
 
 	if (sDeskbarMenu->LockLooper()) {
@@ -158,8 +156,6 @@ TBarWindow::MenusEnded()
 		sDeskbarMenu->RemoveItems(0, sDeskbarMenu->CountItems(), true);
 		sDeskbarMenu->UnlockLooper();
 	}
-
-	fBarView->UpdateEventMask();
 }
 
 
@@ -252,7 +248,7 @@ TBarWindow::WorkspaceActivated(int32 workspace, bool active)
 {
 	BWindow::WorkspaceActivated(workspace, active);
 
-	if (active && !(fBarView->Expando() && fBarView->Vertical()))
+	if (active && !(fBarView->ExpandoState() && fBarView->Vertical()))
 		fBarView->UpdatePlacement();
 	else {
 		BRect screenFrame = (BScreen(fBarView->Window())).Frame();
@@ -346,7 +342,7 @@ TBarWindow::GetLocation(BMessage* message)
 {
 	BMessage reply('rply');
 	reply.AddInt32("location", (int32)DeskbarLocation());
-	reply.AddBool("expanded", fBarView->Expando());
+	reply.AddBool("expanded", fBarView->ExpandoState());
 
 	message->SendReply(&reply);
 }
@@ -430,7 +426,7 @@ void
 TBarWindow::IsExpanded(BMessage* message)
 {
 	BMessage reply('rply');
-	reply.AddBool("expanded", fBarView->Expando());
+	reply.AddBool("expanded", fBarView->ExpandoState());
 	message->SendReply(&reply);
 }
 
@@ -518,7 +514,7 @@ TBarWindow::CountItems(BMessage* message)
 void
 TBarWindow::AddItem(BMessage* message)
 {
-	DeskbarShelf shelf = B_DESKBAR_TRAY; 
+	DeskbarShelf shelf = B_DESKBAR_TRAY;
 	entry_ref ref;
 	int32 id = 999;
 	BMessage reply;
@@ -595,6 +591,13 @@ TBarWindow::GetIconFrame(BMessage* message)
 
 
 bool
+TBarWindow::IsShowingMenu() const
+{
+	return fShowingMenu;
+}
+
+
+bool
 TBarWindow::_IsFocusMessage(BMessage* message)
 {
 	BMessage::Private messagePrivate(message);
@@ -608,4 +611,3 @@ TBarWindow::_IsFocusMessage(BMessage* message)
 
 	return true;
 }
-

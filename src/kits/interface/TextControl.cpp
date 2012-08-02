@@ -440,7 +440,6 @@ BTextControl::Draw(BRect updateRect)
 	rgb_color noTint = ui_color(B_PANEL_BACKGROUND_COLOR);
 	rgb_color lighten1 = tint_color(noTint, B_LIGHTEN_1_TINT);
 	rgb_color lighten2 = tint_color(noTint, B_LIGHTEN_2_TINT);
-	rgb_color lightenMax = tint_color(noTint, B_LIGHTEN_MAX_TINT);
 	rgb_color darken1 = tint_color(noTint, B_DARKEN_1_TINT);
 	rgb_color darken2 = tint_color(noTint, B_DARKEN_2_TINT);
 	rgb_color darken4 = tint_color(noTint, B_DARKEN_4_TINT);
@@ -841,17 +840,6 @@ BTextControl::PreferredSize()
 }
 
 
-void
-BTextControl::InvalidateLayout(bool descendants)
-{
-	CALLED();
-
-	fLayoutData->valid = false;
-
-	BView::InvalidateLayout(descendants);
-}
-
-
 BLayoutItem*
 BTextControl::CreateLabelLayoutItem()
 {
@@ -867,6 +855,15 @@ BTextControl::CreateTextViewLayoutItem()
 	if (!fLayoutData->text_view_layout_item)
 		fLayoutData->text_view_layout_item = new TextViewLayoutItem(this);
 	return fLayoutData->text_view_layout_item;
+}
+
+
+void
+BTextControl::LayoutInvalidated(bool descendants)
+{
+	CALLED();
+
+	fLayoutData->valid = false;
 }
 
 
@@ -965,11 +962,11 @@ BTextControl::Perform(perform_code code, void* _data)
 			BTextControl::SetLayout(data->layout);
 			return B_OK;
 		}
-		case PERFORM_CODE_INVALIDATE_LAYOUT:
+		case PERFORM_CODE_LAYOUT_INVALIDATED:
 		{
-			perform_data_invalidate_layout* data
-				= (perform_data_invalidate_layout*)_data;
-			BTextControl::InvalidateLayout(data->descendants);
+			perform_data_layout_invalidated* data
+				= (perform_data_layout_invalidated*)_data;
+			BTextControl::LayoutInvalidated(data->descendants);
 			return B_OK;
 		}
 		case PERFORM_CODE_DO_LAYOUT:
@@ -1482,4 +1479,14 @@ BTextControl::TextViewLayoutItem::Instantiate(BMessage* from)
 	return NULL;
 }
 
+
+extern "C" void
+B_IF_GCC_2(InvalidateLayout__12BTextControlb,
+	_ZN12BTextControl16InvalidateLayoutEb)(BView* view, bool descendants)
+{
+	perform_data_layout_invalidated data;
+	data.descendants = descendants;
+
+	view->Perform(PERFORM_CODE_LAYOUT_INVALIDATED, &data);
+}
 

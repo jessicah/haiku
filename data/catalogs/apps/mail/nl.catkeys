@@ -1,19 +1,22 @@
-1	dutch; flemish	x-vnd.Be-MAIL	361254796
+1	dutch; flemish	x-vnd.Be-MAIL	2834665561
 View	Mail		Bekijken
 %d - Date	Mail		%d - Datum
 Attach attributes:	Mail		Attributen bijvoegen:
 Inconsistency occurred in the undo/redo buffer.	Mail		Er is een onregelmatigheid ontstaan in het herstel- /herhaalbuffer.
 An error occurred trying to save the attachment.	Mail		Er is een fout ontstaan bij het opslaan van de bijlage.
 Copy to new	Mail		Kopiëren naar nieuw
+Leave as 'New'	Mail	Do not translate New - this is non-localizable e-mail status	Behouden als 'Nieuw'
 Edit	Mail		Aanpassen
 Print	Mail		Afdrukken
 <none>	Mail		<geen>
 New mail message	Mail		Nieuw mailbericht
 Automatic	Mail		Automatisch
 Automatically mark mail as read:	Mail		Automatisch markeren als gelezen:
+helpful message	Mail		nuttig bericht
 Colored quotes:	Mail		Quotes in kleur:
 Subject:	Mail		Onderwerp:
 Reply to all	Mail		Allen beantwoorden
+Enclosure: %name% (Type: %type%)	Mail	Don't translate the variables %name% and %type%.	Bijlage: %name% (Type: %type%)
 Show icons & labels	Mail		Toon iconen & tekst
 Remove attachment	Mail		Verwijder bijlage
 Button bar:	Mail		Knoppenbalk:
@@ -33,11 +36,11 @@ Your main text contains %ld unencodable characters. Perhaps a different characte
 Signature:	Mail		Onderschrift:
 Save changes to this signature?	Mail		Veranderingen aan dit onderschrift opslaan?
 Cc:	Mail		Cc:
+Off	Mail		Uit
 Find	Mail		Zoeken
 Preferences…	Mail		Voorkeuren...
 Undo	Mail		Ongedaan maken
 Date:	Mail		Datum:
-Leave as New	Mail		Als Nieuw laten
 An error occurred trying to open this signature.	Mail		Er is een fout ontstaan bij het openen van dit onderschift.
 No file attributes, just plain data	Mail		Geen bestandskenmerken, alleen gewone gegevens
 Edit queries…	Mail		Zoektermen aanpassen…
@@ -61,6 +64,7 @@ Warn unencodable:	Mail		Waarschuwen oncodeerbaar:
 Quit	Mail		Afsluiten
 %n - Full name	Mail		%n - Volledige naam
  Read 	Mail		Lezen
+UTF-8	Mail	This string is used as a key to set default message compose encoding. It must be correct IANA name from http://cgit.haiku-os.org/haiku/tree/src/kits/textencoding/character_sets.cpp Translate it only if you want to change default message compose encoding for your locale. If you don't know what is it and why it may needs changing, just leave \"UTF-8\".	UTF-8
 Trash	Mail		Prullenbak
 Default account:	Mail		Standaard-account:
 Size:	Mail		Grootte:
@@ -139,6 +143,7 @@ The mail_daemon could not be started:\n\t	Mail		De mail_daemon kon niet worden g
 Open attachment	Mail		Bijlage openen
 sent	B_USER_DIRECTORY/mail/sent		verzonden
 (Date unavailable)	Mail		(Datum niet beschikbaar)
+Put your favorite e-mail queries and query templates in this folder.	Mail		Plaats je favoriete e-mailqueries en querysjablonen in deze map.
 Reply	Mail		Beantwoorden
 From:	Mail		Van:
 Couldn't open this signature. Sorry.	Mail		Kon dit onderschrift niet openen. Sorry.

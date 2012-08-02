@@ -109,8 +109,8 @@ CannaLooper::ReadSettings(char* basePath)
 
 	font_family family;
 	font_style style;
-	strcpy(family, "Haru");
-	strcpy(style, "Regular");
+	strcpy(family, "VL PGothic");
+	strcpy(style, "regular");
 
 	fKouhoFont.SetFamilyAndStyle(family, style);
 	fKouhoFont.SetSize(12);
@@ -233,7 +233,7 @@ CannaLooper::_HandleKeyDown(BMessage* msg)
 	}
 
 	SERIAL_PRINT(("CannaLooper: HandleKeyDown() calling "
-		"CannaInterface::KeyIn()...\n", result));
+		"CannaInterface::KeyIn()...\n"));
 
 	uint32 result = fCanna->KeyIn(character, modifier, key);
 

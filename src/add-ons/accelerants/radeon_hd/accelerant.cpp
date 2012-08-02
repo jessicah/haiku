@@ -7,6 +7,7 @@
  *		Alexander von Gluck, kallisti5@unixzen.com
  */
 
+
 #include "accelerant.h"
 
 #include <AGP.h>
@@ -43,7 +44,6 @@ struct accelerant_info* gInfo;
 display_info* gDisplay[MAX_DISPLAY];
 connector_info* gConnector[ATOM_MAX_SUPPORTED_DEVICE];
 gpio_info* gGPIOInfo[ATOM_MAX_SUPPORTED_DEVICE];
-dp_info* gDPInfo[ATOM_MAX_SUPPORTED_DEVICE];
 
 
 class AreaCloner {
@@ -140,16 +140,6 @@ init_common(int device, bool isClone)
 		if (gGPIOInfo[id] == NULL)
 			return B_NO_MEMORY;
 		memset(gGPIOInfo[id], 0, sizeof(gpio_info));
-	}
-
-	// malloc for card DP information
-	for (uint32 id = 0; id < ATOM_MAX_SUPPORTED_DEVICE; id++) {
-		gDPInfo[id] = (dp_info*)malloc(sizeof(dp_info));
-
-		if (gDPInfo[id] == NULL)
-			return B_NO_MEMORY;
-		memset(gDPInfo[id], 0, sizeof(dp_info));
-		gDPInfo[id]->valid = false;
 	}
 
 	gInfo->is_clone = isClone;
@@ -262,6 +252,9 @@ radeon_init_accelerant(int device)
 
 	radeon_init_bios(gInfo->rom);
 
+	// disable spread spectrum as it requires lots of extra calculations
+	radeon_gpu_ss_disable();
+
 	// find GPIO pins from AtomBIOS
 	gpio_probe();
 
@@ -280,6 +273,9 @@ radeon_init_accelerant(int device)
 
 	// print found connectors
 	debug_connectors();
+
+	// setup encoders on each connector if needed
+	encoder_init();
 
 	// setup link on any DisplayPort connectors
 	dp_setup_connectors();
@@ -300,6 +296,11 @@ radeon_init_accelerant(int device)
 	//}
 
 	radeon_gpu_mc_setup();
+
+	// Set up data crunching + irq rings
+	radeon_gpu_ring_setup();
+
+	radeon_gpu_ring_boot(RADEON_QUEUE_TYPE_GFX_INDEX);
 
 	TRACE("%s done\n", __func__);
 	return B_OK;

@@ -548,12 +548,13 @@ public:
 	virtual	void				GetHeightForWidth(float width, float* min,
 									float* max, float* preferred);
 
+			void				InvalidateLayout(bool descendants = false);
 	virtual	void				SetLayout(BLayout* layout);
 			BLayout*			GetLayout() const;
 
-	virtual	void				InvalidateLayout(bool descendants = false);
 			void				EnableLayoutInvalidation();
 			void				DisableLayoutInvalidation();
+			bool				IsLayoutInvalidationDisabled();
 			bool				IsLayoutValid() const;
 			void				ResetLayoutInvalidation();
 
@@ -565,6 +566,7 @@ public:
 	class Private;
 
 protected:
+	virtual	void				LayoutInvalidated(bool descendants = false);
 	virtual	void				DoLayout();
 
 public:
@@ -580,6 +582,10 @@ public:
 protected:
 	virtual bool				GetToolTipAt(BPoint point, BToolTip** _tip);
 
+	virtual	void				LayoutChanged();
+
+			void				ScrollWithMouseWheelDelta(BScrollBar*, float);
+
 private:
 			void				_Layout(bool force, BLayoutContext* context);
 			void				_LayoutLeft(BLayout* deleted);
@@ -587,7 +593,6 @@ private:
 
 private:
 	// FBC padding and forbidden methods
-	virtual	void				_ReservedView12();
 	virtual	void				_ReservedView13();
 	virtual	void				_ReservedView14();
 	virtual	void				_ReservedView15();
@@ -698,9 +703,8 @@ private:
 
 			LayoutData*			fLayoutData;
 			BToolTip*			fToolTip;
-			BToolTip*			fVisibleToolTip;
 
-			uint32				_reserved[5];
+			uint32				_reserved[6];
 };
 
 

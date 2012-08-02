@@ -49,6 +49,23 @@ typedef struct identify_cookie {
 } identify_cookie;
 
 
+static bool
+is_device_read_only(const char *device)
+{
+	bool isReadOnly = false;
+	device_geometry geometry;
+	int fd = open(device, O_RDONLY | O_NOCACHE);
+	if (fd < 0)
+		return false;
+
+	if (ioctl(fd, B_GET_GEOMETRY, &geometry) == 0)
+		isReadOnly = geometry.read_only;
+
+	close(fd);
+	return isReadOnly;
+}
+
+
 static status_t
 get_node_type(ntfs_inode* ni, int* _type)
 {
@@ -234,12 +251,12 @@ fs_mount(fs_volume *_vol, const char *device, ulong flags, const char *args,
 		"true"), "true") == 0;
 	unload_driver_settings(handle);
 
-	if (ns->ro || (flags & B_MOUNT_READ_ONLY) != 0) {
+	if (ns->ro || (flags & B_MOUNT_READ_ONLY) != 0
+		|| is_device_read_only(device)) {
 		mountFlags |= MS_RDONLY;
 		ns->flags |= B_FS_IS_READONLY;
 	}
 
-	// TODO: this does not take read-only volumes into account!
 	ns->ntvol = utils_mount_volume(device, mountFlags, true);
 	if (ns->ntvol != NULL)
 		result = B_NO_ERROR;
@@ -271,7 +288,8 @@ fs_mount(fs_volume *_vol, const char *device, ulong flags, const char *args,
 				ntfs_calc_free_space(ns);
 			}
 		}
-	}
+	} else
+		free(ns);
 
 exit:
 	ERROR("fs_mount - EXIT, result code is %s\n", strerror(result));
@@ -964,8 +982,6 @@ fs_create(fs_volume *_vol, fs_vnode *_dir, const char *name, int omode,
 			result = errno;
 	}
 
-	free(uname);
-
 exit:
 	if (result >= B_OK)
 		*_cookie = cookie;
@@ -978,6 +994,7 @@ exit:
 		ntfs_inode_close(ni);
 	if (bi)
 		ntfs_inode_close(bi);
+	free(uname);
 
 	TRACE("fs_create - EXIT, result is %s\n", strerror(result));
 
@@ -1384,6 +1401,8 @@ exit:
 		ntfs_inode_close(sym);
 	if (bi)
 		ntfs_inode_close(bi);
+	free(utarget);
+	free(uname);
 
 	TRACE("fs_symlink - EXIT, result is %s\n", strerror(result));
 
@@ -1444,7 +1463,6 @@ fs_mkdir(fs_volume *_vol, fs_vnode *_dir, const char *name,	int perms)
 		newNode = (vnode*)ntfs_calloc(sizeof(vnode));
 		if (newNode == NULL) {
 		 	result = ENOMEM;
-		 	ntfs_inode_close(ni);
 		 	goto exit;
 		}
 
@@ -1469,6 +1487,7 @@ exit:
 		ntfs_inode_close(ni);
 	if (bi)
 		ntfs_inode_close(bi);
+	free(uname);
 
 	TRACE("fs_mkdir - EXIT, result is %s\n", strerror(result));
 

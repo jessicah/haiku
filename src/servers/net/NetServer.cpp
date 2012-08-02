@@ -1,10 +1,11 @@
 /*
- * Copyright 2006-2010, Haiku, Inc. All Rights Reserved.
+ * Copyright 2006-2012, Haiku, Inc. All Rights Reserved.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
  *		Axel Dörfler, axeld@pinc-software.de
  * 		Vegard Wærp, vegarwa@online.no
+ *		Alexander von Gluck, kallisti5@unixzen.com
  */
 
 
@@ -16,6 +17,7 @@
 #include <stdlib.h>
 #include <string>
 #include <string.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include <arpa/inet.h>
@@ -64,6 +66,7 @@ public:
 	virtual	void				MessageReceived(BMessage* message);
 
 private:
+			bool				_IsValidFamily(uint32 family);
 			bool				_IsValidInterface(BNetworkInterface& interface);
 			void				_RemoveInvalidInterfaces();
 			status_t			_RemoveInterface(const char* name);
@@ -79,6 +82,8 @@ private:
 									BMessage* suggestedInterface = NULL);
 			void				_ConfigureInterfaces(
 									BMessage* _missingDevice = NULL);
+			void				_ConfigureIPv6LinkLocal(const char* name);
+
 			void				_BringUpInterfaces();
 			void				_StartServices();
 			status_t			_HandleDeviceMonitor(BMessage* message);
@@ -104,13 +109,6 @@ struct address_family {
 	const char*	identifiers[4];
 };
 
-
-// AF_INET6 family
-#if INET6
-static bool inet6_parse_address(const char* string, sockaddr* address);
-static void inet6_set_any_address(sockaddr* address);
-static void inet6_set_port(sockaddr* address, int32 port);
-#endif
 
 static const address_family kFamilies[] = {
 	{
@@ -207,44 +205,6 @@ parse_address(int32& family, const char* argument, BNetworkAddress& address)
 
 	return true;
 }
-
-
-#if INET6
-static bool
-inet6_parse_address(const char* string, sockaddr* _address)
-{
-	sockaddr_in6& address = *(sockaddr_in6*)_address;
-
-	if (inet_pton(AF_INET6, string, &address.sin6_addr) != 1)
-		return false;
-
-	address.sin6_family = AF_INET6;
-	address.sin6_len = sizeof(sockaddr_in6);
-	address.sin6_port = 0;
-	address.sin6_flowinfo = 0;
-	address.sin6_scope_id = 0;
-
-	return true;
-}
-
-
-void
-inet6_set_any_address(sockaddr* _address)
-{
-	sockaddr_in6& address = *(sockaddr_in6*)_address;
-	memset(&address, 0, sizeof(sockaddr_in6));
-	address.sin6_family = AF_INET6;
-	address.sin6_len = sizeof(struct sockaddr_in6);
-}
-
-
-void
-inet6_set_port(sockaddr* _address, int32 port)
-{
-	sockaddr_in6& address = *(sockaddr_in6*)_address;
-	address.sin6_port = port;
-}
-#endif
 
 
 //	#pragma mark -
@@ -420,6 +380,22 @@ NetServer::MessageReceived(BMessage* message)
 }
 
 
+/*!	Checks if provided address family is valid.
+	Families include AF_INET, AF_INET6, AF_APPLETALK, etc
+*/
+bool
+NetServer::_IsValidFamily(uint32 family)
+{
+	// Mostly verifies add-on is present
+	int socket = ::socket(family, SOCK_DGRAM, 0);
+	if (socket < 0)
+		return false;
+
+	close(socket);
+	return true;
+}
+
+
 /*!	Checks if an interface is valid, that is, if it has an address in any
 	family, and, in case of ethernet, a hardware MAC address.
 */
@@ -574,6 +550,9 @@ NetServer::_ConfigureInterface(BMessage& message)
 		}
 	}
 
+	// Set up IPv6 Link Local address (based on MAC, if not loopback)
+	_ConfigureIPv6LinkLocal(name);
+
 	BMessage addressMessage;
 	for (int32 index = 0; message.FindMessage("address", index,
 			&addressMessage) == B_OK; index++) {
@@ -619,7 +598,7 @@ NetServer::_ConfigureInterface(BMessage& message)
 			if (addressMessage.FindString("broadcast", &string) == B_OK)
 				parse_address(family, string, broadcast);
 		}
-		
+
 		if (autoConfig) {
 			_QuitLooperForDevice(name);
 			startAutoConfig = true;
@@ -844,14 +823,12 @@ void
 NetServer::_BringUpInterfaces()
 {
 	// we need a socket to talk to the networking stack
-	int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
-	if (socket < 0) {
+	if (!_IsValidFamily(AF_LINK)) {
 		fprintf(stderr, "%s: The networking stack doesn't seem to be "
 			"available.\n", Name());
 		Quit();
 		return;
 	}
-	close(socket);
 
 	_RemoveInvalidInterfaces();
 
@@ -866,11 +843,18 @@ NetServer::_BringUpInterfaces()
 		// there is no loopback interface, create one
 		BMessage interface;
 		interface.AddString("device", "loop");
-		BMessage address;
-		address.AddString("family", "inet");
-		address.AddString("address", "127.0.0.1");
-		interface.AddMessage("address", &address);
+		BMessage v4address;
+		v4address.AddString("family", "inet");
+		v4address.AddString("address", "127.0.0.1");
+		interface.AddMessage("address", &v4address);
 
+		// Check for IPv6 support and add ::1
+		if (_IsValidFamily(AF_INET6)) {
+			BMessage v6address;
+			v6address.AddString("family", "inet6");
+			v6address.AddString("address", "::1");
+			interface.AddMessage("address", &v6address);
+		}
 		_ConfigureInterface(interface);
 	}
 
@@ -882,6 +866,86 @@ NetServer::_BringUpInterfaces()
 		_ConfigureDevices("/dev/net",
 			missingDevice.HasString("device") ? &missingDevice : NULL);
 	}
+}
+
+
+/*!	Configure the link local address based on the network card's MAC address
+	if this isn't a loopback device.
+*/
+void
+NetServer::_ConfigureIPv6LinkLocal(const char* name)
+{
+	// Check for IPv6 support
+	if (!_IsValidFamily(AF_INET6))
+		return;
+
+	BNetworkInterface interface(name);
+
+	// Lets make sure this is *not* the loopback interface
+	if ((interface.Flags() & IFF_LOOPBACK) != 0)
+		return;
+
+	BNetworkAddress link;
+	status_t result = interface.GetHardwareAddress(link);
+
+	if (result != B_OK || link.LinkLevelAddressLength() != 6)
+		return;
+
+	const uint8* mac = link.LinkLevelAddress();
+
+	// Check for a few failure situations
+	static const char zeroMac[6] = {0, 0, 0, 0, 0, 0};
+	static const char fullMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	if (memcmp(mac, zeroMac, 6) == 0
+		|| memcmp(mac, fullMac, 6) == 0) {
+		// Mac address is all 0 or all FF's
+		syslog(LOG_DEBUG, "%s: MacAddress for interface '%s' is invalid.",
+			__func__, name);
+		return;
+	}
+
+	// Generate a Link Local Scope address
+	// (IPv6 address based on Mac address)
+	in6_addr addressRaw;
+	memset(addressRaw.s6_addr, 0, sizeof(addressRaw.s6_addr));
+	addressRaw.s6_addr[0] = 0xfe;
+	addressRaw.s6_addr[1] = 0x80;
+	addressRaw.s6_addr[8] = mac[0] ^ 0x02;
+	addressRaw.s6_addr[9] = mac[1];
+	addressRaw.s6_addr[10] = mac[2];
+	addressRaw.s6_addr[11] = 0xff;
+	addressRaw.s6_addr[12] = 0xfe;
+	addressRaw.s6_addr[13] = mac[3];
+	addressRaw.s6_addr[14] = mac[4];
+	addressRaw.s6_addr[15] = mac[5];
+
+	BNetworkAddress localLinkAddress(addressRaw, 0);
+	BNetworkAddress localLinkMask("ffff:ffff:ffff:ffff::"); // 64
+	BNetworkAddress localLinkBroadcast("fe80::ffff:ffff:ffff:ffff");
+
+	if (interface.FindAddress(localLinkAddress) >= 0) {
+		// uhoh... already has a local link address
+
+		/*	TODO: Check for any local link scope addresses assigned to card
+			There isn't any flag at the moment though for address scope
+		*/
+		syslog(LOG_DEBUG, "%s: Local Link address already assigned to %s\n",
+			__func__, name);
+		return;
+	}
+
+	BNetworkInterfaceAddress interfaceAddress;
+	interfaceAddress.SetAddress(localLinkAddress);
+	interfaceAddress.SetMask(localLinkMask);
+	interfaceAddress.SetBroadcast(localLinkMask);
+
+	/*	TODO: Duplicate Address Detection.  (DAD)
+		Need to blast an icmp packet over the IPv6 network from :: to ensure
+		there aren't duplicate MAC addresses on the network. (definitely an
+		edge case, but a possible issue)
+	*/
+
+	interface.AddAddress(interfaceAddress);
 }
 
 
@@ -910,12 +974,12 @@ NetServer::_HandleDeviceMonitor(BMessage* message)
 		// not a device entry, ignore
 		return B_NAME_NOT_FOUND;
 	}
-			
+
 	if (opcode == B_ENTRY_CREATED)
 		_ConfigureDevice(path);
 	else
 		_RemoveInterface(path);
-		
+
 	return B_OK;
 }
 

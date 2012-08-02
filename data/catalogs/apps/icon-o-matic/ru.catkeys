@@ -1,4 +1,4 @@
-1	russian	x-vnd.haiku-icon_o_matic	2326864078
+1	russian	x-vnd.haiku-icon_o_matic	4233739176
 Select All	Icon-O-Matic-PathManipulator		Выделить всё
 Add Style	Icon-O-Matic-AddStylesCmd		Добавить стиль
 Color (#%02x%02x%02x)	Style name after dropping a color		Цвет (#%02x%02x%02x)
@@ -47,7 +47,7 @@ Change Color	Icon-O-Matic-SetColorCmd		Изменить цвет
 Style	Icon-O-Matic-Menus		Стиль
 <modify path>	Icon-O-Matic-PathCmd		<изменить путь>
 Opening the icon failed!	Icon-O-Matic-Main		Не удалось открыть значок!
-Error: 	Icon-O-Matic-Main		Ошибка:
+Error: 	Icon-O-Matic-Main		Ошибка: 
 Rotate indices backwards	Icon-O-Matic-PathsList		Переместить начало контура назад
 Name	Icon-O-Matic-PropertyNames		Название
 bad news	Icon-O-Matic-Exporter		плохие новости
@@ -117,6 +117,7 @@ Gradient	Icon-O-Matic-StyleTypes		Градиент
 Min LOD	Icon-O-Matic-PropertyNames		Мин. LOD
 BEOS:ICON Attribute	Icon-O-Matic-SavePanel		Атрибут BEOS:ICON
 Invert selection	Icon-O-Matic-Properties		Инвертировать выделение
+Drop shapes	Icon-O-Matic-ShapesList		Удалить формы
 Export as…	Icon-O-Matic-Menu-File		Экспортировать как…
 Transformation	Transformation		Изменение
 Click on an object in	Empty property list - 1st line		Нажмите на объект в
@@ -140,7 +141,7 @@ Move Pivot	Icon-O-Matic-TransformationBoxStates		Переместить точк
 Path	Icon-O-Matic-Menus		Контур
 Freeze transformation	Icon-O-Matic-ShapesList		Применить изменения
 File	Icon-O-Matic-Menus		Файл
-Error: 	Icon-O-Matic-Exporter		Ошибка:
+Error: 	Icon-O-Matic-Exporter		Ошибка: 
 Add Transformers	Icon-O-Matic-AddTransformersCmd		Добавить трансформаторы
 Diamond	Icon-O-Matic-StyleTypes		Ромбовидный
 Path	Icon-O-Matic-PropertyNames		Контур
@@ -158,6 +159,7 @@ Snap to grid	Icon-O-Matic-Menu-Settings		Выровнять по сетке
 Remove	Icon-O-Matic-ShapesList		Удалить
 Yes	Icon-O-Matic-StyledTextImport		Да
 Transformation	Icon-O-Matic-TransformersList		Изменение
+Save image	Icon-O-Matic-SavePanel		Сохранить изображение
 Add Styles	Icon-O-Matic-AddStylesCmd		Добавить стили
 Remove Control Points	Icon-O-Matic-RemovePointsCmd		Удалить точки
 Format	Icon-O-Matic-SavePanel		Формат

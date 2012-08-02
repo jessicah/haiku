@@ -63,26 +63,50 @@ public:
 									float weight);
 
 	virtual	void				Draw(BRect updateRect);
+	virtual	void				DrawAfterChildren(BRect updateRect);
 	virtual	void				MouseDown(BPoint where);
 	virtual	void				MouseUp(BPoint where);
 	virtual	void				MouseMoved(BPoint where, uint32 transit,
 									const BMessage* message);
+
+	virtual	void				MessageReceived(BMessage* message);
 
 
 	virtual	void				SetLayout(BLayout* layout);
 									// overridden to avoid use
 
 	virtual status_t			Archive(BMessage* into, bool deep = true) const;
-	virtual status_t			AllUnarchived(const BMessage* from);
 	static	BArchivable*		Instantiate(BMessage* from);
 
+	virtual	status_t			Perform(perform_code d, void* arg);
+
 protected:
+	virtual	status_t			AllArchived(BMessage* into) const;
+	virtual status_t			AllUnarchived(const BMessage* from);
+
 	virtual	void				DrawSplitter(BRect frame,
 									const BRect& updateRect,
 									enum orientation orientation,
 									bool pressed);
 
 private:
+
+	// FBC padding
+	virtual	void				_ReservedSplitView1();
+	virtual	void				_ReservedSplitView2();
+	virtual	void				_ReservedSplitView3();
+	virtual	void				_ReservedSplitView4();
+	virtual	void				_ReservedSplitView5();
+	virtual	void				_ReservedSplitView6();
+	virtual	void				_ReservedSplitView7();
+	virtual	void				_ReservedSplitView8();
+	virtual	void				_ReservedSplitView9();
+	virtual	void				_ReservedSplitView10();
+
+	// forbidden methods
+								BSplitView(const BSplitView&);
+			void				operator =(const BSplitView&);
+
 	static	void				_DrawDefaultSplitter(BView* view, BRect frame,
 									const BRect& updateRect,
 									enum orientation orientation,
@@ -90,6 +114,7 @@ private:
 
 private:
 			BSplitLayout*		fSplitLayout;
+			uint32				_reserved[3];
 };
 
 

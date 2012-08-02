@@ -220,9 +220,8 @@ public:
 	virtual	void				GetHeightForWidth(float width, float* min,
 									float* max, float* preferred);
 
-	virtual	void				InvalidateLayout(bool descendants = false);
-
 protected:
+	virtual	void				LayoutInvalidated(bool descendants);
 	virtual	void				DoLayout();
 
 public:
@@ -410,6 +409,9 @@ private:
 			float				_NullStyleHeight() const;
 
 			void				_ShowContextMenu(BPoint where);
+
+			void				_FilterDisallowedChars(char* text,
+									int32& length, text_run_array* runArray);
 
 private:
 			BPrivate::TextGapBuffer*	fText;

@@ -1,11 +1,12 @@
 /*
- * Copyright 2001-2011, Haiku.
+ * Copyright 2001-2012, Haiku.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
  *		Rafael Romo
  *		Stefano Ceccherini (burton666@libero.it)
  *		Andrew Bachmann
+ *		Rene Gollent, rene@gollent.com
  *		Thomas Kurschel
  *		Axel Dörfler, axeld@pinc-software.de
  *		Stephan Aßmus <superstippi@gmx.de>
@@ -62,8 +63,8 @@
 #include "multimon.h"	// the usual: DANGER WILL, ROBINSON!
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Screen"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Screen"
 
 
 const char* kBackgroundsSignature = "application/x-vnd.Haiku-Backgrounds";
@@ -170,6 +171,7 @@ ScreenWindow::ScreenWindow(ScreenSettings* settings)
 		| B_AUTO_UPDATE_SIZE_LIMITS, B_ALL_WORKSPACES),
 	fIsVesa(false),
 	fBootWorkspaceApplied(false),
+	fOtherRefresh(NULL),
 	fScreenMode(this),
 	fUndoScreenMode(this),
 	fModified(false)
@@ -308,19 +310,24 @@ ScreenWindow::ScreenWindow(ScreenSettings* settings)
 
 	fRefreshMenu = new BPopUpMenu("refresh rate", true, true);
 
-	BMessage *message;
-
 	float min, max;
-	if (fScreenMode.GetRefreshLimits(fActive, min, max) && min == max) {
+	if (fScreenMode.GetRefreshLimits(fActive, min, max) != B_OK) {
+		// if we couldn't obtain the refresh limits, reset to the default
+		// range. Constraints from detected monitors will fine-tune this
+		// later.
+		min = kRefreshRates[0];
+		max = kRefreshRates[kRefreshRateCount - 1];
+	}
+
+	if (min == max) {
 		// This is a special case for drivers that only support a single
 		// frequency, like the VESA driver
 		BString name;
-		name << min << " " << B_TRANSLATE("Hz");
-
-		message = new BMessage(POP_REFRESH_MSG);
+		refresh_rate_to_string(min, name);
+		BMessage *message = new BMessage(POP_REFRESH_MSG);
 		message->AddFloat("refresh", min);
-
-		fRefreshMenu->AddItem(item = new BMenuItem(name.String(), message));
+		BMenuItem *item = new BMenuItem(name.String(), message);
+		fRefreshMenu->AddItem(item);
 		item->SetEnabled(false);
 	} else {
 		monitor_info info;
@@ -336,16 +343,14 @@ ScreenWindow::ScreenWindow(ScreenSettings* settings)
 			BString name;
 			name << kRefreshRates[i] << " " << B_TRANSLATE("Hz");
 
-			message = new BMessage(POP_REFRESH_MSG);
+			BMessage *message = new BMessage(POP_REFRESH_MSG);
 			message->AddFloat("refresh", kRefreshRates[i]);
 
 			fRefreshMenu->AddItem(new BMenuItem(name.String(), message));
 		}
 
-		message = new BMessage(POP_OTHER_REFRESH_MSG);
-
 		fOtherRefresh = new BMenuItem(B_TRANSLATE("Other" B_UTF8_ELLIPSIS),
-			message);
+			new BMessage(POP_OTHER_REFRESH_MSG));
 		fRefreshMenu->AddItem(fOtherRefresh);
 	}
 
@@ -374,7 +379,7 @@ ScreenWindow::ScreenWindow(ScreenSettings* settings)
 			true, true);
 
 		for (int32 i = 0; i < kCombineModeCount; i++) {
-			message = new BMessage(POP_COMBINE_DISPLAYS_MSG);
+			BMessage *message = new BMessage(POP_COMBINE_DISPLAYS_MSG);
 			message->AddInt32("mode", kCombineModes[i].mode);
 
 			fCombineMenu->AddItem(new BMenuItem(kCombineModes[i].name,
@@ -391,7 +396,7 @@ ScreenWindow::ScreenWindow(ScreenSettings* settings)
 			true, true);
 
 		// !order is important - we rely that boolean value == idx
-		message = new BMessage(POP_SWAP_DISPLAYS_MSG);
+		BMessage *message = new BMessage(POP_SWAP_DISPLAYS_MSG);
 		message->AddBool("swap", false);
 		fSwapDisplaysMenu->AddItem(new BMenuItem(B_TRANSLATE("no"), message));
 
@@ -663,28 +668,28 @@ ScreenWindow::_CheckRefreshMenu()
 void
 ScreenWindow::_UpdateRefreshControl()
 {
-	BString string;
-	refresh_rate_to_string(fSelected.refresh, string);
-
-	BMenuItem* item = fRefreshMenu->FindItem(string.String());
-	if (item) {
-		if (!item->IsMarked())
+	for (int32 i = 0; i < fRefreshMenu->CountItems(); i++) {
+		BMenuItem* item = fRefreshMenu->ItemAt(i);
+		if (item->Message()->FindFloat("refresh") == fSelected.refresh) {
 			item->SetMarked(true);
-
-		// "Other" items only contains a refresh rate when active
-		fOtherRefresh->SetLabel(B_TRANSLATE("Other" B_UTF8_ELLIPSIS));
-		return;
+			// "Other" items only contains a refresh rate when active
+			fOtherRefresh->SetLabel(B_TRANSLATE("Other" B_UTF8_ELLIPSIS));
+			return;
+		}
 	}
 
 	// this is a non-standard refresh rate
+	if (fOtherRefresh != NULL) {
+		fOtherRefresh->Message()->ReplaceFloat("refresh", fSelected.refresh);
+		fOtherRefresh->SetMarked(true);
 
-	fOtherRefresh->Message()->ReplaceFloat("refresh", fSelected.refresh);
-	fOtherRefresh->SetMarked(true);
+		BString string;
+		refresh_rate_to_string(fSelected.refresh, string);
+		fRefreshMenu->Superitem()->SetLabel(string.String());
 
-	fRefreshMenu->Superitem()->SetLabel(string.String());
-
-	string.Append(B_TRANSLATE("/other" B_UTF8_ELLIPSIS));
-	fOtherRefresh->SetLabel(string.String());
+		string.Append(B_TRANSLATE("/other" B_UTF8_ELLIPSIS));
+		fOtherRefresh->SetLabel(string.String());
+	}
 }
 
 

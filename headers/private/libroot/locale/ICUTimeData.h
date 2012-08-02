@@ -18,11 +18,15 @@ namespace BPrivate {
 namespace Libroot {
 
 
+class ICUMessagesData;
+
+
 class ICUTimeData : public ICUCategoryData {
 	typedef	ICUCategoryData		inherited;
 public:
 								ICUTimeData(pthread_key_t tlsKey,
-									struct lc_time_t& lcTimeInfo);
+									struct lc_time_t& lcTimeInfo,
+									const ICUMessagesData& messagesData);
 								~ICUTimeData();
 
 			void				Initialize(LocaleTimeDataBridge* dataBridge);
@@ -33,7 +37,7 @@ public:
 
 			const char*			GetLanginfo(int index);
 
-			const Locale&		ICULocale() const;
+			const Locale&		ICULocaleForStrings() const;
 
 private:
 			status_t			_SetLCTimeEntries(const UnicodeString* strings,
@@ -59,6 +63,8 @@ private:
 			struct lc_time_t&	fLCTimeInfo;
 
 			LocaleTimeDataBridge*	fDataBridge;
+
+			const ICUMessagesData&	fMessagesData;
 };
 
 

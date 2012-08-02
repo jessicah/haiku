@@ -1,10 +1,11 @@
-1	german	x-vnd.Be-MAIL	1835398254
+1	german	x-vnd.Be-MAIL	2834665561
 View	Mail		Ansicht
 %d - Date	Mail		%d - Datum
 Attach attributes:	Mail		Attribute von Anhängen:
 Inconsistency occurred in the undo/redo buffer.	Mail		Es ist ein Fehler im Rückgängig/Wiederherstellen-Puffer aufgetreten.
 An error occurred trying to save the attachment.	Mail		Beim Speichern des Anhangs ist ein Fehler aufgetreten.
 Copy to new	Mail		In neue Nachricht kopieren
+Leave as 'New'	Mail	Do not translate New - this is non-localizable e-mail status	Status 'New' belassen
 Edit	Mail		Bearbeiten
 Print	Mail		Drucken
 <none>	Mail		<kein>
@@ -15,6 +16,7 @@ helpful message	Mail		Tipp
 Colored quotes:	Mail		Farbige Zitate:
 Subject:	Mail		Betreff:
 Reply to all	Mail		Allen antworten
+Enclosure: %name% (Type: %type%)	Mail	Don't translate the variables %name% and %type%.	Anhang: %name% (Typ: %type%)
 Show icons & labels	Mail		Icons und Beschriftung anzeigen
 Remove attachment	Mail		Anhang entfernen
 Button bar:	Mail		Werkzeugleiste:
@@ -39,7 +41,6 @@ Find	Mail		Suchen
 Preferences…	Mail		Einstellungen…
 Undo	Mail		Rückgängig
 Date:	Mail		Datum:
-Leave as New	Mail		Status 'New' belassen
 An error occurred trying to open this signature.	Mail		Beim Öffnen dieser Signatur ist ein Fehler aufgetreten.
 No file attributes, just plain data	Mail		Keine Dateiattribute, nur reine Daten
 Edit queries…	Mail		Queries bearbeiten…
@@ -63,6 +64,7 @@ Warn unencodable:	Mail		Warnung bei nicht-kodierbaren Zeichen:
 Quit	Mail		Beenden
 %n - Full name	Mail		%n - Voller Name
  Read 	Mail		 Gelesen 
+UTF-8	Mail	This string is used as a key to set default message compose encoding. It must be correct IANA name from http://cgit.haiku-os.org/haiku/tree/src/kits/textencoding/character_sets.cpp Translate it only if you want to change default message compose encoding for your locale. If you don't know what is it and why it may needs changing, just leave \"UTF-8\".	UTF-8
 Trash	Mail		Löschen
 Default account:	Mail		Standardkonto:
 Size:	Mail		Größe:
@@ -112,7 +114,7 @@ Next message	Mail		Nächste Nachricht
 User interface	Mail		Programmoberfläche
 Cancel	Mail		Abbrechen
 Send message	Mail		Nachricht senden
-Remove enclosure	Mail		Anhang löschen
+Remove enclosure	Mail		Anhang entfernen
 Account:	Mail		Konto:
 Decoding:	Mail		Kodierung:
 Sorry, could not find an application that supports the 'Person' data type.	Mail		Es konnte leider keine Anwendung gefunden werden, die den Datentyp 'Person' unterstützt.
@@ -151,7 +153,7 @@ Check spelling	Mail		Rechtschreibung prüfen
 Set to Saved	Mail		Status setzen: Saved
 Open this link	Mail		Link öffnen
 Auto signature:	Mail		Automatische Signatur:
-Add signature	Mail		Signatur hinzufügen
+Add signature	Mail		Signatur anhängen
 Need Tracker to move items to trash	Mail		Um Nachrichten in den Papierkorb zu verschieben, muss Tracker laufen.
 Mailing	Mail		Nachrichten
 Unread	Mail		Ungelesen

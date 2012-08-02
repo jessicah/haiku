@@ -31,8 +31,8 @@
 #include "SettingsHost.h"
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "DisplayView"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "DisplayView"
 
 
 DisplayView::DisplayView(SettingsHost* host)
@@ -65,6 +65,7 @@ DisplayView::DisplayView(SettingsHost* host)
 		.Add(fIconSizeField->CreateLabelLayoutItem(), 0, 1)
 		.Add(fIconSizeField->CreateMenuBarLayoutItem(), 1, 1)
 		.Add(BSpaceLayoutItem::CreateGlue(), 0, 2, 2, 1)
+		.SetInsets(inset, inset, inset, inset)
 	);
 }
 

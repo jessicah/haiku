@@ -32,7 +32,7 @@
 using namespace BPrivate;
 
 
-BRect gWindowRect(7-15, 26-15, 507, 426);
+BRect gWindowRect(7 - 15, 26 - 15, 507, 426);
 
 
 namespace
@@ -80,8 +80,8 @@ namespace
 //	#pragma mark -
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Open_and_SaveAsPanel"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Open_and_SaveAsPanel"
 
 
 StyledEditApp::StyledEditApp()
@@ -89,8 +89,8 @@ StyledEditApp::StyledEditApp()
 	BApplication(APP_SIGNATURE),
 	fOpenPanel(NULL)
 {
-	B_TRANSLATE_MARK_SYSTEM_NAME("StyledEdit");
-	
+	B_TRANSLATE_MARK_SYSTEM_NAME_VOID("StyledEdit");
+
 	fOpenPanel = new BFilePanel();
 	fOpenAsEncoding = 0;
 
@@ -117,8 +117,8 @@ StyledEditApp::StyledEditApp()
 				name.Append(mime);
 				name.Append(")");
 			}
-			BMenuItem* item =
-				new BMenuItem(name.String(), new BMessage(OPEN_AS_ENCODING));
+			BMenuItem* item
+				= new BMenuItem(name.String(), new BMessage(OPEN_AS_ENCODING));
 			item->SetTarget(this);
 			fOpenPanelEncodingMenu->AddItem(item);
 			if (charset.GetFontID() == fOpenAsEncoding)

@@ -33,17 +33,17 @@ holders.
 All rights reserved.
 */
 
-#include <Debug.h>
 
 #include "BarMenuBar.h"
 
 #include <string.h>
 
 #include <Bitmap.h>
+#include <Debug.h>
 #include <NodeInfo.h>
 
 #include "icons.h"
-#include "icons_logo.h"
+
 #include "BarWindow.h"
 #include "DeskbarMenu.h"
 #include "DeskbarUtils.h"
@@ -61,8 +61,10 @@ TBarMenuBar::TBarMenuBar(TBarView* bar, BRect frame, const char* name)
 	TDeskbarMenu* beMenu = new TDeskbarMenu(bar);
 	TBarWindow::SetDeskbarMenu(beMenu);
 
+	const BBitmap* logoBitmap = AppResSet()->FindBitmap(B_MESSAGE_TYPE,
+		R_LeafLogoBitmap);
 	fDeskbarMenuItem = new TBarMenuTitle(frame.Width(), frame.Height(),
-		AppResSet()->FindBitmap(B_MESSAGE_TYPE, R_LeafLogoBitmap), beMenu);
+		logoBitmap, beMenu);
 	AddItem(fDeskbarMenuItem);
 }
 
@@ -203,4 +205,3 @@ TBarMenuBar::InitTrackingHook(bool (*hookFunction)(BMenu*, void*),
 	if (fAppListMenuItem && (fAppListMenuItem->Frame().Contains(loc) || both))
 		init_tracking_hook(fAppListMenuItem, hookFunction, state);
 }
-

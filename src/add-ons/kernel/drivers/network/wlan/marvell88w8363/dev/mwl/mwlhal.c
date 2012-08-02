@@ -279,7 +279,7 @@ mwl_hal_attach(device_t dev, uint16_t devid,
 	hvap->vap_type = MWL_HAL_STA;
 	hvap->bss_type = htole16(WL_MAC_TYPE_PRIMARY_CLIENT);
 	hvap->macid = i;
-	for (i++; i < MWL_MBSS_STA_MAX; i++) {
+	for (i++; i < MWL_MBSS_MAX; i++) {
 		hvap = &mh->mh_vaps[i];
 		hvap->vap_type = MWL_HAL_STA;
 		hvap->bss_type = htole16(WL_MAC_TYPE_SECONDARY_CLIENT);
@@ -1451,15 +1451,20 @@ mwl_hal_bastream_alloc(struct mwl_hal_vap *vap, int ba_policy,
 	}
 	sp = &mh->mh_streams[s];
 	mh->mh_bastreams &= ~(1<<s);
-	sp->public.data[0] = a1;
-	sp->public.data[1] = a2;
-	IEEE80211_ADDR_COPY(sp->macaddr, Macaddr);
-	sp->tid = Tid;
-	sp->paraminfo = ParamInfo;
-	sp->setup = 0;
-	sp->ba_policy = ba_policy;
-	MWL_HAL_UNLOCK(mh);
-	return sp != NULL ? &sp->public : NULL;
+	if (sp != NULL) {
+		sp->public.data[0] = a1;
+		sp->public.data[1] = a2;
+		IEEE80211_ADDR_COPY(sp->macaddr, Macaddr);
+		sp->tid = Tid;
+		sp->paraminfo = ParamInfo;
+		sp->setup = 0;
+		sp->ba_policy = ba_policy;
+		MWL_HAL_UNLOCK(mh);
+		return &sp->public;
+	} else {
+		MWL_HAL_UNLOCK(mh);
+		return NULL;
+	}
 }
 
 const MWL_HAL_BASTREAM *

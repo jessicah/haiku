@@ -1,23 +1,26 @@
 /*
  * Copyright 2004-2008, Axel Dörfler, axeld@pinc-software.de.
  * Distributed under the terms of the MIT License.
+ *
+ * Copyright 2012, Alexander von Gluck, kallisti5@unixzen.com
+ * Distributed under the terms of the MIT License.
  */
 
 
 #include "serial.h"
 
-#include "uart.h"
+#include <debug_uart_8250.h>
+#include <board_config.h>
 #include <boot/platform.h>
 #include <arch/cpu.h>
 #include <boot/stage2.h>
+#include <new>
 #include <string.h>
 
-// serial output should always be enabled on u-boot platforms..
-#define ENABLE_SERIAL 
 
+DebugUART* gUART;
 
 static int32 sSerialEnabled = 0;
-
 static char sBuffer[16384];
 static uint32 sBufferPosition;
 
@@ -25,7 +28,7 @@ static uint32 sBufferPosition;
 static void
 serial_putc(char c)
 {
-	uart_putc(uart_debug_port(),c);
+	gUART->PutChar(c);
 }
 
 
@@ -54,25 +57,20 @@ serial_puts(const char* string, size_t size)
 }
 
 
-extern "C" void 
+extern "C" void
 serial_disable(void)
 {
-#ifdef ENABLE_SERIAL
 	sSerialEnabled = 0;
-#else
-	sSerialEnabled--;
-#endif
 }
 
 
-extern "C" void 
+extern "C" void
 serial_enable(void)
 {
 	/* should already be initialized by U-Boot */
 	/*
-	uart_init_early();
-	uart_init();//todo
-	uart_init_port(uart_debug_port(),9600);
+	gUART->InitEarly();
+	gUART->InitPort(9600);
 	*/
 	sSerialEnabled++;
 }
@@ -95,8 +93,9 @@ serial_cleanup(void)
 extern "C" void
 serial_init(void)
 {
-#ifdef ENABLE_SERIAL
-	serial_enable();
-#endif
-}
+	gUART = arch_get_uart_8250(BOARD_UART_DEBUG, BOARD_UART_CLOCK);
+	if (gUART == 0)
+		return;
 
+	serial_enable();
+}

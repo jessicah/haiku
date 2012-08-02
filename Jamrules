@@ -42,7 +42,6 @@ include [ FDirName $(HAIKU_BUILD_RULES_DIR) CommandLineArguments ] ;
 include [ FDirName $(HAIKU_BUILD_RULES_DIR) ConfigRules ] ;
 include [ FDirName $(HAIKU_BUILD_RULES_DIR) DocumentationRules ] ;
 include [ FDirName $(HAIKU_BUILD_RULES_DIR) FileRules ] ;
-include [ FDirName $(HAIKU_BUILD_RULES_DIR) FreetypeRules ] ;
 include [ FDirName $(HAIKU_BUILD_RULES_DIR) HeadersRules ] ;
 include [ FDirName $(HAIKU_BUILD_RULES_DIR) KernelRules ] ;
 include [ FDirName $(HAIKU_BUILD_RULES_DIR) ImageRules ] ;
@@ -87,13 +86,6 @@ if $(HAIKU_BUILD_PROFILE) && ! $(HAIKU_BUILD_PROFILE_DEFINED) {
 	} else {
 		Exit "Build profile" $(HAIKU_BUILD_PROFILE) "not defined." ;
 	}
-}
-
-# Include embedded board-specific file.
-# UserBuildConfig can override HAIKU_BOOT_BOARD.
-if $(HAIKU_BOOT_BOARD) {
-	include [ FDirName $(HAIKU_BUILD_RULES_DIR) board $(HAIKU_BOOT_BOARD)
-		BoardSetup ] ;
 }
 
 PrepareConfigVariables ;

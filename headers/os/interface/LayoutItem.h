@@ -55,24 +55,46 @@ public:
 			void				AlignInFrame(BRect frame);
 
 	virtual status_t			Archive(BMessage* into, bool deep = true) const;
+
+	virtual status_t			Perform(perform_code d, void* arg);
+
+protected:
+	// archiving methods
 	virtual status_t			AllArchived(BMessage* into) const;
 	virtual	status_t			AllUnarchived(const BMessage* from);
 
-protected:
-
-			void				SetLayout(BLayout* layout);
-
 	// hook methods
+	virtual	void				LayoutInvalidated(bool children);
+
 	virtual	void				AttachedToLayout();
 	virtual	void				DetachedFromLayout(BLayout* layout);
 
 	virtual void				AncestorVisibilityChanged(bool shown);
 
 private:
+			void				SetLayout(BLayout* layout);
+
+	virtual	void				_ReservedLayoutItem1();
+	virtual	void				_ReservedLayoutItem2();
+	virtual	void				_ReservedLayoutItem3();
+	virtual	void				_ReservedLayoutItem4();
+	virtual	void				_ReservedLayoutItem5();
+	virtual	void				_ReservedLayoutItem6();
+	virtual	void				_ReservedLayoutItem7();
+	virtual	void				_ReservedLayoutItem8();
+	virtual	void				_ReservedLayoutItem9();
+	virtual	void				_ReservedLayoutItem10();
+
+	// forbidden methods
+								BLayoutItem(const BLayoutItem&);
+			void				operator =(const BLayoutItem&);
+
 			friend class BLayout;
 
 			BLayout*			fLayout;
 			void*				fLayoutData;
+
+			uint32				_reserved[5];
 };
 
 

@@ -37,8 +37,8 @@
 #include "PeopleApp.h"	// for B_PERSON_MIMETYPE
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "People"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "People"
 
 
 const uint32 kMsgPopUpMenuClosed = 'pmcl';
@@ -445,8 +445,10 @@ PictureView::_BeginDrag(BPoint sourcePoint)
 	drag.AddString("be:clip_name", name.String());
 
 	BTranslatorRoster* roster = BTranslatorRoster::Default();
-	if (roster == NULL)
+	if (roster == NULL) {
+		delete bitmap;
 		return;
+	}
 
 	int32 infoCount;
 	translator_info* info;

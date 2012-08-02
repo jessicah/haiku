@@ -36,7 +36,7 @@
 #include "UnzipEngine.h"
 
 
-#define B_TRANSLATE_CONTEXT "InstallProgress"
+#define B_TRANSLATION_CONTEXT "InstallProgress"
 
 
 //#define COPY_TRACE
@@ -527,6 +527,7 @@ WorkerThread::_MirrorIndices(const BPath& sourceDirectory,
 			continue;
 		}
 	}
+	fs_close_index_dir(indices);
 	return B_OK;
 }
 

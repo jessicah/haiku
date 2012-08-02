@@ -19,7 +19,7 @@
 #include <ExpressionParser.h>
 
 #include "Architecture.h"
-#include "GUITeamUISettings.h"
+#include "GuiTeamUiSettings.h"
 #include "MemoryView.h"
 #include "MessageCodes.h"
 #include "Team.h"
@@ -251,9 +251,6 @@ InspectorWindow::MessageReceived(BMessage* msg)
 			}
 			break;
 		}
-		{
-			break;
-		}
 		default:
 		{
 			BWindow::MessageReceived(msg);
@@ -288,7 +285,7 @@ InspectorWindow::MemoryBlockRetrieved(TeamMemoryBlock* block)
 
 
 status_t
-InspectorWindow::LoadSettings(const GUITeamUISettings& settings)
+InspectorWindow::LoadSettings(const GuiTeamUiSettings& settings)
 {
 	AutoLocker<BLooper> lock(this);
 	if (!lock.IsLocked())

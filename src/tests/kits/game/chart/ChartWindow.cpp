@@ -39,8 +39,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "ChartWindow"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "ChartWindow"
 
 /* pseudo-random generator parameters (not very good ones,
    but good enough for what we do here). */
@@ -51,7 +51,7 @@ enum {
 
 #define	MAX_FONT_SIZE	12.0f
 
-/* various offse, width, height and position used to align and
+/* various offset, width, height and position used to align and
    set the various UI elements. */
 enum {
 	TOP_LEFT_LIMIT	= 26,

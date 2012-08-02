@@ -28,8 +28,11 @@ export MAKE
 
 case $haikuMachine in
 x86_64-*)
-	binutilsConfigureArgs="--enable-multilib"
-	gccConfigureArgs="--enable-multilib"
+	# GCC's default is to enable multilib, but there is a bug when
+	# explicitly using --enable-multilib that causes a build
+	# failure
+	binutilsConfigureArgs=""
+	gccConfigureArgs=""
 	;;
 m68k-*)
 	binutilsConfigureArgs="--enable-multilib"
@@ -143,8 +146,8 @@ copy_headers $haikuSourceDir/headers/posix $tmpIncludeDir/posix
 # configure gcc
 cd $gccObjDir
 CFLAGS="-O2" CXXFLAGS="-O2" $gccSourceDir/configure --prefix=$installDir \
-	--target=$haikuMachine --disable-nls --disable-shared \
-	--enable-languages=c,c++ \
+	--target=$haikuMachine --disable-nls --disable-shared --with-system-zlib \
+	--enable-languages=c,c++ --enable-lto --enable-frame-pointer \
 	--with-headers=$tmpIncludeDir --with-libs=$tmpLibDir \
 	$gccConfigureArgs || exit 1
 

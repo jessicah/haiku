@@ -14,12 +14,12 @@
 
 #include "radeon_reg.h"
 
-#include "avivo.h"
-#include "r500_reg.h"
+//#include "r500_reg.h"  // Not used atm
+#include "avivo_reg.h"
 #include "r600_reg.h"
 #include "r700_reg.h"
 #include "evergreen_reg.h"
-#include "evergreend.h"
+#include "si_reg.h"
 
 #include <Accelerant.h>
 #include <Drivers.h>
@@ -91,7 +91,8 @@ enum radeon_chipset {
 	RADEON_CAYMAN,
 	RADEON_ANTILLES,
 	RADEON_LOMBOK,		//Southern Islands, Radeon HD 7000
-	RADEON_THAMES,
+	RADEON_CAPEVERDE,
+	RADEON_PITCAIRN,
 	RADEON_TAHITI,
 	RADEON_NEWZEALAND
 };

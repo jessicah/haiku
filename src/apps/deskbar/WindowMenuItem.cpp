@@ -33,6 +33,7 @@ holders.
 All rights reserved.
 */
 
+
 #include "WindowMenuItem.h"
 
 #include <stdio.h>
@@ -133,7 +134,7 @@ TWindowMenuItem::SetLabel(const char* string)
 			Frame().Width() - contLoc.x - 3.0f);
 	}
 
-	if (strcasecmp(Label(), truncatedTitle.String()) != 0)
+	if (strcmp(Label(), truncatedTitle.String()) != 0)
 		BMenuItem::SetLabel(truncatedTitle.String());
 }
 
@@ -149,18 +150,13 @@ TWindowMenuItem::FullTitle() const
 TWindowMenuItem::InsertIndexFor(BMenu* menu, int32 startIndex,
 	TWindowMenuItem* newItem)
 {
-	int32 index = 0;
-
-	for (index = startIndex;; index++) {
+	for (int32 index = startIndex;; index++) {
 		TWindowMenuItem* item
 			= dynamic_cast<TWindowMenuItem*>(menu->ItemAt(index));
 		if (item == NULL || NaturalCompare(item->FullTitle(),
 				newItem->FullTitle()) > 0)
 			return index;
 	}
-
-	// we should never get here
-	return index;
 }
 
 
@@ -334,4 +330,3 @@ TWindowMenuItem::RequiresUpdate()
 {
 	return fRequireUpdate;
 }
-

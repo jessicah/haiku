@@ -10,14 +10,18 @@
 
 #include <list>
 
-#include <Bitmap.h>
-#include <MessageRunner.h>
-#include <Notification.h>
+#include <String.h>
 #include <View.h>
+
+
+class BBitmap;
+class BMessageRunner;
+class BNotification;
 
 class NotificationWindow;
 
 const uint32 kRemoveView = 'ReVi';
+
 
 class NotificationView : public BView {
 public:
@@ -47,7 +51,7 @@ public:
 			const char*			MessageID() const;
 
 private:
-			BSize				_CalculateSize();
+			void				_CalculateSize();
 
 			struct LineInfo {
 				BFont	font;

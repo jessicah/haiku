@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2009, Haiku.
+ * Copyright 2001-2012, Haiku.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
@@ -26,6 +26,7 @@
 #include <File.h>
 #include <Locker.h>
 #include <MessageRunner.h>
+#include <ObjectList.h>
 #include <Path.h>
 #include <PropertyInfo.h>
 #include <RegistrarDefs.h>
@@ -36,9 +37,11 @@
 #include <AppMisc.h>
 #include <AppServerLink.h>
 #include <AutoLocker.h>
+#include <BitmapPrivate.h>
 #include <DraggerPrivate.h>
 #include <LooperList.h>
 #include <MenuWindow.h>
+#include <PicturePrivate.h>
 #include <PortLink.h>
 #include <RosterPrivate.h>
 #include <ServerMemoryAllocator.h>
@@ -399,7 +402,7 @@ BApplication::_InitData(const char *signature, bool initGUI, status_t *_error)
 			// TODO: When BLooper::AddMessage() is done, use that instead of
 			// PostMessage().
 
-			DBG(OUT("info: BApplication sucessfully registered.\n"));
+			DBG(OUT("info: BApplication successfully registered.\n"));
 
 			if (__libc_argc > 1) {
 				BMessage argvMessage(B_ARGV_RECEIVED);
@@ -596,6 +599,21 @@ BApplication::MessageReceived(BMessage *message)
 			// (see _InitData())
 			be_roster->ActivateApp(Team());
 			break;
+
+		case kMsgAppServerRestarted:
+			_ReconnectToServer();
+			break;
+
+		case kMsgDeleteServerMemoryArea:
+		{
+			int32 serverArea;
+			if (message->FindInt32("server area", &serverArea) == B_OK) {
+				// The link is not used, but we currently borrow its lock
+				BPrivate::AppServerLink link;
+				fServerAllocator->RemoveArea(serverArea);
+			}
+			break;
+		}
 
 		default:
 			BLooper::MessageReceived(message);
@@ -1281,6 +1299,34 @@ BApplication::_ConnectToServer()
 
 	fServerReadOnlyMemory = base;
 	return B_OK;
+}
+
+
+void
+BApplication::_ReconnectToServer()
+{
+	delete_port(fServerLink->SenderPort());
+	delete_port(fServerLink->ReceiverPort());
+	invalidate_server_port();
+
+	if (_ConnectToServer() != B_OK)
+		debugger("Can't reconnect to app server!");
+
+	AutoLocker<BLooperList> listLock(gLooperList);
+	if (!listLock.IsLocked())
+		return;
+
+	uint32 count = gLooperList.CountLoopers();
+	for (uint32 i = 0; i < count ; i++) {
+		BWindow* window = dynamic_cast<BWindow*>(gLooperList.LooperAt(i));
+		if (window == NULL)
+			continue;
+		BMessenger windowMessenger(window);
+		windowMessenger.SendMessage(kMsgAppServerRestarted);
+	}
+
+	reconnect_bitmaps_to_app_server();
+	reconnect_pictures_to_app_server();
 }
 
 

@@ -92,7 +92,7 @@ fs_opendir(fs_volume *_vol, fs_vnode *_node, void** _cookie)
 {
 	nspace		*ns = (nspace*)_vol->private_volume;
 	vnode		*node = (vnode*)_node->private_node;
-	dircookie	*cookie = (dircookie*)ntfs_calloc(sizeof(dircookie));
+	dircookie	*cookie = NULL;
 	int			result = B_NO_ERROR;
 	ntfs_inode	*ni = NULL;
 
@@ -111,6 +111,7 @@ fs_opendir(fs_volume *_vol, fs_vnode *_node, void** _cookie)
 		goto exit;
 	}
 
+	cookie = (dircookie*)ntfs_calloc(sizeof(dircookie));
 	if (cookie != NULL) {
 		cookie->pos = 0;
 		cookie->ino = 0;
@@ -182,7 +183,7 @@ fs_readdir(fs_volume *_vol, fs_vnode *_node, void *_cookie, struct dirent *buf,
 	TRACE("fs_readdir - ENTER (sizeof(buf)=%d, bufsize=%d, num=%d\n",
 		sizeof(buf), bufsize, *num);
 
-	if (!ns || !node || !cookie || !num || bufsize < sizeof(buf)) {
+	if (!ns || !node || !cookie || !num || bufsize < sizeof(*buf)) {
 	 	result = EINVAL;
 		goto exit;
 	}

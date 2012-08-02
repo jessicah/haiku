@@ -6,10 +6,17 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <Catalog.h>
-#include <DefaultCatalog.h>
 #include <File.h>
 #include <String.h>
+
+#include <DefaultCatalog.h>
+#include <EditableCatalog.h>
+
+
+using BPrivate::CatKey;
+using BPrivate::DefaultCatalog;
+using BPrivate::EditableCatalog;
+
 
 void
 usage()
@@ -44,7 +51,7 @@ main(int argc, char **argv)
 		exit(-1);
 	}
 	DefaultCatalog* inputCatImpl
-		= dynamic_cast<DefaultCatalog*>(inputCatalog.CatalogAddOn());
+		= dynamic_cast<DefaultCatalog*>(inputCatalog.CatalogData());
 	if (!inputCatImpl) {
 		fprintf(stderr, "couldn't access impl of input-catalog %s\n",
 			inputFile);
@@ -57,8 +64,8 @@ main(int argc, char **argv)
 	while (!walker.AtEnd()) {
 		const CatKey &key(walker.GetKey());
 		key.GetStringParts(&str, &ctx, &cmt);
-		printf("Hash:\t\t%lu\nKey:\t\t<%s:%s:%s>\nTranslation:\t%s\n-----\n", 
-			key.fHashVal, str.String(), ctx.String(), cmt.String(), 
+		printf("Hash:\t\t%lu\nKey:\t\t<%s:%s:%s>\nTranslation:\t%s\n-----\n",
+			key.fHashVal, str.String(), ctx.String(), cmt.String(),
 			walker.GetValue());
 		walker.Next();
 	}

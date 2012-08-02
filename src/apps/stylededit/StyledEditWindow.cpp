@@ -52,8 +52,8 @@ const float kLineViewWidth = 30.0;
 const char* kInfoAttributeName = "StyledEdit-info";
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "StyledEditWindow"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "StyledEditWindow"
 
 
 // This is a temporary solution for building BString with printf like format.
@@ -114,8 +114,8 @@ StyledEditWindow::Quit()
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "QuitAlert"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "QuitAlert"
 
 
 bool
@@ -649,8 +649,8 @@ StyledEditWindow::MenusBeginning()
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "SaveAlert"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "SaveAlert"
 
 
 status_t
@@ -730,8 +730,8 @@ StyledEditWindow::Save(BMessage* message)
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Open_and_SaveAsPanel"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Open_and_SaveAsPanel"
 
 
 status_t
@@ -862,7 +862,8 @@ StyledEditWindow::Print(const char* documentName)
 	int32 currentLine = 0;
 	while (currentLine < linesInDocument) {
 		float currentHeight = 0;
-		while (currentHeight < printableRect.Height() && currentLine < linesInDocument) {
+		while (currentHeight < printableRect.Height() && currentLine
+				< linesInDocument) {
 			currentHeight += fTextView->LineHeight(currentLine);
 			if (currentHeight < printableRect.Height())
 				currentLine++;
@@ -964,8 +965,8 @@ StyledEditWindow::IsDocumentEntryRef(const entry_ref* ref)
 // #pragma mark - private methods
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Menus"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Menus"
 
 
 void
@@ -1027,8 +1028,8 @@ StyledEditWindow::_InitWindow(uint32 encoding)
 		new BMessage(MENU_NEW), 'N'));
 	menuItem->SetTarget(be_app);
 
-	menu->AddItem(menuItem = new BMenuItem(fRecentMenu =
-		new BMenu(B_TRANSLATE("Open" B_UTF8_ELLIPSIS)),
+	menu->AddItem(menuItem = new BMenuItem(fRecentMenu
+		= new BMenu(B_TRANSLATE("Open" B_UTF8_ELLIPSIS)),
 			new BMessage(MENU_OPEN)));
 	menuItem->SetShortcut('O', 0);
 	menuItem->SetTarget(be_app);
@@ -1042,8 +1043,8 @@ StyledEditWindow::_InitWindow(uint32 encoding)
 	menuItem->SetShortcut('S', B_SHIFT_KEY);
 	menuItem->SetEnabled(true);
 
-	menu->AddItem(fRevertItem =
-		new BMenuItem(B_TRANSLATE("Revert to saved" B_UTF8_ELLIPSIS),
+	menu->AddItem(fRevertItem
+		= new BMenuItem(B_TRANSLATE("Revert to saved" B_UTF8_ELLIPSIS),
 		new BMessage(MENU_REVERT)));
 	fRevertItem->SetEnabled(false);
 	menu->AddItem(new BMenuItem(B_TRANSLATE("Close"),
@@ -1280,8 +1281,8 @@ StyledEditWindow::_SaveAttrs()
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "LoadAlert"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "LoadAlert"
 
 
 status_t
@@ -1345,8 +1346,8 @@ StyledEditWindow::_LoadFile(entry_ref* ref)
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "RevertToSavedAlert"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "RevertToSavedAlert"
 
 
 void
@@ -1386,8 +1387,8 @@ StyledEditWindow::_RevertToSaved()
 	if (_LoadFile(&ref) != B_OK)
 		return;
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Menus"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Menus"
 
 	// clear undo modes
 	fUndoItem->SetLabel(B_TRANSLATE("Can't undo"));
@@ -1408,7 +1409,7 @@ StyledEditWindow::_RevertToSaved()
 
 bool
 StyledEditWindow::_Search(BString string, bool caseSensitive, bool wrap,
-	bool backSearch)
+	bool backSearch, bool scrollToOccurence)
 {
 	int32 start;
 	int32 finish;
@@ -1450,7 +1451,9 @@ StyledEditWindow::_Search(BString string, bool caseSensitive, bool wrap,
 	if (start != B_ERROR) {
 		finish = start + length;
 		fTextView->Select(start, finish);
-		fTextView->ScrollToSelection();
+		
+		if (scrollToOccurence)
+			fTextView->ScrollToSelection();
 		return true;
 	}
 
@@ -1478,7 +1481,8 @@ StyledEditWindow::_Replace(BString findThis, BString replaceWith,
 	bool caseSensitive, bool wrap, bool backSearch)
 {
 	if (_Search(findThis, caseSensitive, wrap, backSearch)) {
-		int32 start, finish;
+		int32 start;
+		int32 finish;
 		fTextView->GetSelection(&start, &finish);
 
 		_UpdateCleanUndoRedoSaveRevert();
@@ -1501,17 +1505,28 @@ StyledEditWindow::_ReplaceAll(BString findThis, BString replaceWith,
 {
 	bool first = true;
 	fTextView->SetSuppressChanges(true);
-	while (_Search(findThis, caseSensitive, true, false)) {
+	
+	// start from the beginning of text
+	fTextView->Select(0, 0);
+
+	// iterate occurences of findThis without wrapping around
+	while (_Search(findThis, caseSensitive, false, false, false)) {
 		if (first) {
 			_UpdateCleanUndoRedoSaveRevert();
 			first = false;
 		}
-		int32 start, finish;
+		int32 start;
+		int32 finish;
+				
 		fTextView->GetSelection(&start, &finish);
-
 		fTextView->Delete(start, start + findThis.Length());
 		fTextView->Insert(start, replaceWith.String(), replaceWith.Length());
+		
+		// advance the caret behind the inserted text
+		start += replaceWith.Length();
+		fTextView->Select(start, start);
 	}
+	fTextView->ScrollToSelection();
 	fTextView->SetSuppressChanges(false);
 }
 
@@ -1597,8 +1612,8 @@ StyledEditWindow::_SetFontStyle(const char* fontFamily, const char* fontStyle)
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Statistics"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Statistics"
 
 
 int32
@@ -1630,8 +1645,8 @@ StyledEditWindow::_ShowStatistics()
 }
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "Menus"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Menus"
 
 
 void

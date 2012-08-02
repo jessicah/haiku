@@ -41,9 +41,8 @@ All rights reserved.
 #include <Messenger.h>
 #include <View.h>
 
+#include "PreferencesWindow.h" // For message constants
 
-const uint32 kShowSeconds = 'ShSc';
-const uint32 kFullDate = 'FDat';
 
 class BCountry;
 class BMessageRunner;
@@ -52,71 +51,84 @@ class BMessageRunner;
 class _EXPORT	TTimeView;
 #endif
 
-
 class TTimeView : public BView {
-	public:
-		TTimeView(float maxWidth, float height, bool showSeconds = false,
-			bool showInterval = false);
-		TTimeView(BMessage* data);
-		~TTimeView();
+public:
+								TTimeView(float maxWidth, float height,
+									bool use24HourClock, bool showSeconds,
+									bool showDayOfWeek);
+								TTimeView(BMessage* data);
+								~TTimeView();
 
 #ifdef AS_REPLICANT
-		status_t Archive(BMessage* data, bool deep = true) const;
-		static BArchivable* Instantiate(BMessage* data);
+				status_t		Archive(BMessage* data,
+									bool deep = true) const;
+		static	BArchivable*	Instantiate(BMessage* data);
 #endif
 
-		void		AttachedToWindow();
-		void		Draw(BRect update);
-		void		GetPreferredSize(float* width, float* height);
-		void		ResizeToPreferred();
-		void		FrameMoved(BPoint);
-		void		MessageReceived(BMessage*);
-		void		MouseDown(BPoint where);
-		void		Pulse();
+				void			AttachedToWindow();
+				void			Draw(BRect update);
+				void			FrameMoved(BPoint);
+				void			GetPreferredSize(float* width, float* height);
+				void			MessageReceived(BMessage*);
+				void			MouseDown(BPoint where);
+				void			Pulse();
+				void			ResizeToPreferred();
 
-		bool		ShowingSeconds() { return fShowSeconds; }
-		void		ShowSeconds(bool);
-		void		ShowCalendar(BPoint where);
+				bool			Orientation() const;
+				void			SetOrientation(bool o);
 
-		bool		Orientation() const;
-		void		SetOrientation(bool o);
+				bool			Use24HourClock() const;
+				void			SetUse24HourClock(bool use24HourClock);
 
-	private:
+				bool			ShowSeconds() const;
+				void			SetShowSeconds(bool show);
+
+				bool			ShowDayOfWeek() const;
+				void			SetShowDayOfWeek(bool show);
+
+				void			ShowCalendar(BPoint where);
+
+private:
 		friend class TReplicantTray;
 
-		void		Update();
-		void		GetCurrentTime();
-		void		GetCurrentDate();
-		void		CalculateTextPlacement();
-		void		ShowClockOptions(BPoint);
+				void			GetCurrentTime();
+				void			GetCurrentDate();
+				void			CalculateTextPlacement();
+				void			ShowTimeOptions(BPoint);
+				void			Update();
+				void			UpdateTimeFormat();
 
-		BView		*fParent;
-		bool		fNeedToUpdate;
+				BView*			fParent;
+				bool			fNeedToUpdate;
 
-		time_t		fTime;
-		time_t		fLastTime;
+				time_t			fCurrentTime;
+				time_t			fLastTime;
 
-		char		fTimeStr[64];
-		char		fLastTimeStr[64];
-		char		fDateStr[64];
-		char		fLastDateStr[64];
+				char			fCurrentTimeStr[64];
+				char			fLastTimeStr[64];
+				char			fCurrentDateStr[64];
+				char			fLastDateStr[64];
 
-		int			fSeconds;
-		int			fMinute;
-		int			fHour;
+				int				fSeconds;
+				int				fMinute;
+				int				fHour;
 
-		bool		fShowInterval;
-		bool		fShowSeconds;
+				float			fMaxWidth;
+				float			fHeight;
+				bool			fOrientation; // vertical = true
 
-		float		fMaxWidth;
-		float		fHeight;
-		bool		fOrientation; // vertical = true
-		BPoint		fTimeLocation;
-		BPoint		fDateLocation;
+				bool			fUse24HourClock;
+				bool			fShowSeconds;
+				bool			fShowDayOfWeek;
+				BString			fTimeFormat;
 
-		BMessenger	fCalendarWindow;
+				BPoint			fTimeLocation;
+				BPoint			fDateLocation;
 
-		BLocale		fLocale; // For date and time localizing purposes
+				BMessenger		fCalendarWindow;
+
+				// For date and time localization purposes
+				BLocale			fLocale;
 };
 
 
@@ -128,4 +140,3 @@ TTimeView::Orientation() const
 
 
 #endif	/* TIME_VIEW_H */
-

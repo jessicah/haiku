@@ -33,9 +33,13 @@ holders.
 All rights reserved.
 */
 
+
+#include "WindowMenu.h"
+
 #include <malloc.h>
 #include <stdio.h>
 #include <string.h>
+
 #include <Catalog.h>
 #include <Locale.h>
 #include <Window.h>
@@ -46,10 +50,8 @@ All rights reserved.
 #include "ShowHideMenuItem.h"
 #include "TeamMenu.h"
 #include "TeamMenuItem.h"
-#include "WindowMenuItem.h"
-#include "WindowMenu.h"
-
 #include "tracker_private.h"
+#include "WindowMenuItem.h"
 
 
 const int32 kDesktopWindow = 1024;
@@ -61,8 +63,8 @@ const int32 kListFloater = 5;
 const int32 kSystemFloater = 6;
 
 
-#undef B_TRANSLATE_CONTEXT
-#define B_TRANSLATE_CONTEXT "WindowMenu"
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "WindowMenu"
 
 bool
 TWindowMenu::WindowShouldBeListed(uint32 behavior)
@@ -105,7 +107,7 @@ TWindowMenu::AttachedToWindow()
 			// and then.
 			Window()->Hide();
 			// if in expando (horizontal or vertical)
-			if (barview->Expando()) {
+			if (barview->ExpandoState()) {
 				SetTrackingHook(barview->MenuTrackingHook,
 					barview->GetTrackingHookData());
 			}
@@ -116,7 +118,8 @@ TWindowMenu::AttachedToWindow()
 
 	int32 parentMenuItems = 0;
 
-	for (int32 i = 0; i < fTeam->CountItems(); i++) {
+	int32 teamCount = fTeam->CountItems();
+	for (int32 i = 0; i < teamCount; i++) {
 		team_id theTeam = (team_id)fTeam->ItemAt(i);
 		int32 tokenCount = 0;
 		int32* tokens = get_token_list(theTeam, &tokenCount);
@@ -130,7 +133,11 @@ TWindowMenu::AttachedToWindow()
 				&& (wInfo->show_hide_level <= 0 || wInfo->is_mini)) {
 				// Don't add new items if we're expanded. We've already done
 				// this, they've just been moved.
-				for (int32 addIndex = 0; addIndex < CountItems(); addIndex++) {
+				int32 numItems = CountItems();
+
+				// Find first item that sorts alphabetically after this window,
+				// so we know where to put it
+				for (int32 addIndex = 0; addIndex < numItems; addIndex++) {
 					TWindowMenuItem* item
 						= static_cast<TWindowMenuItem*>(ItemAt(addIndex));
 					if (item != NULL
@@ -227,7 +234,7 @@ TWindowMenu::DetachedFromWindow()
 	// in expando mode the teammenu will not call DragStop, thus, it needs to
 	// be called from here
 	TBarView* barview = (dynamic_cast<TBarApp*>(be_app))->BarView();
-	if (barview && barview->Expando() && barview->Dragging()
+	if (barview && barview->ExpandoState() && barview->Dragging()
 		&& barview->LockLooper()) {
 		// We changed the show level in AttachedToWindow(). Undo it.
 		Window()->Show();
@@ -252,4 +259,3 @@ TWindowMenu::SetExpanded(bool status, int lastIndex)
 	fExpanded = status;
 	fExpandedIndex = lastIndex;
 }
-
