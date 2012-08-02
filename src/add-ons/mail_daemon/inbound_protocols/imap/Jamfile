@@ -43,17 +43,12 @@ Addon IMAP
 	$(sources)
 	:
 	be libmail.so $(HAIKU_LOCALE_LIBS) $(TARGET_NETWORK_LIBS) libbnetapi.so
-	libalm.so libshared.a $(TARGET_LIBSUPC++) $(TARGET_LIBSTDC++)
+	libshared.a $(TARGET_LIBSUPC++) $(TARGET_LIBSTDC++)
 ;
 
 SEARCH on [ FGristFiles Commands.cpp Protocol.cpp Response.cpp ]
 	= [ FDirName $(HAIKU_TOP) src add-ons mail_daemon inbound_protocols imap
 		imap_lib ] ;
-
-Package haiku-maildaemon-cvs :
-	IMAP :
-	boot home config add-ons mail_daemon inbound_protocols
-;
 
 DoCatalogs IMAP :
 	x-vnd.Haiku-IMAP
