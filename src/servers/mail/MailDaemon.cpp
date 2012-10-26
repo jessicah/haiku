@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2011, Haiku, Inc. All rights reserved.
+ * Copyright 2007-2012, Haiku, Inc. All rights reserved.
  * Copyright 2001-2002 Dr. Zoidberg Enterprises. All rights reserved.
  * Copyright 2011, Clemens Zeidler <haiku@clemens-zeidler.de>
  * Distributed under the terms of the MIT License.
@@ -184,8 +184,7 @@ MailDaemonApp::ReadyToRun()
 
 		numString << fNewMessages;
 		string.ReplaceFirst("%num", numString);
-	}
-	else
+	} else
 		string = B_TRANSLATE("No new messages");
 
 	fCentralBeep = false;
@@ -213,16 +212,16 @@ MailDaemonApp::RefsReceived(BMessage* message)
 	entry_ref ref;
 	for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
 		BNode node(&ref);
-		if (node.InitCheck() < B_OK)
+		if (node.InitCheck() != B_OK)
 			continue;
 
 		int32 account;
 		if (node.ReadAttr(B_MAIL_ATTR_ACCOUNT_ID, B_INT32_TYPE, 0, &account,
-			sizeof(account)) < 0)
+				sizeof(account)) < 0)
 			continue;
 
 		InboundProtocolThread* protocolThread = _FindInboundProtocol(account);
-		if (!protocolThread)
+		if (protocolThread == NULL)
 			continue;
 
 		BMessenger target;
@@ -436,7 +435,8 @@ MailDaemonApp::InstallDeskbarIcon()
 
 		status = deskbar.AddItem(&ref);
 		if (status < B_OK) {
-			fprintf(stderr, "Can't add deskbar replicant: %s\n", strerror(status));
+			fprintf(stderr, "Can't add deskbar replicant: %s\n",
+				strerror(status));
 			return;
 		}
 	}
@@ -702,7 +702,7 @@ MailDaemonApp::_ReloadAccounts(BMessage* message)
 		if (it != fAccounts.end())
 			_RemoveAccount(it);
 		BMailAccountSettings* settings = accounts.AccountByID(account);
-		if (settings)
+		if (settings != NULL)
 			_InitAccount(*settings);
 	}
 }
@@ -802,9 +802,10 @@ MailDaemonApp::_UpdateAutoCheck(bigtime_t interval)
 		if (fAutoCheckRunner != NULL) {
 			fAutoCheckRunner->SetInterval(interval);
 			fAutoCheckRunner->SetCount(-1);
-		} else
+		} else {
 			fAutoCheckRunner = new BMessageRunner(be_app_messenger,
 				new BMessage('moto'), interval);
+		}
 	} else {
 		delete fAutoCheckRunner;
 		fAutoCheckRunner = NULL;
