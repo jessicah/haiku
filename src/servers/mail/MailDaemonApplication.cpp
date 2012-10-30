@@ -6,7 +6,7 @@
  */
 
 
-#include "MailDaemon.h"
+#include "MailDaemonApplication.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -170,7 +170,7 @@ account_protocols::account_protocols()
 // #pragma mark -
 
 
-MailDaemonApp::MailDaemonApp()
+MailDaemonApplication::MailDaemonApplication()
 	:
 	BApplication(B_MAIL_DAEMON_SIGNATURE),
 
@@ -186,7 +186,7 @@ MailDaemonApp::MailDaemonApp()
 }
 
 
-MailDaemonApp::~MailDaemonApp()
+MailDaemonApplication::~MailDaemonApplication()
 {
 	delete fAutoCheckRunner;
 
@@ -204,7 +204,7 @@ MailDaemonApp::~MailDaemonApp()
 
 
 void
-MailDaemonApp::ReadyToRun()
+MailDaemonApplication::ReadyToRun()
 {
 	InstallDeskbarIcon();
 
@@ -273,7 +273,7 @@ MailDaemonApp::ReadyToRun()
 
 
 void
-MailDaemonApp::RefsReceived(BMessage* message)
+MailDaemonApplication::RefsReceived(BMessage* message)
 {
 	entry_ref ref;
 	for (int32 i = 0; message->FindRef("refs", i, &ref) == B_OK; i++) {
@@ -301,7 +301,7 @@ MailDaemonApp::RefsReceived(BMessage* message)
 
 
 void
-MailDaemonApp::MessageReceived(BMessage* msg)
+MailDaemonApplication::MessageReceived(BMessage* msg)
 {
 	switch (msg->what) {
 		case 'moto':
@@ -468,7 +468,7 @@ MailDaemonApp::MessageReceived(BMessage* msg)
 
 
 void
-MailDaemonApp::Pulse()
+MailDaemonApplication::Pulse()
 {
 	bigtime_t idle = idle_time();
 	if (fLEDAnimation->IsRunning() && idle < 100000)
@@ -477,7 +477,7 @@ MailDaemonApp::Pulse()
 
 
 bool
-MailDaemonApp::QuitRequested()
+MailDaemonApplication::QuitRequested()
 {
 	RemoveDeskbarIcon();
 	return true;
@@ -485,7 +485,7 @@ MailDaemonApp::QuitRequested()
 
 
 void
-MailDaemonApp::InstallDeskbarIcon()
+MailDaemonApplication::InstallDeskbarIcon()
 {
 	BDeskbar deskbar;
 
@@ -511,7 +511,7 @@ MailDaemonApp::InstallDeskbarIcon()
 
 
 void
-MailDaemonApp::RemoveDeskbarIcon()
+MailDaemonApplication::RemoveDeskbarIcon()
 {
 	BDeskbar deskbar;
 	if (deskbar.HasItem("mail_daemon"))
@@ -520,7 +520,7 @@ MailDaemonApp::RemoveDeskbarIcon()
 
 
 void
-MailDaemonApp::GetNewMessages(BMessage* msg)
+MailDaemonApplication::GetNewMessages(BMessage* msg)
 {
 	int32 account = -1;
 	if (msg->FindInt32("account", &account) == B_OK && account >= 0) {
@@ -543,7 +543,7 @@ MailDaemonApp::GetNewMessages(BMessage* msg)
 
 
 void
-MailDaemonApp::SendPendingMessages(BMessage* msg)
+MailDaemonApplication::SendPendingMessages(BMessage* msg)
 {
 	BVolumeRoster roster;
 	BVolume volume;
@@ -619,7 +619,7 @@ MailDaemonApp::SendPendingMessages(BMessage* msg)
 
 
 void
-MailDaemonApp::MakeMimeTypes(bool remakeMIMETypes)
+MailDaemonApplication::MakeMimeTypes(bool remakeMIMETypes)
 {
 	// Add MIME database entries for the e-mail file types we handle.  Either
 	// do a full rebuild from nothing, or just add on the new attributes that
@@ -676,7 +676,7 @@ MailDaemonApp::MakeMimeTypes(bool remakeMIMETypes)
 
 
 void
-MailDaemonApp::_InitAccounts()
+MailDaemonApplication::_InitAccounts()
 {
 	BMailAccounts accounts;
 	for (int i = 0; i < accounts.CountAccounts(); i++)
@@ -685,7 +685,7 @@ MailDaemonApp::_InitAccounts()
 
 
 void
-MailDaemonApp::_InitAccount(BMailAccountSettings& settings)
+MailDaemonApplication::_InitAccount(BMailAccountSettings& settings)
 {
 	account_protocols account;
 
@@ -723,7 +723,7 @@ MailDaemonApp::_InitAccount(BMailAccountSettings& settings)
 
 
 void
-MailDaemonApp::_ReloadAccounts(BMessage* message)
+MailDaemonApplication::_ReloadAccounts(BMessage* message)
 {
 	type_code typeFound;
 	int32 countFound;
@@ -750,7 +750,7 @@ MailDaemonApp::_ReloadAccounts(BMessage* message)
 
 
 void
-MailDaemonApp::_RemoveAccount(const account_protocols& account)
+MailDaemonApplication::_RemoveAccount(const account_protocols& account)
 {
 	if (account.inboundProtocol != NULL) {
 		account.inboundProtocol->Lock();
@@ -769,7 +769,7 @@ MailDaemonApp::_RemoveAccount(const account_protocols& account)
 
 
 BInboundMailProtocol*
-MailDaemonApp::_CreateInboundProtocol(BMailAccountSettings& settings,
+MailDaemonApplication::_CreateInboundProtocol(BMailAccountSettings& settings,
 	image_id& image)
 {
 	const entry_ref& entry = settings.InboundAddOnRef();
@@ -791,7 +791,7 @@ MailDaemonApp::_CreateInboundProtocol(BMailAccountSettings& settings,
 
 
 BOutboundMailProtocol*
-MailDaemonApp::_CreateOutboundProtocol(BMailAccountSettings& settings,
+MailDaemonApplication::_CreateOutboundProtocol(BMailAccountSettings& settings,
 	image_id& image)
 {
 	const entry_ref& entry = settings.OutboundAddOnRef();
@@ -813,7 +813,7 @@ MailDaemonApp::_CreateOutboundProtocol(BMailAccountSettings& settings,
 
 
 BInboundMailProtocol*
-MailDaemonApp::_InboundProtocol(int32 account)
+MailDaemonApplication::_InboundProtocol(int32 account)
 {
 	AccountMap::iterator found = fAccounts.find(account);
 	if (found == fAccounts.end())
@@ -823,7 +823,7 @@ MailDaemonApp::_InboundProtocol(int32 account)
 
 
 BOutboundMailProtocol*
-MailDaemonApp::_OutboundProtocol(int32 account)
+MailDaemonApplication::_OutboundProtocol(int32 account)
 {
 	if (account < 0)
 		account = BMailSettings().DefaultOutboundAccount();
@@ -836,7 +836,7 @@ MailDaemonApp::_OutboundProtocol(int32 account)
 
 
 void
-MailDaemonApp::_UpdateAutoCheck(bigtime_t interval)
+MailDaemonApplication::_UpdateAutoCheck(bigtime_t interval)
 {
 	if (interval > 0) {
 		if (fAutoCheckRunner != NULL) {
@@ -854,7 +854,7 @@ MailDaemonApp::_UpdateAutoCheck(bigtime_t interval)
 
 
 void
-MailDaemonApp::_AddMessage(send_mails_info& info, const BEntry& entry,
+MailDaemonApplication::_AddMessage(send_mails_info& info, const BEntry& entry,
 	const BNode& node)
 {
 	entry_ref ref;
@@ -869,7 +869,7 @@ MailDaemonApp::_AddMessage(send_mails_info& info, const BEntry& entry,
 /*!	Work-around for a broken index that contains out-of-date information.
 */
 /*static*/ bool
-MailDaemonApp::_IsPending(BNode& node)
+MailDaemonApplication::_IsPending(BNode& node)
 {
 	int32 flags;
 	if (node.ReadAttr(B_MAIL_ATTR_FLAGS, B_INT32_TYPE, 0, &flags, sizeof(int32))
@@ -881,7 +881,7 @@ MailDaemonApp::_IsPending(BNode& node)
 
 
 /*static*/ bool
-MailDaemonApp::_IsEntryInTrash(BEntry& entry)
+MailDaemonApplication::_IsEntryInTrash(BEntry& entry)
 {
 	entry_ref ref;
 	entry.GetRef(&ref);
