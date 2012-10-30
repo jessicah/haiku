@@ -829,7 +829,7 @@ TMailWindow::MarkMessageRead(entry_ref* message, read_flags flag)
 	// preserve the read position in the node attribute
 	PreserveReadingPos(true);
 
-	BMailDaemon::MarkAsRead(account, *message, flag);
+	BMailDaemon().MarkAsRead(account, *message, flag);
 }
 
 
@@ -954,7 +954,7 @@ TMailWindow::MessageReceived(BMessage *msg)
 {
 	bool wasReadMsg = false;
 	switch (msg->what) {
-		case kMsgBodyFetched:
+		case B_MAIL_BODY_FETCHED:
 		{
 			status_t status = msg->FindInt32("status");
 			if (status != B_OK) {
@@ -2166,7 +2166,7 @@ TMailWindow::Reply(entry_ref *ref, TMailWindow *window, uint32 type)
 	BString date(mail->Date());
 	if (date.Length() <= 0)
 		date = B_TRANSLATE("(Date unavailable)");
-			
+
 	preamble.ReplaceAll("%n", name);
 	preamble.ReplaceAll("%e", address);
 	preamble.ReplaceAll("%d", date);
@@ -2329,7 +2329,7 @@ TMailWindow::Send(bool now)
 						B_WARNING_ALERT);
 					alert->SetShortcut(1, B_ESCAPE);
 					userAnswer = alert->Go();
-					
+
 					if (userAnswer == 1) {
 						// Cancel was picked.
 						return -1;
@@ -2466,11 +2466,12 @@ TMailWindow::Send(bool now)
 				B_TRANSLATE("Start now"), B_TRANSLATE("OK"));
 			alert->SetShortcut(1, B_ESCAPE);
 			int32 start = alert->Go();
-			
+
 			if (start == 0) {
-				result = be_roster->Launch("application/x-vnd.Be-POST");
+				BMailDaemon daemon;
+				result = daemon.Launch();
 				if (result == B_OK) {
-					BMailDaemon::SendQueuedMail();
+					daemon.SendQueuedMail();
 				} else {
 					errorMessage
 						<< B_TRANSLATE("The mail_daemon could not be "
@@ -2601,12 +2602,12 @@ TMailWindow::SaveAsDraft()
 		WriteAttrString(&draft, B_MAIL_ATTR_CC, fHeaderView->fCc->Text());
 	if (fHeaderView->fBcc != NULL)
 		WriteAttrString(&draft, B_MAIL_ATTR_BCC, fHeaderView->fBcc->Text());
-	
+
 	// Add account
 	BMenuItem* menuItem = fHeaderView->fAccountMenu->FindMarked();
 	if (menuItem != NULL)
 		WriteAttrString(&draft, B_MAIL_ATTR_ACCOUNT, menuItem->Label());
-	
+
 	// Add encoding
 	menuItem = fHeaderView->fEncodingMenu->FindMarked();
 	if (menuItem != NULL)
@@ -2821,7 +2822,7 @@ TMailWindow::OpenMessage(const entry_ref *ref, uint32 characterSetForDecoding)
 
 	if (strcmp(mimeType, B_PARTIAL_MAIL_TYPE) == 0) {
 		BMessenger listener(this);
-		BMailDaemon::FetchBody(*ref, &listener);
+		BMailDaemon().FetchBody(*ref, &listener);
 		fileInfo.GetType(mimeType);
 		_SetDownloading(true);
 	} else
@@ -2849,21 +2850,21 @@ TMailWindow::OpenMessage(const entry_ref *ref, uint32 characterSetForDecoding)
 			fHeaderView->fCc->SetText(string.String());
 		if (node.ReadAttrString(B_MAIL_ATTR_BCC, &string) == B_OK)
 			fHeaderView->fBcc->SetText(string.String());
-		
+
 		// Restore account
 		if (node.ReadAttrString(B_MAIL_ATTR_ACCOUNT, &string) == B_OK) {
 			BMenuItem* accountItem = fHeaderView->fAccountMenu->FindItem(string.String());
 			if (accountItem != NULL)
 				accountItem->SetMarked(true);
 		}
-		
+
 		// Restore encoding
 		if (node.ReadAttrString("MAIL:encoding", &string) == B_OK) {
 			BMenuItem* encodingItem = fHeaderView->fEncodingMenu->FindItem(string.String());
 			if (encodingItem != NULL)
 				encodingItem->SetMarked(true);
 		}
-		
+
 		// Restore attachments
 		if (node.ReadAttrString("MAIL:attachments", &string) == B_OK) {
 			BMessage msg(REFS_RECEIVED);
@@ -2880,7 +2881,7 @@ TMailWindow::OpenMessage(const entry_ref *ref, uint32 characterSetForDecoding)
 			}
 			AddEnclosure(&msg);
 		}
-		
+
 		// restore the reading position if available
 		PostMessage(M_READ_POS);
 
