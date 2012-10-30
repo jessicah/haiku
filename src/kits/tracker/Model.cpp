@@ -96,7 +96,8 @@ Model::Model()
 	fWritable(false),
 	fNode(NULL),
 	fStatus(B_NO_INIT),
-	fHasLocalizedName(false)
+	fHasLocalizedName(false),
+	fLocalizedNameIsCached(false)
 {
 }
 
@@ -111,7 +112,8 @@ Model::Model(const Model &cloneThis)
 	fWritable(false),
 	fNode(NULL),
 	fLocalizedName(cloneThis.fLocalizedName),
-	fHasLocalizedName(cloneThis.fHasLocalizedName)
+	fHasLocalizedName(cloneThis.fHasLocalizedName),
+	fLocalizedNameIsCached(cloneThis.fLocalizedNameIsCached)
 {
 	fStatBuf.st_dev = cloneThis.NodeRef()->device;
 	fStatBuf.st_ino = cloneThis.NodeRef()->node;
@@ -137,7 +139,8 @@ Model::Model(const node_ref* dirNode, const node_ref* node, const char* name,
 	fPreferredAppName(NULL),
 	fWritable(false),
 	fNode(NULL),
-	fHasLocalizedName(false)
+	fHasLocalizedName(false),
+	fLocalizedNameIsCached(false)
 {
 	SetTo(dirNode, node, name, open, writable);
 }
@@ -148,7 +151,8 @@ Model::Model(const BEntry* entry, bool open, bool writable)
 	fPreferredAppName(NULL),
 	fWritable(false),
 	fNode(NULL),
-	fHasLocalizedName(false)
+	fHasLocalizedName(false),
+	fLocalizedNameIsCached(false)
 {
 	SetTo(entry, open, writable);
 }
@@ -161,7 +165,8 @@ Model::Model(const entry_ref* ref, bool traverse, bool open, bool writable)
 	fIconFrom(kUnknownSource),
 	fWritable(false),
 	fNode(NULL),
-	fHasLocalizedName(false)
+	fHasLocalizedName(false),
+	fLocalizedNameIsCached(false)
 {
 	BEntry entry(ref, traverse);
 	fStatus = entry.InitCheck();
@@ -569,11 +574,14 @@ Model::SetupBaseType()
 void
 Model::CacheLocalizedName()
 {
-	if (BLocaleRoster::Default()->GetLocalizedFileName(
-			fLocalizedName, fEntryRef, true) == B_OK)
-		fHasLocalizedName = true;
-	else
-		fHasLocalizedName = false;
+	if (!fLocalizedNameIsCached) {
+		fLocalizedNameIsCached = true;
+		if (BLocaleRoster::Default()->GetLocalizedFileName(
+				fLocalizedName, fEntryRef, true) == B_OK)
+			fHasLocalizedName = true;
+		else
+			fHasLocalizedName = false;
+	}
 }
 
 
@@ -890,8 +898,6 @@ Model::AttrChanged(const char* attrName)
 	if (!attrName
 		|| strcmp(attrName, kAttrMIMEType) == 0
 		|| strcmp(attrName, kAttrPreferredApp) == 0) {
-		ModelNodeLazyOpener opener(this);
-		opener.OpenNode();
 		char mimeString[B_MIME_TYPE_LENGTH];
 		BNodeInfo info(fNode);
 		if (info.GetType(mimeString) != B_OK)
@@ -1100,15 +1106,15 @@ Model::SupportsMimeType(const char* type, const BObjectList<BString>* list,
 
 		int32 match;
 
-		if (type) {
+		if (type || (list != NULL && list->IsEmpty())) {
 			BString typeString(type);
 			match = MatchMimeTypeString(&typeString, mimeSignature);
-		} else
+		} else {
 			match = WhileEachListItem(const_cast<BObjectList<BString>*>(list),
 				MatchMimeTypeString, mimeSignature);
-				// const_cast shouldnt be here, have to have it until
-				// MW cleans up
-
+			// const_cast shouldnt be here, have to have it until
+			// MW cleans up
+		}
 		if (match == kMatch)
 			// supports the actual type, it can't get any better
 			return kModelSupportsType;
@@ -1194,7 +1200,8 @@ Model::Mimeset(bool force)
 	GetPath(&path);
 
 	update_mime_info(path.Path(), 0, 1, force ? 2 : 0);
-
+	ModelNodeLazyOpener opener(this);
+	opener.OpenNode();
 	AttrChanged(0);
 
 	return !oldType.ICompare(MimeType());

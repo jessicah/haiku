@@ -495,10 +495,6 @@ BrowserWindow::BrowserWindow(BRect frame, SettingsMessage* appSettings,
 		.Add(statusGroup)
 	);
 
-	// TODO: Small hack for fixing some invalidation problems with BMenuBar...
-	mainMenu->SetFlags(mainMenu->Flags() | B_FULL_UPDATE_ON_RESIZE);
-	mainMenu->SetViewColor(B_TRANSPARENT_COLOR);
-
 	fURLInputGroup->MakeFocus(true);
 
 	fMenuGroup = menuBarGroup;
@@ -684,6 +680,8 @@ BrowserWindow::MessageReceived(BMessage* message)
 				B_TRANSLATE("Do you really want to "
 				"clear the browsing history?"), B_TRANSLATE("Clear"),
 				B_TRANSLATE("Cancel"));
+			alert->SetShortcut(1, B_ESCAPE);
+
 			if (alert->Go() == 0)
 				history->Clear();
 			break;
@@ -736,6 +734,7 @@ BrowserWindow::MessageReceived(BMessage* message)
 
 				BAlert* alert = new BAlert(B_TRANSLATE("Open bookmarks confirmation"),
 					string.String(), B_TRANSLATE("Cancel"), B_TRANSLATE("Open all"));
+				alert->SetShortcut(0, B_ESCAPE);
 				if (alert->Go() == 0)
 					break;
 			}
@@ -1590,6 +1589,7 @@ BrowserWindow::_CreateBookmark()
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go();
 		return;
 	}
@@ -1619,6 +1619,7 @@ BrowserWindow::_CreateBookmark()
 		message.ReplaceFirst("%bookmarkName", bookmarkName);
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark info"),
 			message.String(), B_TRANSLATE("OK"));
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go();
 		return;
 	}
@@ -1713,6 +1714,7 @@ BrowserWindow::_CreateBookmark()
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go();
 		return;
 	}
@@ -1738,6 +1740,7 @@ BrowserWindow::_ShowBookmarks()
 		BAlert* alert = new BAlert(B_TRANSLATE("Bookmark error"),
 			message.String(), B_TRANSLATE("OK"), NULL, NULL,
 			B_WIDTH_AS_USUAL, B_STOP_ALERT);
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go();
 		return;
 	}
@@ -2230,6 +2233,7 @@ BrowserWindow::_HandlePageSourceResult(const BMessage* message)
 			"page source: %s\n", strerror(ret));
 		BAlert* alert = new BAlert(B_TRANSLATE("Page source error"), buffer,
 			B_TRANSLATE("OK"));
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go(NULL);
 	}
 }

@@ -32,6 +32,7 @@
 #include <MutableLocaleRoster.h>
 #include <Node.h>
 #include <Path.h>
+#include <Roster.h>
 #include <String.h>
 #include <TimeZone.h>
 
@@ -102,14 +103,20 @@ country_code_for_language(const BLanguage& language)
 			return "CZ";
 		case 'da':	// Denmark
 			return "DK";
+		case 'el':	// Greece
+			return "GR";
 		case 'en':	// United Kingdom
 			return "GB";
+		case 'hi':	// India
+			return "IN";
 		case 'ja':	// Japan
 			return "JP";
 		case 'ko':	// South Korea
 			return "KR";
 		case 'nb':	// Norway
 			return "NO";
+		case 'pa':	// Pakistan
+			return "PK";
 		case 'sv':	// Sweden
 			return "SE";
 		case 'uk':	// Ukraine
@@ -122,6 +129,7 @@ country_code_for_language(const BLanguage& language)
 		case 'es':	// Spain
 		case 'fi':	// Finland
 		case 'fr':	// France
+		case 'hr':	// Croatia
 		case 'hu':	// Hungary
 		case 'it':	// Italy
 		case 'lt':	// Lithuania
@@ -507,7 +515,19 @@ BLocaleRoster::GetLocalizedFileName(BString& localizedFileName,
 	if (status != B_OK)
 		return status;
 
-	BCatalog catalog(ref);
+	// Try to get entry_ref for signature from above
+	BRoster roster;
+	entry_ref catalogRef;
+	// The signature is missing application/
+	signature.Prepend("application/");
+	status = roster.FindApp(signature, &catalogRef);
+	if (status != B_OK) {
+		log_team(LOG_ERR, "Could not find the entry_ref for signature %s"
+				" to load a catalog.", signature.String());
+		return status;
+	}
+
+	BCatalog catalog(catalogRef);
 	const char* temp = catalog.GetString(string, context);
 
 	if (temp == NULL)

@@ -1,4 +1,4 @@
-1	dutch; flemish	x-vnd.Haiku-libtracker	3203928783
+1	dutch; flemish	x-vnd.Haiku-libtracker	344678808
 common	B_COMMON_DIRECTORY		algemeen
 OK	WidgetAttributeText		OK
 Icon view	VolumeWindow		Icoonweergave
@@ -363,7 +363,6 @@ Modified	FindPanel		Gewijzigd
 Error moving \"%name\" to Trash. (%error)	FSUtils		Fout bij het verplaatsen van \"%name\" naar de prullenbak. (%error)
 You can't replace a folder with one of its sub-folders.	FSUtils		U kunt een map niet vervangen door een van zijn submappen.
 <No recent items>	FavoritesMenu		<Geen recente items>
-Preferences…	ContainerWindow		Voorkeuren...
 Move	PoseView		Verplaatsen
 Open and make preferred	OpenWithWindow		Openen en bevoorkeuren
 Are you sure you want to delete the selected item(s)? This operation cannot be reverted.	FSUtils		Bent u zeker dat u het/de geselecteerde item(s) wilt verwijderen? Deze actie kan niet ongedaan gemaakt worden.
@@ -384,7 +383,6 @@ Restoring: 	StatusWindow		Herstelt:
 system	B_SYSTEM_DIRECTORY		system
 Skip	FSUtils		Overslaan
 Settings…	MountMenu		Instellingen...
-Error emptying Trash!	FSUtils		Fout bij het leegmaken van de prullenbak!
 Recent folders	FavoritesMenu		Recente mappen
 Close	ContainerWindow		Sluiten
 Preferred for file	OpenWithWindow		Bevoorkeurd voor bestand

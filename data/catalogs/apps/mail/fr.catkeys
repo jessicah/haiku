@@ -1,10 +1,11 @@
-1	french	x-vnd.Be-MAIL	1896251069
+1	french	x-vnd.Be-MAIL	3337401776
 View	Mail		Vue
 %d - Date	Mail		%d - Date
 Attach attributes:	Mail		Attributs du fichier joint :
 Inconsistency occurred in the undo/redo buffer.	Mail		Une incohérence est survenue dans le tampon d'annulation.
 An error occurred trying to save the attachment.	Mail		Une erreur s'est produite en essayant de sauvegarder le fichier joint.
 Copy to new	Mail		Copier vers nouveau
+Leave as 'New'	Mail	Do not translate New - this is non-localizable e-mail status	Laisser en « nouveau »
 Edit	Mail		Modifier
 Print	Mail		Imprimer
 <none>	Mail		<aucun>
@@ -15,16 +16,18 @@ helpful message	Mail		message utile
 Colored quotes:	Mail		Citations en couleurs :
 Subject:	Mail		Objet :
 Reply to all	Mail		Répondre à tous
-Show icons & labels	Mail		Montrer les icônes et les textes
-Remove attachment	Mail		Retirer le fichier joint
+Enclosure: %name% (Type: %type%)	Mail	Don't translate the variables %name% and %type%.	Pièce jointe : %name% (Type : %type%)
+Show icons & labels	Mail		Afficher les icônes et les étiquettes
+Remove attachment	Mail		Retirer la pièce jointe
 Button bar:	Mail		Barre d'icônes :
 spam	B_USER_DIRECTORY/mail/spam		spam
 Beginner	Mail		Débutant
 Don't save	Mail		Ne pas enregistrer
 Expert	Mail		Expert
-Reply account:	Mail		Compte pour la réponse :
+Reply account:	Mail		Compte de réponse :
 Discard	Mail		Ignorer
 Message	Mail		Message
+Settings…	Mail		Réglages…
 Reply to sender	Mail		Répondre à l'expéditeur
 There is no installed handler for URL links.	Mail		Il n'y a pas d'application d'ouvrir les liens URL.
 Signature	Mail		Signature
@@ -36,11 +39,10 @@ Save changes to this signature?	Mail		Enregistrer les modifications apportées �
 Cc:	Mail		Cc :
 Off	Mail		Arrêt
 Find	Mail		Rechercher
-Preferences…	Mail		Préférences…
 Undo	Mail		Annuler
 Date:	Mail		Date :
 An error occurred trying to open this signature.	Mail		Une erreur est survenue en essayant d'ouvrir la signature.
-No file attributes, just plain data	Mail		Pas d'attributs, seulement des donnés
+No file attributes, just plain data	Mail		Pas d'attributs, seulement des donnés brutes
 Edit queries…	Mail		Modifier les requêtes…
 queries	B_USER_DIRECTORY/mail/queries		requêtes
 Paste	Mail		Coller
@@ -62,12 +64,14 @@ Warn unencodable:	Mail		Avertir si non encodable :
 Quit	Mail		Quitter
 %n - Full name	Mail		%n - Nom complet
  Read 	Mail		 Lu 
+UTF-8	Mail	This string is used as a key to set default message compose encoding. It must be correct IANA name from http://cgit.haiku-os.org/haiku/tree/src/kits/textencoding/character_sets.cpp Translate it only if you want to change default message compose encoding for your locale. If you don't know what is it and why it may needs changing, just leave \"UTF-8\".	UTF-8
 Trash	Mail		Corbeille
 Default account:	Mail		Compte par défaut :
 Size:	Mail		Taille :
 Account from mail	Mail		Compte de courrier
 Edit signatures…	Mail		Modifier les signatures…
 New	Mail		Nouveau
+Attachments: 	Mail		Pièces jointes : 
 On	Mail		Marche
 Set to %s	Mail		Changer en %s
 Forward	Mail		Transférer
@@ -76,6 +80,7 @@ E-mail draft could not be saved!	Mail		Le brouillon n'a pas pu être sauvegardé
 To:	Mail		À :
 Only files can be added as attachments.	Mail		Seuls des fichiers peuvent être joints à un message.
 Previous message	Mail		Message précédent
+Attachments:	Mail		Pièces jointes :
 Title:	Mail		Titre :
 Find…	Mail		Chercher…
 Accounts…	Mail		Comptes…
@@ -86,7 +91,7 @@ Page setup…	Mail		Mise en page…
 Text wrapping:	Mail		Renvoi à la ligne :
 Revert	Mail		Défaire
 File	Mail		Fichier
-mail	B_USER_DIRECTORY/mail		mail
+mail	B_USER_DIRECTORY/mail		courrier
 None	Mail		Aucun
 (Name unavailable)	Mail		(Nom non disponible)
 Copy link location	Mail		Copier l'adresse du lien
@@ -98,6 +103,7 @@ Show raw message	Mail		Montrer le message brut
 \\n - Newline	Mail		\\n - Nouvelle ligne
 Start now	Mail		Démarrer maintenant
 Close	Mail		Fermer
+No matches	Mail		Pas de correspondances
 The mail_daemon is not running. The message is queued and will be sent when the mail_daemon is started.	Mail		mail_daemon n'est pas démarré. Ce message a été placé en file d'attente et sera envoyé quand mail_daemon sera démarré.
 Really delete this signature? This cannot be undone.	Mail		Voulez-vous vraiment effacer cette signature ? Ça ne pourra pas être annulé.
 Open	Mail		Ouvrir

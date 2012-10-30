@@ -286,7 +286,7 @@ AddOnThread(BMessage* refsMessage, entry_ref addonRef, entry_ref dirRef)
 
 	BAlert* alert = new BAlert("", buffer.String(), B_TRANSLATE("Cancel"),
 		0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT);
-	alert->SetShortcut(0, B_ESCAPE);
+	alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 	alert->Go();
 
 	return result;
@@ -873,34 +873,36 @@ BContainerWindow::RepopulateMenus()
 	fWindowContextMenu->SetFont(be_plain_font);
 	AddWindowContextMenus(fWindowContextMenu);
 
-	fMenuBar->RemoveItem(fFileMenu);
-	delete fFileMenu;
-	fFileMenu = new BMenu(B_TRANSLATE("File"));
-	AddFileMenu(fFileMenu);
-	fMenuBar->AddItem(fFileMenu);
+	if (fMenuBar != NULL) {
+		fMenuBar->RemoveItem(fFileMenu);
+		delete fFileMenu;
+		fFileMenu = new BMenu(B_TRANSLATE("File"));
+		AddFileMenu(fFileMenu);
+		fMenuBar->AddItem(fFileMenu);
 
-	fMenuBar->RemoveItem(fWindowMenu);
-	delete fWindowMenu;
-	fWindowMenu = new BMenu(B_TRANSLATE("Window"));
-	fMenuBar->AddItem(fWindowMenu);
-	AddWindowMenu(fWindowMenu);
+		fMenuBar->RemoveItem(fWindowMenu);
+		delete fWindowMenu;
+		fWindowMenu = new BMenu(B_TRANSLATE("Window"));
+		fMenuBar->AddItem(fWindowMenu);
+		AddWindowMenu(fWindowMenu);
 
-	// just create the attribute, decide to add it later
-	fMenuBar->RemoveItem(fAttrMenu);
-	delete fAttrMenu;
-	fAttrMenu = new BMenu(B_TRANSLATE("Attributes"));
-	NewAttributeMenu(fAttrMenu);
-	if (PoseView()->ViewMode() == kListMode)
-		ShowAttributeMenu();
+		// just create the attribute, decide to add it later
+		fMenuBar->RemoveItem(fAttrMenu);
+		delete fAttrMenu;
+		fAttrMenu = new BMenu(B_TRANSLATE("Attributes"));
+		NewAttributeMenu(fAttrMenu);
+		if (PoseView()->ViewMode() == kListMode)
+			ShowAttributeMenu();
 
-	PopulateArrangeByMenu(fArrangeByMenu);
+		PopulateArrangeByMenu(fArrangeByMenu);
 
-	int32 selectCount = PoseView()->SelectionList()->CountItems();
+		int32 selectCount = PoseView()->SelectionList()->CountItems();
 
-	SetupOpenWithMenu(fFileMenu);
-	SetupMoveCopyMenus(selectCount ? PoseView()->SelectionList()->
-			FirstItem()->TargetModel()->EntryRef() : NULL,
-		fFileMenu);
+		SetupOpenWithMenu(fFileMenu);
+		SetupMoveCopyMenus(selectCount ? PoseView()->SelectionList()
+				->FirstItem()->TargetModel()->EntryRef() : NULL,
+			fFileMenu);
+	}
 }
 
 
@@ -1525,6 +1527,13 @@ BContainerWindow::MessageReceived(BMessage* message)
 		case kFindButton:
 			(new FindWindow())->Show();
 			break;
+
+		case kRestartDeskbar:
+		{
+			BRoster roster;
+			roster.Launch(kDeskbarSignature);
+			break;
+		}
 
 		case kQuitTracker:
 			be_app->PostMessage(B_QUIT_REQUESTED);
@@ -2713,6 +2722,10 @@ BContainerWindow::ShowContextMenu(BPoint loc, const entry_ref* ref, BView*)
 		if (fWindowContextMenu->Window())
 			return;
 
+		// Repopulate desktop menu if IsDesktop
+		if (dynamic_cast<BDeskWindow*>(this))
+			RepopulateMenus();
+
 		MenusEnded();
 
 		// clicked on a window, show window context menu
@@ -3213,7 +3226,7 @@ BContainerWindow::LoadAddOn(BMessage* message)
 
 		BAlert* alert = new BAlert("", buffer.String(),	B_TRANSLATE("Cancel"),
 			0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT);
-		alert->SetShortcut(0, B_ESCAPE);
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 		alert->Go();
 		return;
 	}

@@ -1,4 +1,4 @@
-1	russian	x-vnd.haiku-icon_o_matic	4233739176
+1	russian	x-vnd.haiku-icon_o_matic	2079362081
 Select All	Icon-O-Matic-PathManipulator		Выделить всё
 Add Style	Icon-O-Matic-AddStylesCmd		Добавить стиль
 Color (#%02x%02x%02x)	Style name after dropping a color		Цвет (#%02x%02x%02x)
@@ -40,7 +40,7 @@ Remove Paths	Icon-O-Matic-RemovePathsCmd		Удалить контуры
 Scale Y	Icon-O-Matic-PropertyNames		Масштабировать по Y
 Add Control Point	Icon-O-Matic-AddPointCmd		Добавить точку управления
 Untitled	Icon-O-Matic-Main		Новый значок
-Multi Set 	Multi Set (property name)		Множество
+Multi Set 	Multi Set (property name)		Множество 
 any of the other lists to	Empty property list - 2nd line		любом другом списке для того,
 Save as…	Icon-O-Matic-Menu-File		Сохранить как…
 Change Color	Icon-O-Matic-SetColorCmd		Изменить цвет
@@ -58,13 +58,14 @@ PNG Set	Icon-O-Matic-SavePanel		Набор PNG
 Joins	Icon-O-Matic-PropertyNames		Соединения
 Remove Style	Icon-O-Matic-RemoveStylesCmd		Удалить стиль
 Scale X	Icon-O-Matic-PropertyNames		Масштабировать по X
-Set 	Set (property name)		Множество
+Set 	Set (property name)		Множество 
 Cancel	Icon-O-Matic-SVGExport		Отмена
 Add shape with style	Icon-O-Matic-Menu-Shape		Добавить форму со стилем
 Remove Shape	Icon-O-Matic-RemoveShapesCmd		Удалить форму
 Reverse	Icon-O-Matic-PathsList		Обратить
 HVIF Source Code	Icon-O-Matic-SavePanel		Исходный код HVIF
 Reset Transformations	Icon-O-Matic-ResetTransformationCmd		Сбросить изменения
+Settings	Icon-O-Matic-Menus		Настройки
 All	Icon-O-Matic-Properties		Все
 Multi Paste Properties	Icon-O-Matic-Properties		Вставить все свойства
 Undo	Icon-O-Matic-Main		Отменить
@@ -181,7 +182,7 @@ Assign Paths	Icon-O-Matic-AddPathsCmd		Применить контуры
 OK	Icon-O-Matic-SVGImport		ОК
 Multi paste	Icon-O-Matic-Properties		Мульти вставка
 to attach transformers.	Empty transformers list - 2nd line		чтобы применить трансформатор.
-Reset Transformation	Icon-O-Matic-ResetTransformationCmd		Сбросить изменения 
+Reset Transformation	Icon-O-Matic-ResetTransformationCmd		Сбросить изменения
 Reverse Path	Icon-O-Matic-ReversePathCmd		Обратить контур
 Scale	Icon-O-Matic-TransformationBoxStates		Масштабировать
 Duplicate	Icon-O-Matic-PathsList		Дублировать
@@ -192,7 +193,6 @@ Overwrite	Icon-O-Matic-SVGExport		Перезаписать
 Freeze Shapes	Icon-O-Matic-FreezeTransformationCmd		Заморозить формы
 Split Control Point	Icon-O-Matic-SplitPointsCmd		Разделить точку
 Open…	Icon-O-Matic-Menu-File		Открыть…
-Options	Icon-O-Matic-Menus		Опции
 Color (#%02x%02x%02x)	Icon-O-Matic-StyledTextImport		Цвет (#%02x%02x%02x)
 Edit Gradient	Icon-O-Matic-SetGradientCmd		Изменить градиент
 Clean Up Path	Icon-O-Matic-CleanUpPathCmd		Очистить контур

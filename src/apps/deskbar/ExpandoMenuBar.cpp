@@ -761,7 +761,7 @@ TExpandoMenuBar::DrawBackground(BRect)
 		return;
 
 	BRect bounds(Bounds());
-	rgb_color menuColor = ViewColor();
+	rgb_color menuColor = LowColor();
 	rgb_color hilite = tint_color(menuColor, B_DARKEN_1_TINT);
 	rgb_color vlight = tint_color(menuColor, B_LIGHTEN_2_TINT);
 
@@ -859,9 +859,7 @@ TExpandoMenuBar::monitor_team_windows(void* arg)
 							if (wInfo == NULL)
 								continue;
 
-							if (TWindowMenu::WindowShouldBeListed(wInfo->feel)
-								&& (wInfo->show_hide_level <= 0
-									|| wInfo->is_mini)) {
+							if (TWindowMenu::WindowShouldBeListed(wInfo)) {
 								// Check if we have a matching window item...
 								item = teamItem->ExpandedWindowItem(
 									wInfo->server_token);

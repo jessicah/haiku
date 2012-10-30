@@ -1,4 +1,4 @@
-1	german	x-vnd.Haiku-libtracker	3778030996
+1	german	x-vnd.Haiku-libtracker	2606149823
 common	B_COMMON_DIRECTORY		Allgemein
 OK	WidgetAttributeText		OK
 Icon view	VolumeWindow		Icon-Ansicht
@@ -15,11 +15,14 @@ Decrease size	ContainerWindow		Verkleinern
 Mini icon view	VolumeWindow		Mini-Icon-Ansicht
 You must have at least one attribute showing.	PoseView		Es muss mindestens ein Attribut angezeigt werden.
 Permissions	InfoWindow		Berechtigungen
+128 x 128	DeskWindow		128 x 128
 Invert selection	VolumeWindow		Auswahl umkehren
+128 x 128	ContainerWindow		128 x 128
 Recent documents	FavoritesMenu		Letzte Dokumente
 Modified	QueryPoseView		Geändert
 Created	ContainerWindow		Erstellt
 Error %error loading add-On %name.	ContainerWindow		Fehler %error beim Laden von Add-On %name.
+If you %ifYouDoAction the settings folder, %osName may not behave properly!\n\nAre you sure you want to do this?	FSUtils		Wird der Settings-Ordner %ifYouDoAction, kann %osName vielleicht nicht mehr fehlerfrei arbeiten!
 contains	SelectionWindow		enthält
 Sorry, you can't save things at the root of your system.	FilePanelPriv		Im Root-Verzeichnis des Systems kann leider nichts gespeichert werden.
 Show shared volumes on Desktop	SettingsView		Netzwerk-Laufwerke auf dem Desktop zeigen
@@ -39,6 +42,7 @@ Make active printer	ContainerWindow		Zum aktiven Drucker machen
 Create link here	ContainerWindow		Verknüpfung hier erstellen
 Moving: 	StatusWindow		Verschiebe:
 before	FindPanel		vor
+Error emptying Trash	FSUtils		Fehler beim Leeren des Papierkorbs
 On	FindPanel		auf
 MiB	WidgetAttributeText		MiB
 greater than	FindPanel		größer als
@@ -89,7 +93,9 @@ Cut	FilePanelPriv		Ausschneiden
 Replace	FilePanelPriv		Ersetzen
 Select all	VolumeWindow		Alles auswählen
 Opens with:	InfoWindow		Wird geöffnet mit:
+If you %ifYouDoAction the mime settings, %osName may not behave properly!\n\nAre you sure you want to do this?	FSUtils		Wird der MIME-Ordner %ifYouDoAction, kann %osName vielleicht nicht mehr fehlerfrei arbeiten!
 Open	ContainerWindow		Öffnen
+96 x 96	DeskWindow		96 x 96
 Error calculating folder size.	InfoWindow		Fehler beim Ermitteln der Ordnergröße.
 New folder	FilePanelPriv		Neuer Ordner
 %name info	InfoWindow	InfoWindow Title	%name Info
@@ -117,6 +123,7 @@ Move to Trash	ContainerWindow		In Papierkorb verschieben
 Move to	ContainerWindow		Verschieben nach
 Create %s clipping	PoseView		Erzeuge %s Ausschnitt
 Set new link target	InfoWindow		Neues Verknüpfungsziel setzen
+If you %ifYouDoAction the system folder or its contents, you won't be able to boot %osName!\n\nAre you sure you want to do this?\n\nTo %toDoAction the system folder or its contents anyway, hold down the Shift key and click \"%toConfirmAction\".	FSUtils		Wird der System-Ordner oder seine Inhalte %ifYouDoAction, kann %osName nicht mehr gestartet werden!\n\nUm ihn oder seine Inhalte dennoch %toDoAction, Shift-Taste gedrückt halten und \"%toConfirmAction\" klicken.
 Save as Query template:	FindPanel		Query als Vorlage speichern:
 preferences	B_PREFERENCES_DIRECTORY		Einstellungen
 Cancel	FSUtils		Abbrechen
@@ -140,6 +147,7 @@ Could not open \"%document\" with application \"%app\" (%error). 	FSUtils		\"%do
 Sorry, saving more than one item is not allowed.	FilePanelPriv		Es kann leider immer nur ein einzelnes Objekt gespeichert werden.
 Searching for disks to mount…	StatusWindow		Es werden Datenträger zum Einhängen gesucht…
 New folder	FSUtils		Neuer Ordner
+If you %ifYouDoAction the common folder, %osName may not behave properly!\n\nAre you sure you want to do this?\n\nTo %toDoAction the common folder anyway, hold down the Shift key and click \"%toConfirmAction\".	FSUtils		Wird der Allgemein-Ordner %ifYouDoAction, kann %osName vielleicht nicht mehr fehlerfrei arbeiten!\n\nUm ihn dennoch %toDoAction, Shift-Taste gedrückt halten und \"%toConfirmAction\" klicken.
 Free space color	SettingsView		Farbe für freien Speicher
 Cut	ContainerWindow		Ausschneiden
 Remove	FindPanel		Entfernen
@@ -156,6 +164,7 @@ no supporting apps	OpenWithWindow		keine unterstützenden Anwendungen
 That name is already taken. Please type another one.	InfoWindow		Dieser Name wird bereits verwendet. Bitte einen anderen wählen.
 Sorry, you can't create links in the Trash.	PoseView		Im Papierkorb können leider keine Verknüpfungen erstellt werden.
 An item named \"%name\" already exists in this folder, and may contain\nitems with the same names. Would you like to replace them with those contained in the folder you are %verb?	FSUtils		Ein Objekt mit dem Namen \"%name\" existiert bereits in diesem Ordner und könnte\nObjekte mit gleichen Namen enthalten. Sollen sie mit denen des Ordners ersetzt werden, der %verb werden soll?
+Tracker preferences…	ContainerWindow		Tracker-Einstellungen…
 Link \"%name\" to:	InfoWindow	File dialog title for new sym link	Verknüpfe \"%name\" mit:
 Mount settings…	VolumeWindow		Einhänge-Einstellungen…
 Select…	VolumeWindow		Auswählen…
@@ -249,6 +258,7 @@ The file \"%name\" already exists in the specified folder. Do you want to replac
 Cancel	ContainerWindow		Abbrechen
 Only the boot disk	AutoMounterSettings		Nur das Boot-Laufwerk
 Trash	TrackerSettingsWindow		Papierkorb
+If you %ifYouDoAction the config folder, %osName may not behave properly!\n\nAre you sure you want to do this?	FSUtils		Wird der Konfiguration-Ordner %ifYouDoAction, kann %osName vielleicht nicht mehr fehlerfrei arbeiten!
 Unmount	ContainerWindow		Aushängen
 Copy layout	ContainerWindow		Anordnung kopieren
 label too long	PoseView		Beschriftung zu lang
@@ -309,6 +319,7 @@ The Tracker must be running to see Info windows.	PoseView		Um Info-Fenster zeige
 Other	FilePermissionsView		Andere
 Query name:	FindPanel		Query-Name:
 Permissions	ContainerWindow		Berechtigungen
+96 x 96	ContainerWindow		96 x 96
 moving	FSUtils		verschoben
 Identify	InfoWindow		Identifizieren
 Recent folders	ContainerWindow		Letzte Ordner
@@ -334,6 +345,7 @@ Handles any file	OpenWithWindow		Geeignet für jede Datei
 Get info	FilePanelPriv		Infos
 32 x 32	DeskWindow		32 x 32
 Cancel	FilePanelPriv		Abbrechen
+The application \"%appname\" does not support the type of document you are about to open.\nAre you sure you want to proceed?\n\nIf you know that the application supports the document type, you should contact the publisher of the application and ask them to update their application to list the type of your document as supported.	OpenWithWindow		Die Anwendung \"%appname\" unterstützt das zu öffnende Dateiformat nicht.\nTrotzdem fortfahren?\n\nKann die Anwendung dieses Dateiformat tatsächlich öffnen, sollte dessen Hersteller kontaktiert werden, damit das Format beim nächsten Update gleich als unterstützt erkannt wird.
 Disks	DirMenu		Datenträger
 New folder %ld	FSUtils		Neuer Ordner %ld
 All BeOS disks	AutoMounterSettings		Alle BeOS-Datenträger
@@ -367,10 +379,10 @@ Modified	FindPanel		Geändert
 Error moving \"%name\" to Trash. (%error)	FSUtils		Fehler beim Verschieben von \"%name\" in den Papierkorb. (%error)
 You can't replace a folder with one of its sub-folders.	FSUtils		Ordner können nicht mit einem seiner Unterordner ersetzt werden.
 <No recent items>	FavoritesMenu		<Keine letzten Objekte>
-Preferences…	ContainerWindow		Einstellungen…
 Move	PoseView		Verschieben
 Open and make preferred	OpenWithWindow		Öffnen und zur Bevorzugten machen
 Are you sure you want to delete the selected item(s)? This operation cannot be reverted.	FSUtils		Sollen die ausgewählten Objekte wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden.
+If you %ifYouDoAction the home folder, %osName may not behave properly!\n\nAre you sure you want to do this?\n\nTo %toDoAction the home folder anyway, hold down the Shift key and click \"%toConfirmAction\".	FSUtils		Wird der Home-Ordner %ifYouDoAction, kann %osName vielleicht nicht mehr fehlerfrei arbeiten!\n\nUm ihn dennoch %toDoAction, Shift-Taste gedrückt halten und \"%toConfirmAction\" klicken.
 Add-ons	DeskWindow		Add-ons
 Name	FindPanel		Name
 And	FindPanel		Und
@@ -388,7 +400,6 @@ Restoring: 	StatusWindow		Wiederherstellen von:
 system	B_SYSTEM_DIRECTORY		System
 Skip	FSUtils		Überspringen
 Settings…	MountMenu		Einstellungen…
-Error emptying Trash!	FSUtils		Fehler beim Leeren des Papierkorbs!
 Recent folders	FavoritesMenu		Letzte Ordner
 Close	ContainerWindow		Schließen
 Preferred for file	OpenWithWindow		Bevorzugt für Datei

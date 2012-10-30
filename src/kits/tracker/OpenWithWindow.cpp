@@ -648,6 +648,8 @@ OpenWithPoseView::InitDirentIterator(const entry_ref*)
 		HideBarberPole();
 		return NULL;
 	}
+	SetRefFilter(new OpenWithRefFilter(fIterator, entryList,
+		(fHaveCommonPreferredApp ? &fPreferredRef : 0)));
 	return fIterator;
 }
 
@@ -672,8 +674,10 @@ OpenWithPoseView::OpenSelection(BPose* pose, int32*)
 			B_TRANSLATE("Could not find application \"%appname\""));
 		errorString.ReplaceFirst("%appname", pose->TargetModel()->Name());
 
-		(new BAlert("", errorString.String(), B_TRANSLATE("OK"), 0, 0,
-			B_WIDTH_AS_USUAL, B_WARNING_ALERT))->Go();
+		BAlert* alert = new BAlert("", errorString.String(), B_TRANSLATE("OK"),
+			0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT);
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
+		alert->Go();
 		return;
 	}
 
@@ -933,16 +937,25 @@ OpenWithPoseView::OpenWithRelationDescription(const Model* model,
 }
 
 
-bool
-OpenWithPoseView::ShouldShowPose(const Model* model, const PoseInfo* poseInfo)
-{
-	OpenWithContainerWindow* window = ContainerWindow();
-	// filter for add_poses
-	if (!fIterator->CanOpenWithFilter(model, window->EntryList(),
-		fHaveCommonPreferredApp ? &fPreferredRef : 0))
-		return false;
+//  #pragma mark -
 
-	return _inherited::ShouldShowPose(model, poseInfo);
+
+OpenWithRefFilter::OpenWithRefFilter(SearchForSignatureEntryList* iterator,
+	const BMessage *entryList, entry_ref* preferredRef)
+	:
+	fIterator(iterator),
+	fEntryList(entryList),
+	fPreferredRef(preferredRef)
+{
+}
+
+
+bool
+OpenWithRefFilter::Filter(const entry_ref* ref, BNode* node, stat_beos* st,
+	const char* filetype)
+{
+	Model *model = new Model(ref, true, true);
+	return fIterator->CanOpenWithFilter(model, fEntryList, fPreferredRef);
 }
 
 

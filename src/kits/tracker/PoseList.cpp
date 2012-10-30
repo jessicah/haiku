@@ -112,3 +112,35 @@ PoseList::DeepFindPose(const node_ref* node, int32* resultingIndex) const
 
 	return NULL;
 }
+
+
+PoseList*
+PoseList::FindAllPoses(const node_ref* node) const
+{
+	int32 count = CountItems();
+	PoseList *result = new PoseList(5, false);
+	for (int32 index = 0; index < count; index++) {
+		BPose *pose = ItemAt(index);
+		Model *model = pose->TargetModel();
+		if (*model->NodeRef() == *node) {
+			result->AddItem(pose, 0);
+			continue;
+		}
+		
+		if (!model->IsSymLink())
+			continue;
+
+		model = model->LinkTo();
+		if (model != NULL && *model->NodeRef() == *node) {
+			result->AddItem(pose);
+			continue;
+		}
+		
+		if (model == NULL) {
+			Model model(pose->TargetModel()->EntryRef(), true);
+			if (*model.NodeRef() == *node)
+				result->AddItem(pose);
+		}
+	}
+	return result;
+}

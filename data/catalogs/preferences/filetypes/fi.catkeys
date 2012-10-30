@@ -1,4 +1,4 @@
-1	finnish	x-vnd.Haiku-FileTypes	473999706
+1	finnish	x-vnd.Haiku-FileTypes	2496450458
 Application types…	FileTypes Window		Sovellustyypit…
 Description:	Application Types Window		Kuvaus:
 Args only	Application Type Window		Vain argumentit
@@ -49,6 +49,7 @@ Name:	Application Types Window		Nimi:
 Group name:	New File Type Window		Ryhmänimi:
 Preferred application	FileType Window		Ensisijainen sovellus
 Progress	Application Types Window		Edistyminen
+Set preferred application	Preferred App Menu		Aseta ensisijainen sovellus
 File	Application Type Window		Tiedosto
 Version:	Application Type Window		Versio:
 Select…	FileTypes Window		Valitse…
@@ -85,7 +86,6 @@ The application \"%s\" does not support this file type.\nAre you sure you want t
 Type:	Attribute Window		Tyyppi:
 Removing uninstalled application types	Application Types Window		Poistetaan poistettujen sovellusten tyyppejä
 Done	Attribute Window		Valmis
-Set Preferred Application	Preferred App Menu		Aseta ensisijainen sovellus
 no icon	FileTypes Window		ei kuvaketta
 Alpha	Application Types Window		Alfa
 Version	Application Types Window		Versio

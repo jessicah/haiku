@@ -1163,12 +1163,13 @@ AttributeView::ModelChanged(Model* model, BMessage* message)
 			if (message->FindString("attr", &attrName) == B_OK) {
 				if (strcmp(attrName, kAttrLargeIcon) == 0
 					|| strcmp(attrName, kAttrIcon) == 0) {
-					Invalidate(BRect(10, 10, 10 + B_LARGE_ICON, 10
-						+ B_LARGE_ICON));
 
+					IconCache::sIconCache->IconChanged(model->ResolveIfLink());
+					Invalidate();
 				} else if (strcmp(attrName, kAttrMIMEType) == 0) {
 
 					if (model->OpenNode() == B_OK) {
+						model->AttrChanged(attrName);
 						InitStrings(model);
 						model->CloseNode();
 					}
@@ -1700,7 +1701,7 @@ AttributeView::MessageReceived(BMessage* message)
 
 
 void
-AttributeView::Draw(BRect)
+AttributeView::Draw(BRect updateRect)
 {
 	// Set the low color for anti-aliasing
 	SetLowColor(ui_color(B_PANEL_BACKGROUND_COLOR));
@@ -1719,7 +1720,7 @@ AttributeView::Draw(BRect)
 	SetDrawingMode(B_OP_OVER);
 	IconCache::sIconCache->Draw(fIconModel, this, fIconRect.LeftTop(),
 		kNormalIcon, B_LARGE_ICON, true);
-
+	SetDrawingMode(B_OP_COPY);
 	// Font information
 	font_height fontMetrics;
 	BFont currentFont;
@@ -1985,11 +1986,13 @@ AttributeView::FinishEditingTitle(bool commit)
 		if (entry.InitCheck() == B_OK
 			&& entry.GetParent(&parent) == B_OK) {
 			if (parent.Contains(text)) {
-				(new BAlert("",
+				BAlert* alert = new BAlert("",
 					B_TRANSLATE("That name is already taken. "
 					"Please type another one."),
 					B_TRANSLATE("OK"),
-					0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT))->Go();
+					0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT);
+				alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
+				alert->Go();
 				reopen = true;
 			} else {
 				if (fModel->IsVolume()) {
@@ -2009,11 +2012,12 @@ AttributeView::FinishEditingTitle(bool commit)
 			}
 		}
 	} else if (length >= B_FILE_NAME_LENGTH) {
-		(new BAlert("",
-			B_TRANSLATE("That name is too long. "
-			"Please type another one."),
+		BAlert* alert = new BAlert("",
+			B_TRANSLATE("That name is too long. Please type another one."),
 			B_TRANSLATE("OK"),
-			0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT))->Go();
+			0, 0, B_WIDTH_AS_USUAL, B_WARNING_ALERT);
+		alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
+		alert->Go();
 		reopen = true;
 	}
 

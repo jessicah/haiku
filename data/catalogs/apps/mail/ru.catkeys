@@ -1,4 +1,4 @@
-1	russian	x-vnd.Be-MAIL	2834665561
+1	russian	x-vnd.Be-MAIL	3337401776
 View	Mail		Вид
 %d - Date	Mail		%d - Дата
 Attach attributes:	Mail		Прикрепление атрибутов:
@@ -27,6 +27,7 @@ Expert	Mail		Эксперт
 Reply account:	Mail		Ответить, используя акканут:
 Discard	Mail		Сбросить
 Message	Mail		Сообщение
+Settings…	Mail		Настройки…
 Reply to sender	Mail		Ответить отправителю
 There is no installed handler for URL links.	Mail		Не выбрано приложение для открытия ссылок.
 Signature	Mail		Подпись
@@ -38,7 +39,6 @@ Save changes to this signature?	Mail		Сохранить изменения в �
 Cc:	Mail		Копия:
 Off	Mail		Выключить
 Find	Mail		Найти
-Preferences…	Mail		Настройки…
 Undo	Mail		Отменить
 Date:	Mail		Дата:
 An error occurred trying to open this signature.	Mail		Возникла ошибка при попытке открытия этой подписи.
@@ -80,7 +80,7 @@ E-mail draft could not be saved!	Mail		Черновик не может быть
 To:	Mail		Кому:
 Only files can be added as attachments.	Mail		Только файлы могут быть добавлены как вложения.
 Previous message	Mail		Предыдущее письмо
-Attachments:	Mail		Вложения: 
+Attachments:	Mail		Вложения:
 Title:	Mail		Заголовок:
 Find…	Mail		Найти…
 Accounts…	Mail		Аккаунты…
@@ -105,7 +105,7 @@ Start now	Mail		Запустить сейчас
 Close	Mail		Закрыть
 No matches	Mail		Нет совпадений
 The mail_daemon is not running. The message is queued and will be sent when the mail_daemon is started.	Mail		Не запущен mail_daemon. Сообщение поставлено в очередь и будет отправлено как только mail_daemon будет запущен.
-Really delete this signature? This cannot be undone.	Mail		Действительно удалить эту подпись? Эту операцию будет невозможно  отменить.
+Really delete this signature? This cannot be undone.	Mail		Действительно удалить эту подпись? Эту операцию будет невозможно отменить.
 Open	Mail		Открыть
 draft	B_USER_DIRECTORY/mail/draft		Черновики
 Quote	Mail		Цитата
@@ -147,7 +147,7 @@ Put your favorite e-mail queries and query templates in this folder.	Mail		Пе�
 Reply	Mail		Ответить
 From:	Mail		От:
 Couldn't open this signature. Sorry.	Mail		Невозможно открыть эту подпись. Извините.
-Open draft	Mail		Открыть черновик
+Open draft	Mail		Открыть черновики
 Cut	Mail		Вырезать
 Check spelling	Mail		Проверять орфографию
 Set to Saved	Mail		Послать в сохраненные

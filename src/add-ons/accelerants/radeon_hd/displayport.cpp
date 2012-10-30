@@ -160,14 +160,14 @@ dp_aux_read(uint32 hwPin, uint16 address,
 }
 
 
-static void
+void
 dpcd_reg_write(uint32 hwPin, uint16 address, uint8 value)
 {
 	dp_aux_write(hwPin, address, &value, 1, 0);
 }
 
 
-static uint8
+uint8
 dpcd_reg_read(uint32 hwPin, uint16 address)
 {
 	uint8 value = 0;
@@ -321,15 +321,81 @@ dp_aux_set_i2c_byte(uint32 hwPin, uint16 address, uint8* data, bool end)
 
 
 uint32
-dp_get_link_clock(uint32 connectorIndex)
+dp_get_lane_count(uint32 connectorIndex, display_mode* mode)
+{
+	// Radeon specific
+	dp_info* dpInfo = &gConnector[connectorIndex]->dpInfo;
+
+	size_t pixelChunk;
+	size_t pixelsPerChunk;
+	status_t result = get_pixel_size_for((color_space)mode->space, &pixelChunk,
+		NULL, &pixelsPerChunk);
+
+	if (result != B_OK) {
+		TRACE("%s: Invalid color space!\n", __func__);
+		return 0;
+	}
+
+	uint32 bitsPerPixel = (pixelChunk / pixelsPerChunk) * 8;
+
+	uint32 dpMaxLinkRate = dp_get_link_rate_max(dpInfo);
+	uint32 dpMaxLaneCount = dp_get_lane_count_max(dpInfo);
+
+	uint32 lane;
+	for (lane = 1; lane < dpMaxLaneCount; lane <<= 1) {
+		uint32 maxPixelClock = dp_get_pixel_clock_max(dpMaxLinkRate, lane,
+			bitsPerPixel);
+		if (mode->timing.pixel_clock <= maxPixelClock)
+			break;
+	}
+
+	TRACE("%s: Lanes: %" B_PRIu32 "\n", __func__, lane);
+	return lane;
+}
+
+
+uint32
+dp_get_link_rate(uint32 connectorIndex, display_mode* mode)
 {
 	uint16 encoderID = gConnector[connectorIndex]->encoderExternal.objectID;
 
 	if (encoderID == ENCODER_OBJECT_ID_NUTMEG)
 		return 270000;
 
-	// TODO: calculate DisplayPort max pixel clock based on bpp and DP channels
-	return 162000;
+	dp_info* dpInfo = &gConnector[connectorIndex]->dpInfo;
+	uint32 laneCount = dp_get_lane_count(connectorIndex, mode);
+
+	size_t pixelChunk;
+	size_t pixelsPerChunk;
+	status_t result = get_pixel_size_for((color_space)mode->space, &pixelChunk,
+		NULL, &pixelsPerChunk);
+
+	if (result != B_OK) {
+		TRACE("%s: Invalid color space!\n", __func__);
+		return 0;
+	}
+
+	uint32 bitsPerPixel = (pixelChunk / pixelsPerChunk) * 8;
+
+	uint32 maxPixelClock
+		= dp_get_pixel_clock_max(162000, laneCount, bitsPerPixel);
+	if (mode->timing.pixel_clock <= maxPixelClock)
+		return 162000;
+
+	maxPixelClock = dp_get_pixel_clock_max(270000, laneCount, bitsPerPixel);
+	if (mode->timing.pixel_clock <= maxPixelClock)
+		return 270000;
+
+	// TODO: DisplayPort 1.2
+	#if 0
+	if (is_dp12_capable(connectorIndex)) {
+		maxPixelClock = dp_get_pixel_clock_max(540000, laneCount, bitsPerPixel);
+		if (mode->timing.pixel_clock <= maxPixelClock)
+			return 540000;
+	}
+	#endif
+
+	return dp_get_link_rate_max(dpInfo);
 }
 
 
@@ -364,8 +430,6 @@ dp_setup_connectors()
 			dpInfo->valid = true;
 			memcpy(dpInfo->config, auxMessage, 8);
 		}
-
-		dpInfo->linkRate = dp_get_link_clock(index);
 	}
 }
 
@@ -410,6 +474,27 @@ dp_clock_recovery_ok(dp_info* dp)
 }
 
 
+static bool
+dp_clock_equalization_ok(dp_info* dp)
+{
+	uint8 laneAlignment
+		= dp->linkStatus[DP_LANE_ALIGN - DP_LANE_STATUS_0_1];
+
+	if ((laneAlignment & DP_LANE_ALIGN_DONE) == 0)
+		return false;
+
+	int lane;
+	for (lane = 0; lane < dp->laneCount; lane++) {
+		uint8 laneStatus = dp_get_lane_status(dp, lane);
+		if ((laneStatus & DP_LANE_STATUS_EQUALIZED_A)
+			!= DP_LANE_STATUS_EQUALIZED_A) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
 static void
 dp_update_vs_emph(uint32 connectorIndex)
 {
@@ -442,7 +527,7 @@ dp_get_adjust_request_pre_emphasis(dp_info* dp, int lane)
 {
 	int i = DP_ADJ_REQUEST_0_1 + (lane >> 1);
 	int s = (((lane & 1) != 0) ? DP_ADJ_PRE_EMPHASIS_LANEB_SHIFT
-		: DP_ADJ_PRE_EMPHASIS_LANEB_SHIFT);
+		: DP_ADJ_PRE_EMPHASIS_LANEA_SHIFT);
 	uint8 l = dp->linkStatus[i - DP_LANE_STATUS_0_1];
 
 	return ((l >> s) & 0x3) << DP_TRAIN_PRE_EMPHASIS_SHIFT;
@@ -613,11 +698,62 @@ dp_link_train_cr(uint32 connectorIndex)
 
 
 status_t
-dp_link_train(uint8 crtcID, display_mode* mode)
+dp_link_train_ce(uint32 connectorIndex)
 {
 	TRACE("%s\n", __func__);
 
-	uint32 connectorIndex = gDisplay[crtcID]->connectorIndex;
+	dp_info* dp = &gConnector[connectorIndex]->dpInfo;
+
+	// TODO: DisplayPort: Supports TP3?
+	dp_set_tp(connectorIndex, DP_TRAIN_PATTERN_2);
+
+	dp->trainingAttempts = 0;
+	bool channelEqual = false;
+
+	while (1) {
+		if (dp->trainingReadInterval == 0)
+			snooze(100);
+		else
+			snooze(1000 * 4 * dp->trainingReadInterval);
+
+		if (!dp_get_link_status(dp))
+			break;
+
+		if (dp_clock_equalization_ok(dp)) {
+			channelEqual = true;
+			break;
+		}
+
+		if (dp->trainingAttempts > 5) {
+			ERROR("%s: ERROR: failed > 5 times!\n", __func__);
+			break;
+		}
+
+		dp_get_adjust_train(dp);
+
+		dp_update_vs_emph(connectorIndex);
+		dp->trainingAttempts++;
+	}
+
+	if (!channelEqual) {
+		ERROR("%s: ERROR: failed\n", __func__);
+		return B_ERROR;
+	}
+
+	TRACE("%s: channels equalized at voltage %d pre-emphasis %d\n",
+		__func__, dp->trainingSet[0] & DP_ADJ_VCC_SWING_LANEA_MASK,
+		(dp->trainingSet[0] & DP_TRAIN_PRE_EMPHASIS_MASK)
+		>> DP_TRAIN_PRE_EMPHASIS_SHIFT);
+
+	return B_OK;
+}
+
+
+status_t
+dp_link_train(uint32 connectorIndex, display_mode* mode)
+{
+	TRACE("%s\n", __func__);
+
 	dp_info* dp = &gConnector[connectorIndex]->dpInfo;
 
 	if (dp->valid != true) {
@@ -702,8 +838,7 @@ dp_link_train(uint8 crtcID, display_mode* mode)
 	dpcd_reg_write(hwPin, DP_TRAIN, DP_TRAIN_PATTERN_DISABLED);
 
 	dp_link_train_cr(connectorIndex);
-	// TODO: dp_link_train_ce
-
+	dp_link_train_ce(connectorIndex);
 
 	// *** DisplayPort link training finish
 	snooze(400);
@@ -721,4 +856,48 @@ dp_link_train(uint8 crtcID, display_mode* mode)
 	}
 
 	return B_OK;
+}
+
+
+void
+debug_dp_info()
+{
+	ERROR("Current DisplayPort Info =================\n");
+	for (uint32 id = 0; id < ATOM_MAX_SUPPORTED_DEVICE; id++) {
+		if (gConnector[id]->valid == true) {
+			dp_info* dp = &gConnector[id]->dpInfo;
+			ERROR("Connector #%" B_PRIu32 ") DP: %s\n", id,
+				dp->valid ? "true" : "false");
+
+			if (!dp->valid)
+				continue;
+			ERROR(" + DP Config Data\n");
+			ERROR("   - max lane count:          %d\n",
+				dp->config[DP_MAX_LANE_COUNT] & DP_MAX_LANE_COUNT_MASK);
+			ERROR("   - max link rate:           %d\n",
+				dp->config[DP_MAX_LINK_RATE]);
+			ERROR("   - receiver port count:     %d\n",
+				dp->config[DP_NORP] & DP_NORP_MASK);
+			ERROR("   - downstream port present: %s\n",
+				(dp->config[DP_DOWNSTREAMPORT] & DP_DOWNSTREAMPORT_EN)
+				? "yes" : "no");
+			ERROR("   - downstream port count:   %d\n",
+				dp->config[DP_DOWNSTREAMPORT_COUNT]
+				& DP_DOWNSTREAMPORT_COUNT_MASK);
+			ERROR(" + Training\n");
+			ERROR("   - use encoder:             %s\n",
+				dp->trainingUseEncoder ? "true" : "false");
+			ERROR("   - attempts:                %" B_PRIu8 "\n",
+				dp->trainingAttempts);
+			ERROR("   - delay:                   %d\n",
+				dp->trainingReadInterval);
+			ERROR(" + Data\n");
+			ERROR("   - auxPin:                  0x%" B_PRIX32"\n", dp->auxPin);
+			ERROR(" + Video\n");
+			ERROR("   - laneCount:               %d\n", dp->laneCount);
+			ERROR("   - linkRate:                %" B_PRIu32 "\n",
+				dp->linkRate);
+		}
+	}
+	ERROR("==========================================\n");
 }

@@ -1,4 +1,4 @@
-1	english	x-vnd.Haiku-Installer	2099988747
+1	english	x-vnd.Haiku-Installer	3488795908
 So behind the other menu entries towards the bottom of the file, add something similar to these lines:\n\n	InstallerApp		在接近文件末尾，其他菜单条目之后，添加类似于下面的内容：\n\n
 Are you sure you want to abort the installation and restart the system?	InstallerWindow		您是否确定终止安装，重新启动系统？
 \t}\n\n	InstallerApp		\t}\n\n
@@ -12,6 +12,7 @@ With GRUB it's: (hdN,n)\n\n	InstallerApp		使用 GRUB，如下：(hdN,n)\n\n
 \tsudo update-grub\n\n\n	InstallerApp		\tsudo update-grub\n\n\n
 Stop	InstallerWindow	In alert after pressing Stop	暂停
 Install progress:  	InstallerWindow		安装进度：
+2.2) GRUB 1\n	InstallerApp		2.1) GRUB 1\n
 Starting Installation.	InstallProgress		启动安装
 This is alpha-quality software! It means there is a high risk of losing important data. Make frequent backups! You have been warned.\n\n\n	InstallerApp		这是 测试版本 软件！因此会有很高的丢失数据风险。请经常进行数据的备份！这是我们的善意提醒。
 Are you sure you want to abort the installation?	InstallerWindow		您确定要取消安装吗？
@@ -37,6 +38,7 @@ Boot sector successfully written.	InstallProgress		引导扇区写入成功。
 Performing installation.	InstallProgress		执行安装。
 scanning…	InstallerWindow		扫描...
 Set up boot menu	InstallerWindow		设置引导菜单
+2.1) GRUB (since os-prober v1.44)\n	InstallerApp		2.1) GRUB ( os-prober v1.44 以上版本)\n
 The first logical partition always has the number \"4\", regardless of the number of primary partitions.\n\n	InstallerApp		首个逻辑分区的编号总是 \"4\"，
 GRUB's naming scheme is still: (hdN,n)\n\n	InstallerApp		GRUB 的命名策略仍然是：(hdN,n)\n\n
 \tsudo <your favorite text editor> /boot/grub/menu.lst\n\n	InstallerApp		\tsudo <偏好文本编辑器> /boot/grub/menu.lst\n\n 
@@ -48,6 +50,7 @@ README	InstallerApp		README
 The destination disk may not have enough space. Try choosing a different disk or choose to not install optional items.	InstallProgress		目标磁盘可能没有足够的空间。尝试选择其他的磁盘或者选择不安装附加项目。
 Please close the Boot Manager and DriveSetup windows before closing the Installer window.	InstallerWindow		请在关闭系统安装器之前关闭引导管理器和磁盘管理器。
 Scanning for disks…	InstallerWindow		扫描磁盘...
+2.3) GRUB 2\n	InstallerApp		2.2) GRUB 2\n
 The disk can't be mounted. Please choose a different disk.	InstallProgress		磁盘无法挂载。请选择其他磁盘。
 ?? of ??	InstallerWindow	Unknown progress	??来源于??
 \tmenuentry \"Haiku Alpha\" {\n	InstallerApp		\tmenuentry \"Haiku Alpha\" {\n
@@ -67,6 +70,7 @@ Installer	System name		系统安装器
 You can't install the contents of a disk onto itself. Please choose a different disk.	InstallProgress		您无法将磁盘内容进行自我安装。请选择其他磁盘。
 ???	InstallerWindow	Unknown currently copied item	???
 \"n\" is the partition number, which for GRUB 2 starts with \"1\"\n	InstallerApp		\"n\" 是分区编号，对于 GRUB 2 ，则以 \"1\" 开始。\n
+Starting with os-prober v1.44 (e.g. in Ubuntu 11.04 or later), Haiku should be recognized out of the box. To add Haiku to the GRUB menu, open a Terminal and enter:\n\n	InstallerApp		如果使用 os-prober v1.44（如，Ubuntu 11.04 及其更高版本），Haiku 能够被自动识别。如果希望将 Haiku 加入 GRUB 菜单，打开终端，然后输入：\n\n
 Quit DriveSetup	InstallerWindow		退出磁盘管理器
 \"N\" is the hard disk number, starting with \"0\".\n	InstallerApp		\"N\" 是硬盘编号，以 \"0\" 开始。\n
 Hide optional packages	InstallerWindow		隐藏附加软件包
@@ -109,6 +113,7 @@ So below the heading that must not be edited, add something similar to these lin
 Are you sure you want to to stop the installation?	InstallerWindow		您是否确定终止安装过程？
 Onto:	InstallerWindow		安装到：
 Please close the Boot Manager window before closing the Installer window.	InstallerWindow		在关闭系统安装器之前请关闭引导管理器。
+3)   When you successfully boot into Haiku for the first time, make sure to read our \"Welcome\" and \"Userguide\" documentation. There are links on the Desktop and in WebPositive's bookmarks.\n\n	InstallerApp		3) 在首次成功启动 Haiku 之后，您需要阅读 \"欢迎使用\" 和 \"用户指南\" 等文档。在桌面和 WebPositive 的书签栏内都有它们的链接。\n\n
 Tools	InstallerWindow		工具
 The mount point could not be retrieved.	InstallProgress		挂载点无法恢复。
 The target volume is not empty. Are you sure you want to install anyway?\n\nNote: The 'system' folder will be a clean copy from the source volume, all other folders will be merged, whereas files and links that exist on both the source and target volume will be overwritten with the source volume version.	InstallProgress		目标卷不为空。您确定必须进行安装吗？\n\n注意：从源卷拷贝的 'system' 文件夹为空，所有其他的文件夹将被合并，反之，源卷和目标卷中的所有文件和链接将会被源卷版本所覆盖。

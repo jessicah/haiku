@@ -1,4 +1,4 @@
-1	belarusian	x-vnd.Haiku-MediaPlayer	2389197979
+1	belarusian	x-vnd.Haiku-MediaPlayer	2969013755
 raw audio	MediaPlayer-InfoWin		нефарматаване аўдыё
 Location	MediaPlayer-InfoWin		Месцазнаходжанне
 1.85 : 1 (American)	MediaPlayer-Main		1.85 : 1 (Амерыка)
@@ -58,7 +58,6 @@ Gets the URI of the currently playing item.	MediaPlayer-Main		Вызначае U
 400% scale	MediaPlayer-Main		Маштаб 400%
 Saving the playlist failed:\n\nError: 	MediaPlayer-PlaylistWindow		Не ўдалося захаваць плэйліст:\n\nПамылка:
 Move Entries	MediaPlayer-MovePLItemsCmd		Перамясціць элементы
-Move Into Trash Error	MediaPlayer-RemovePLItemsCmd		Памылка Адпраўкі Ў Сметніцу
 Audio	MediaPlayer-Main		Аўдыё
 Open Playlist	MediaPlayer-PlaylistWindow		Адкрыць плэйліст
 MediaPlayer	System name		Праігравальнік Медыя
@@ -73,6 +72,7 @@ Stop playing.	MediaPlayer-Main		Спыніць прайгранне.
 The file '%filename' could not be opened.\n\n	MediaPlayer-Main		Файл '%filename' немагчыма адкрыць.\n\n
 Error: 	MediaPlayer-RemovePLItemsCmd		Памылка:
 Audio	MediaPlayer-InfoWin		Аўдыё
+Move into trash error	MediaPlayer-RemovePLItemsCmd		Памылка адпраўкі ў Сметніцу
 Internal error (malformed message). Saving the playlist failed.	MediaPlayer-PlaylistWindow		Унутраная памылка (няправільнае паведамленне). Плэйліст не захаваны.
 Skip to the previous track.	MediaPlayer-Main		Пераскочць да папярэдняй дарожкі.
 %app% encountered an internal error. The file could not be opened.	MediaPlayer-Main		Адбылася ўнутраная памылка %app%. Файл не можа быць адкрыты.
