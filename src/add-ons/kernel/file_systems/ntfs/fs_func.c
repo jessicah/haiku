@@ -36,6 +36,7 @@
 
 #include <driver_settings.h>
 #include <KernelExport.h>
+#include <disk_device_manager.h>
 
 #include "attributes.h"
 #include "fake_attributes.h"
@@ -43,10 +44,11 @@
 #include "ntfs.h"
 #include "volume_util.h"
 
+static const char* kNTFSUnnamed = {"NTFS Unnamed"};
 
 typedef struct identify_cookie {
 	NTFS_BOOT_SECTOR boot;
-	char label[256];
+	char label[MAX_PATH];
 } identify_cookie;
 
 
@@ -225,10 +227,10 @@ float
 fs_identify_partition(int fd, partition_data *partition, void **_cookie)
 {
 	NTFS_BOOT_SECTOR boot;
-	identify_cookie *cookie;
+	char devpath[MAX_PATH];
+	identify_cookie *cookie = NULL;
 	ntfs_volume *ntVolume;
 	uint8 *buf = (uint8*)&boot;
-	char devpath[256];
 
 	// read in the boot sector
 	TRACE("fs_identify_partition: read in the boot sector\n");
@@ -249,19 +251,6 @@ fs_identify_partition(int fd, partition_data *partition, void **_cookie)
 		return -1;
 	}
 
-	// get path for device
-	if (!ioctl(fd, B_GET_PATH_FOR_DEVICE, devpath)) {
-		ERROR("fs_identify_partition: couldn't get path for device\n");
-		return -1;
-	}
-
-	// try mount
-	ntVolume = utils_mount_volume(devpath, MS_RDONLY | MS_RECOVER);
-	if (!ntVolume) {
-		ERROR("fs_identify_partition: mount failed\n");
-		return -1;
-	}
-
 	// allocate identify_cookie
 	cookie = (identify_cookie *)malloc(sizeof(identify_cookie));
 	if (!cookie) {
@@ -269,14 +258,40 @@ fs_identify_partition(int fd, partition_data *partition, void **_cookie)
 		return -1;
 	}
 
+	cookie->label[0]='\0';
 	memcpy(&cookie->boot, &boot, 512);
 
-	strcpy(cookie->label, "NTFS Volume");
+	// get path for device
+	if (ioctl(fd, B_GET_PATH_FOR_DEVICE, devpath) != 0) {
+		// try mount
+		ntVolume = utils_mount_volume(devpath, MS_RDONLY | MS_RECOVER);
+		if (ntVolume != NULL) {
+			if (ntVolume->vol_name && ntVolume->vol_name[0] != '\0')
+				strcpy(cookie->label, ntVolume->vol_name);
+			ntfs_umount(ntVolume, true);
+		}	
+	}
 
-	if (ntVolume->vol_name && ntVolume->vol_name[0] != '\0')
-		strcpy(cookie->label, ntVolume->vol_name);
+	// generate a more or less descriptive name for unnamed volume
+	if (cookie->label[0]=='\0') {		
+		double size;
+		off_t diskSize = sle64_to_cpu(boot.number_of_sectors)
+			* le16_to_cpu(boot.bpb.bytes_per_sector);
+		off_t divisor = 1ULL << 40;
+		char unit = 'T';
+		if (diskSize < divisor) {
+			divisor = 1UL << 30;
+			unit = 'G';
+			if (diskSize < divisor) {
+				divisor = 1UL << 20;
+				unit = 'M';
+			}
+		}
 
-	ntfs_umount(ntVolume, true);
+		size = (double)((10 * diskSize + divisor - 1) / divisor);
+		snprintf(cookie->label, MAX_PATH - 1, "%g %cB NTFS File System",
+			size / 10, unit);
+	}
 
 	*_cookie = cookie;
 
@@ -346,7 +361,7 @@ fs_mount(fs_volume *_vol, const char *device, ulong flags, const char *args,
 	ns->noatime = strcasecmp(get_driver_parameter(handle, "no_atime", "true",
 		"true"), "true") == 0;
 	ns->fake_attrib = strcasecmp(get_driver_parameter(handle, "fake_attributes",
-		"false", "false"), "false") != 0;
+		"true", "true"), "true") == 0;
 	unload_driver_settings(handle);
 
 	if (ns->ro || (flags & B_MOUNT_READ_ONLY) != 0
@@ -361,7 +376,7 @@ fs_mount(fs_volume *_vol, const char *device, ulong flags, const char *args,
 		gNTFSVnodeOps.free_attr_dir_cookie = fake_free_attrib_dir_cookie;
 		gNTFSVnodeOps.read_attr_dir = fake_read_attrib_dir;
 		gNTFSVnodeOps.rewind_attr_dir = fake_rewind_attrib_dir;
-		gNTFSVnodeOps.create_attr = NULL;
+		gNTFSVnodeOps.create_attr = fake_create_attrib;
 		gNTFSVnodeOps.open_attr = fake_open_attrib;
 		gNTFSVnodeOps.close_attr = fake_close_attrib;
 		gNTFSVnodeOps.free_attr_cookie = fake_free_attrib_cookie;
@@ -369,6 +384,20 @@ fs_mount(fs_volume *_vol, const char *device, ulong flags, const char *args,
 		gNTFSVnodeOps.read_attr_stat = fake_read_attrib_stat;
 		gNTFSVnodeOps.write_attr = fake_write_attrib;
 		gNTFSVnodeOps.remove_attr = NULL;
+	} else {
+		gNTFSVnodeOps.open_attr_dir = fs_open_attrib_dir;
+		gNTFSVnodeOps.close_attr_dir = fs_close_attrib_dir;
+		gNTFSVnodeOps.free_attr_dir_cookie = fs_free_attrib_dir_cookie;
+		gNTFSVnodeOps.read_attr_dir = fs_read_attrib_dir;
+		gNTFSVnodeOps.rewind_attr_dir = fs_rewind_attrib_dir;
+		gNTFSVnodeOps.create_attr = fs_create_attrib;
+		gNTFSVnodeOps.open_attr = fs_open_attrib;
+		gNTFSVnodeOps.close_attr = fs_close_attrib;
+		gNTFSVnodeOps.free_attr_cookie = fs_free_attrib_cookie;
+		gNTFSVnodeOps.read_attr = fs_read_attrib;
+		gNTFSVnodeOps.read_attr_stat = fs_read_attrib_stat;
+		gNTFSVnodeOps.write_attr = fs_write_attrib;
+		gNTFSVnodeOps.remove_attr = fs_remove_attrib;		
 	}
 
 	ns->ntvol = utils_mount_volume(device, mountFlags | MS_RECOVER);
@@ -460,7 +489,7 @@ fs_rfsstat(fs_volume *_vol, struct fs_info *fss)
 			break;
 	}
 	if (i < 0)
-		strcpy(fss->volume_name, "NTFS Untitled");
+		strcpy(fss->volume_name, kNTFSUnnamed);
 	else
 		fss->volume_name[i + 1] = 0;
 
@@ -500,69 +529,49 @@ exit:
 
 
 status_t
-fs_walk(fs_volume *_vol, fs_vnode *_dir, const char *file, ino_t *vnid)
+fs_walk(fs_volume *_vol, fs_vnode *_dir, const char *file, ino_t *_vnid)
 {
 	nspace *ns = (nspace*)_vol->private_volume;
 	vnode *baseNode = (vnode*)_dir->private_node;
 	vnode *newNode = NULL;
-	ntfschar *uname = NULL;
-	ntfs_inode *dir_ni = NULL;
 	status_t result = B_NO_ERROR;
-	int uname_len;
 
 	LOCK_VOL(ns);
 
 	TRACE("fs_walk - ENTER : find for \"%s\"\n",file);
 
-	if (ns == NULL || _dir == NULL || file == NULL || vnid == NULL) {
+	if (ns == NULL || _dir == NULL || file == NULL || _vnid == NULL) {
 		result = EINVAL;
 		goto exit;
 	}
 
 	if (!strcmp(file, ".")) {
-		*vnid = baseNode->vnid;
-		if (get_vnode(_vol, *vnid, (void**)&newNode) != 0)
+		*_vnid = baseNode->vnid;
+		if (get_vnode(_vol, *_vnid, (void**)&newNode) != 0)
 			result = ENOENT;
 	} else if (!strcmp(file, "..") && baseNode->vnid != FILE_root) {
-		*vnid = baseNode->parent_vnid;
-		if (get_vnode(_vol, *vnid, (void**)&newNode) != 0)
+		*_vnid = baseNode->parent_vnid;
+		if (get_vnode(_vol, *_vnid, (void**)&newNode) != 0)
 			result = ENOENT;
 	} else {
-		uname = ntfs_calloc(MAX_PATH);
-		uname_len = ntfs_mbstoucs(file, &uname);
-		if (uname_len < 0) {
-			result = EILSEQ;
+		ino_t vnid = ntfs_inode_lookup(_vol, baseNode->vnid, file);
+
+		if (vnid == (u64)-1) {
+			result = errno;
 			goto exit;
 		}
 
-		dir_ni = ntfs_inode_open(ns->ntvol, baseNode->vnid);
-		if (dir_ni == NULL) {
-			result = ENOENT;
-			goto exit;
-		}
-
-		*vnid = MREF(ntfs_inode_lookup_by_name(dir_ni, uname, uname_len));
-		TRACE("fs_walk - VNID = %d\n",*vnid);
-
-		ntfs_inode_close(dir_ni);
-
-		if (*vnid == (u64)-1) {
-			result = EINVAL;
-			goto exit;
-		}
-
-		if (get_vnode(_vol, *vnid, (void**)&newNode) != 0)
+		if (get_vnode(_vol, vnid, (void**)&newNode) != 0)
 			result = ENOENT;
 
 		if (newNode!=NULL)
 			newNode->parent_vnid = baseNode->vnid;
+			
+		*_vnid = vnid;
 	}
 
 exit:
 	TRACE("fs_walk - EXIT, result is %s\n", strerror(result));
-
-	if (uname)
-		free(uname);
 
 	UNLOCK_VOL(ns);
 
@@ -648,7 +657,7 @@ fs_read_vnode(fs_volume *_vol, ino_t vnid, fs_vnode *_node, int *_type,
 		
 		if (ns->fake_attrib) {
 			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				set_mime(newNode, ".***");
+				set_mime(newNode, NULL);
 			else {
 				name = (char*)malloc(MAX_PATH);
 				if (name != NULL) {
@@ -1088,7 +1097,7 @@ fs_create(fs_volume *_vol, fs_vnode *_dir, const char *name, int omode,
 			}
 
 			newNode->vnid = vnid;
-			newNode->parent_vnid = MREF(dir_ni->mft_no);
+			newNode->parent_vnid = dir->vnid;
 			
 			ni->flags |= FILE_ATTR_ARCHIVE;
 			NInoSetDirty(ni);
@@ -1102,10 +1111,17 @@ fs_create(fs_volume *_vol, fs_vnode *_dir, const char *name, int omode,
 			}				
 
 			*_vnid = vnid;
-					
-			ntfs_mark_free_space_outdated(ns);						
-			fs_ntfs_update_times(_vol, dir_ni, NTFS_UPDATE_MCTIME);			
-			notify_entry_created(ns->id, MREF(dir_ni->mft_no), name, *_vnid);			
+
+			if (ns->fake_attrib) {
+				if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
+					set_mime(newNode, NULL);
+				else
+					set_mime(newNode, name);
+			}
+
+			ntfs_mark_free_space_outdated(ns);	
+			fs_ntfs_update_times(_vol, dir_ni, NTFS_UPDATE_MCTIME);	
+			notify_entry_created(ns->id, dir->vnid, name, vnid);
 		} else
 			result = errno;
 	}
@@ -1131,11 +1147,11 @@ exit:
 
 
 status_t
-fs_read(fs_volume *_vol, fs_vnode *_dir, void *_cookie, off_t offset, void *buf,
+fs_read(fs_volume *_vol, fs_vnode *_node, void *_cookie, off_t offset, void *buf,
 	size_t *len)
 {
 	nspace *ns = (nspace*)_vol->private_volume;
-	vnode *node = (vnode*)_dir->private_node;
+	vnode *node = (vnode*)_node->private_node;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
 	size_t  size = *len;
@@ -1211,11 +1227,11 @@ exit2:
 
 
 status_t
-fs_write(fs_volume *_vol, fs_vnode *_dir, void *_cookie, off_t offset,
+fs_write(fs_volume *_vol, fs_vnode *_node, void *_cookie, off_t offset,
 	const void *buf, size_t *len)
 {
 	nspace *ns = (nspace*)_vol->private_volume;
-	vnode *node = (vnode*)_dir->private_node;
+	vnode *node = (vnode*)_node->private_node;
 	filecookie *cookie = (filecookie*)_cookie;
 	ntfs_inode *ni = NULL;
 	ntfs_attr *na = NULL;
@@ -1269,7 +1285,7 @@ fs_write(fs_volume *_vol, fs_vnode *_dir, void *_cookie, off_t offset,
 		if (ntfs_attr_truncate(na, offset + size))
 			size = na->data_size - offset;
 		else
-			notify_stat_changed(ns->id, MREF(ni->mft_no), B_STAT_SIZE);
+			notify_stat_changed(ns->id, node->vnid, B_STAT_SIZE);
 	}
 
 	while (size) {
@@ -1703,13 +1719,13 @@ fs_rename(fs_volume *_vol, fs_vnode *_odir, const char *name,
 
 		if (ns->fake_attrib) {
 			if (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY)
-				set_mime(file, ".***");
+				set_mime(file, NULL);
 			else
 				set_mime(file, newname);
 			notify_attribute_changed(ns->id, file->vnid, "BEOS:TYPE",
 				B_ATTR_CHANGED);
 		}
-				
+
 		ntfs_inode_close(dir_ni);             
 		ntfs_inode_close(ni);
 		
