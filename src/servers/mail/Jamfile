@@ -16,24 +16,17 @@ Server mail_daemon :
 	DeskbarView.cpp
 	ErrorLogWindow.cpp
 	LEDAnimation.cpp
-	MailDaemon.cpp
+	MailDaemonApplication.cpp
 	main.cpp
 	DefaultNotifier.cpp
 	: be libmail.so tracker $(HAIKU_LOCALE_LIBS) $(TARGET_LIBSTDC++)
 		$(TARGET_NETWORK_LIBS)
 ;
 
-Package haiku-maildaemon-cvs :
-	mail_daemon :
-	boot beos system servers ;
-
-Packages haiku-maildaemon-cvs :
-	README LICENSE HISTORY install.sh ;
-
 DoCatalogs mail_daemon :
 	x-vnd.Be-POST
 	:
 	DeskbarView.cpp
-	MailDaemon.cpp
+	MailDaemonApplication.cpp
 	DefaultNotifier.cpp
 ;
