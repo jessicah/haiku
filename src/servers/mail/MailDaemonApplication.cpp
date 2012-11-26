@@ -305,9 +305,8 @@ MailDaemonApplication::MessageReceived(BMessage* msg)
 {
 	switch (msg->what) {
 		case 'moto':
-			if (fSettingsFile.CheckOnlyIfPPPUp()) {
-				// TODO: check whether internet is up and running!
-			}
+			// TODO: check whether internet is up and running!
+
 			// supposed to fall through
 		case kMsgCheckAndSend:	// check & send messages
 			msg->what = kMsgSendMessages;

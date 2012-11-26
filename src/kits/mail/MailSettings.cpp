@@ -115,39 +115,23 @@ BMailSettings::Reload()
 //	# pragma mark - Global settings
 
 
-int32
-BMailSettings::WindowFollowsCorner()
-{
-	return fData.FindInt32("WindowFollowsCorner");
-}
-
-
-void
-BMailSettings::SetWindowFollowsCorner(int32 whichCorner)
-{
-	if (fData.ReplaceInt32("WindowFollowsCorner", whichCorner) != B_OK)
-		fData.AddInt32("WindowFollowsCorner", whichCorner);
-}
-
-
 uint32
 BMailSettings::ShowStatusWindow()
 {
 	int32 showStatusWindow;
 	if (fData.FindInt32("ShowStatusWindow", &showStatusWindow) != B_OK) {
 		// show during send and receive
-		return 2;
+		return B_MAIL_SHOW_STATUS_WINDOW_WHEN_ACTIVE;
 	}
 
 	return showStatusWindow;
 }
 
 
-void
+status_t
 BMailSettings::SetShowStatusWindow(uint32 mode)
 {
-	if (fData.ReplaceInt32("ShowStatusWindow", mode) != B_OK)
-		fData.AddInt32("ShowStatusWindow", mode);
+	return fData.SetInt32("ShowStatusWindow", mode);
 }
 
 
@@ -158,87 +142,10 @@ BMailSettings::DaemonAutoStarts()
 }
 
 
-void
+status_t
 BMailSettings::SetDaemonAutoStarts(bool startIt)
 {
-	if (fData.ReplaceBool("DaemonAutoStarts", startIt) != B_OK)
-		fData.AddBool("DaemonAutoStarts", startIt);
-}
-
-
-BRect
-BMailSettings::ConfigWindowFrame()
-{
-	return fData.FindRect("ConfigWindowFrame");
-}
-
-
-void
-BMailSettings::SetConfigWindowFrame(BRect frame)
-{
-	if (fData.ReplaceRect("ConfigWindowFrame", frame) != B_OK)
-		fData.AddRect("ConfigWindowFrame", frame);
-}
-
-
-BRect
-BMailSettings::StatusWindowFrame()
-{
-	BRect frame;
-	if (fData.FindRect("StatusWindowFrame", &frame) != B_OK)
-		return BRect(100, 100, 200, 120);
-
-	return frame;
-}
-
-
-void
-BMailSettings::SetStatusWindowFrame(BRect frame)
-{
-	if (fData.ReplaceRect("StatusWindowFrame", frame) != B_OK)
-		fData.AddRect("StatusWindowFrame", frame);
-}
-
-
-int32
-BMailSettings::StatusWindowWorkspaces()
-{
-	uint32 workspaces;
-	if (fData.FindInt32("StatusWindowWorkSpace", (int32*)&workspaces) != B_OK)
-		return B_ALL_WORKSPACES;
-
-	return workspaces;
-}
-
-
-void
-BMailSettings::SetStatusWindowWorkspaces(int32 workspace)
-{
-	if (fData.ReplaceInt32("StatusWindowWorkSpace", workspace) != B_OK)
-		fData.AddInt32("StatusWindowWorkSpace", workspace);
-
-	BMessage msg('wsch');
-	msg.AddInt32("StatusWindowWorkSpace",workspace);
-	BMessenger(B_MAIL_DAEMON_SIGNATURE).SendMessage(&msg);
-}
-
-
-int32
-BMailSettings::StatusWindowLook()
-{
-	return fData.FindInt32("StatusWindowLook");
-}
-
-
-void
-BMailSettings::SetStatusWindowLook(int32 look)
-{
-	if (fData.ReplaceInt32("StatusWindowLook", look) != B_OK)
-		fData.AddInt32("StatusWindowLook", look);
-
-	BMessage msg('lkch');
-	msg.AddInt32("StatusWindowLook", look);
-	BMessenger(B_MAIL_DAEMON_SIGNATURE).SendMessage(&msg);
+	return fData.SetBool("DaemonAutoStarts", startIt);
 }
 
 
@@ -254,41 +161,10 @@ BMailSettings::AutoCheckInterval()
 }
 
 
-void
+status_t
 BMailSettings::SetAutoCheckInterval(bigtime_t interval)
 {
-	if (fData.ReplaceInt64("AutoCheckInterval", interval) != B_OK)
-		fData.AddInt64("AutoCheckInterval", interval);
-}
-
-
-bool
-BMailSettings::CheckOnlyIfPPPUp()
-{
-	return fData.FindBool("CheckOnlyIfPPPUp");
-}
-
-
-void
-BMailSettings::SetCheckOnlyIfPPPUp(bool yes)
-{
-	if (fData.ReplaceBool("CheckOnlyIfPPPUp", yes))
-		fData.AddBool("CheckOnlyIfPPPUp", yes);
-}
-
-
-bool
-BMailSettings::SendOnlyIfPPPUp()
-{
-	return fData.FindBool("SendOnlyIfPPPUp");
-}
-
-
-void
-BMailSettings::SetSendOnlyIfPPPUp(bool yes)
-{
-	if (fData.ReplaceBool("SendOnlyIfPPPUp", yes))
-		fData.AddBool("SendOnlyIfPPPUp", yes);
+	return fData.SetInt64("AutoCheckInterval", interval);
 }
 
 
@@ -299,11 +175,10 @@ BMailSettings::DefaultOutboundAccount()
 }
 
 
-void
+status_t
 BMailSettings::SetDefaultOutboundAccount(int32 to)
 {
-	if (fData.ReplaceInt32("DefaultOutboundAccount", to) != B_OK)
-		fData.AddInt32("DefaultOutboundAccount", to);
+	return fData.SetInt32("DefaultOutboundAccount", to);
 }
 
 
@@ -460,8 +335,6 @@ BMailAddOnSettings::Load(const BMessage& message)
 
 	MakeEmpty();
 	Append(settings);
-puts("settings:");
-settings.PrintToStream();
 
 	fOriginalSettings = *this;
 	fOriginalRef = fRef;

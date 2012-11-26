@@ -40,38 +40,17 @@ public:
 			status_t			InitCheck() const;
 
 			// Global settings
-			int32				WindowFollowsCorner();
-			void				SetWindowFollowsCorner(int32 which_corner);
-
 			uint32				ShowStatusWindow();
-			void				SetShowStatusWindow(uint32 mode);
+			status_t			SetShowStatusWindow(uint32 mode);
 
 			bool				DaemonAutoStarts();
-			void				SetDaemonAutoStarts(bool does_it);
-
-			void				SetConfigWindowFrame(BRect frame);
-			BRect				ConfigWindowFrame();
-
-			void				SetStatusWindowFrame(BRect frame);
-			BRect				StatusWindowFrame();
-
-			int32				StatusWindowWorkspaces();
-			void				SetStatusWindowWorkspaces(int32 workspaces);
-
-			int32				StatusWindowLook();
-			void				SetStatusWindowLook(int32 look);
+			status_t			SetDaemonAutoStarts(bool autoStart);
 
 			bigtime_t			AutoCheckInterval();
-			void				SetAutoCheckInterval(bigtime_t);
-
-			bool				CheckOnlyIfPPPUp();
-			void				SetCheckOnlyIfPPPUp(bool yes);
-
-			bool				SendOnlyIfPPPUp();
-			void				SetSendOnlyIfPPPUp(bool yes);
+			status_t			SetAutoCheckInterval(bigtime_t interval);
 
 			int32				DefaultOutboundAccount();
-			void				SetDefaultOutboundAccount(int32 to);
+			status_t			SetDefaultOutboundAccount(int32 to);
 
 private:
 			BMessage			fData;
