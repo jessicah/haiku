@@ -670,11 +670,13 @@ POP3Protocol::RetrieveInternal(const char* command, int32 message,
 			testStr = buf + testIndex;
 			if (testStr[0] == '\r' && testStr[1] == '\n' && testStr[2] == '.') {
 				if (testStr[3] == '\r' && testStr[4] == '\n') {
-					// Found the end of the message marker.  Ignore remaining data.
-					if (amountInBuffer > testIndex + 5)
-						printf ("POP3Protocol::RetrieveInternal Ignoring %d bytes "
-							"of extra data past message end.\n",
+					// Found the end of the message marker.
+					// Ignore remaining data.
+					if (amountInBuffer > testIndex + 5) {
+						printf("POP3Protocol::RetrieveInternal Ignoring %d "
+							"bytes of extra data past message end.\n",
 							amountInBuffer - (testIndex + 5));
+					}
 					amountInBuffer = testIndex + 2; // Don't include ".\r\n".
 					buf[amountInBuffer] = 0;
 					cont = false;
@@ -684,8 +686,8 @@ POP3Protocol::RetrieveInternal(const char* command, int32 message,
 					// dot starting a line of text.  Of course, a file with a
 					// lot of double period lines will get processed very
 					// slowly.
-					memmove (buf + testIndex + 2, buf + testIndex + 3,
-						amountInBuffer - (testIndex + 3) + 1 /* for NUL at end */);
+					memmove(buf + testIndex + 2, buf + testIndex + 3,
+						amountInBuffer - (testIndex + 3) + 1);
 					amountInBuffer--;
 					// Watch out for the end of buffer case, when the POP text
 					// is "\r\n..X".  Don't want to leave the resulting
@@ -693,7 +695,7 @@ POP3Protocol::RetrieveInternal(const char* command, int32 message,
 					// since that will get mistakenly evaluated again in the
 					// next loop and delete a character by mistake.
 					if (testIndex >= amountInBuffer - 4 && testStr[2] == '.') {
-						printf ("POP3Protocol::RetrieveInternal: Jackpot!  "
+						printf("POP3Protocol::RetrieveInternal: Jackpot!  "
 							"You have hit the rare situation with an escaped "
 							"period at the end of the buffer.  Aren't you happy"
 							"it decodes it correctly?\n");
@@ -711,7 +713,7 @@ POP3Protocol::RetrieveInternal(const char* command, int32 message,
 				to->Write(buf, amountInBuffer - 4);
 				if (postProgress)
 					ReportProgress(0, amountInBuffer - 4);
-				memmove (buf, buf + amountInBuffer - 4, 4);
+				memmove(buf, buf + amountInBuffer - 4, 4);
 				amountInBuffer = 4;
 			}
 		} else {
@@ -727,10 +729,10 @@ POP3Protocol::RetrieveInternal(const char* command, int32 message,
 
 
 void
-POP3Protocol::Delete(int32 num)
+POP3Protocol::Delete(int32 index)
 {
 	BString cmd = "DELE ";
-	cmd << (num+1) << CRLF;
+	cmd << (index + 1) << CRLF;
 	if (SendCommand(cmd.String()) != B_OK) {
 		// Error
 	}
@@ -837,7 +839,7 @@ POP3Protocol::SendCommand(const char* cmd)
 
 
 void
-POP3Protocol::MD5Digest(unsigned char *in, char *asciiDigest)
+POP3Protocol::MD5Digest(unsigned char* in, char* asciiDigest)
 {
 	unsigned char digest[16];
 
