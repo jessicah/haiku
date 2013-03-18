@@ -94,7 +94,8 @@ Architecture::InitRegisterRules(CfaContext& context) const
 status_t
 Architecture::CreateStackTrace(Team* team,
 	ImageDebugInfoProvider* imageInfoProvider, CpuState* cpuState,
-	StackTrace*& _stackTrace, int32 maxStackDepth, bool useExistingTrace)
+	StackTrace*& _stackTrace, target_addr_t returnFunctionAddress,
+	int32 maxStackDepth, bool useExistingTrace, bool getFullFrameInfo)
 {
 	BReference<CpuState> cpuStateReference(cpuState);
 
@@ -122,8 +123,6 @@ Architecture::CreateStackTrace(Team* team,
 	while (cpuState != NULL) {
 		// get the instruction pointer
 		target_addr_t instructionPointer = cpuState->InstructionPointer();
-		if (instructionPointer == 0)
-			break;
 
 		// get the image for the instruction pointer
 		AutoLocker<Team> teamLocker(team);
@@ -163,7 +162,8 @@ Architecture::CreateStackTrace(Team* team,
 		CpuState* previousCpuState = NULL;
 		if (function != NULL) {
 			status_t error = functionDebugInfo->GetSpecificImageDebugInfo()
-				->CreateFrame(image, function, cpuState, frame,
+				->CreateFrame(image, function, cpuState, getFullFrameInfo,
+					nextFrame == NULL ? returnFunctionAddress : 0, frame,
 					previousCpuState);
 			if (error != B_OK && error != B_UNSUPPORTED)
 				break;
@@ -172,7 +172,8 @@ Architecture::CreateStackTrace(Team* team,
 		// If we have no frame yet, let the architecture create it.
 		if (frame == NULL) {
 			status_t error = CreateStackFrame(image, functionDebugInfo,
-				cpuState, nextFrame == NULL, frame, previousCpuState);
+				cpuState, nextFrame == NULL, frame,
+				previousCpuState);
 			if (error != B_OK)
 				break;
 		}
@@ -187,11 +188,14 @@ Architecture::CreateStackTrace(Team* team,
 			return B_NO_MEMORY;
 		}
 
-		frame = nextFrame;
+		nextFrame = frame;
 		cpuState = previousCpuState;
 		if (--maxStackDepth == 0)
 			break;
 	}
+
+	if (stackTrace->CountFrames() == 0)
+		return B_ERROR;
 
 	stackTraceDeleter.Detach();
 	_stackTrace = stackTrace;

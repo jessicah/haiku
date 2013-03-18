@@ -2,30 +2,11 @@
  * Copyright (c) 2003-4 Kian Duffy <myob@users.sourceforge.net>
  * Parts Copyright (C) 1998,99 Kazuho Okui and Takashi Murai. 
  *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files or portions
- * thereof (the "Software"), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge,
- * publish, distribute, sublicense, and/or sell copies of the Software,
- * and to permit persons to whom the Software is furnished to do so, subject
- * to the following conditions:
+ * Distributed under the terms of the MIT License.
  *
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *
- *  * Redistributions in binary form must reproduce the above copyright notice
- *    in the  binary, as well as this list of conditions and the following
- *    disclaimer in the documentation and/or other materials provided with
- *    the distribution.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
+ * Authors:
+ *		Kian Duffy, myob@users.sourceforge.net
+ *		Siarzhuk Zharski, zharik@gmx.li
  */
 
 #include "VTparse.h"
@@ -115,7 +96,7 @@ CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
-CASE_PRINT, 
+CASE_PRINT,
 /*	@		A		B		C	*/
 CASE_PRINT,
 CASE_PRINT,
@@ -440,7 +421,7 @@ CASE_PRINT_CS96,
 CASE_PRINT_CS96,
 CASE_PRINT_CS96,
 CASE_PRINT_CS96,
-CASE_PRINT_CS96, 
+CASE_PRINT_CS96,
 /*	@		A		B		C	*/
 CASE_PRINT_CS96,
 CASE_PRINT_CS96,
@@ -1090,7 +1071,7 @@ CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
-CASE_PRINT, 
+CASE_PRINT,
 /*	@		A		B		C	*/
 CASE_PRINT,
 CASE_PRINT,
@@ -1377,7 +1358,7 @@ CASE_IGNORE,
 CASE_IGNORE,
 CASE_IGNORE,
 /*	SP		!		"		#	*/
-CASE_ESC_IGNORE,
+CASE_CSI_SP,
 CASE_ESC_IGNORE,
 CASE_ESC_IGNORE,
 CASE_ESC_IGNORE,
@@ -1478,7 +1459,7 @@ CASE_CPR,
 CASE_GROUND_STATE,
 /*	p		q		r		s	*/
 CASE_GROUND_STATE,
-CASE_GROUND_STATE,
+CASE_DECSCUSR_ETC,
 CASE_DECSTBM,
 CASE_GROUND_STATE,
 /*	t		u		v		w	*/
@@ -3028,7 +3009,7 @@ CASE_IGNORE,
 CASE_IGNORE,
 CASE_IGNORE,
 /*	CAN		EM		SUB		ESC	*/
-CASE_GROUND_STATE, 
+CASE_GROUND_STATE,
 CASE_IGNORE,
 CASE_GROUND_STATE,
 CASE_IGNORE_ESC,
@@ -4805,7 +4786,7 @@ CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
-CASE_PRINT, 
+CASE_PRINT,
 /*	@		A		B		C	*/
 CASE_PRINT,
 CASE_PRINT,
@@ -5131,7 +5112,7 @@ CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
-CASE_PRINT, 
+CASE_PRINT,
 /*	@		A		B		C	*/
 CASE_PRINT,
 CASE_PRINT,
@@ -5173,18 +5154,18 @@ CASE_PRINT,
 CASE_PRINT,
 CASE_PRINT,
 /*	`		a		b		c	*/
-CASE_PRINT,
+CASE_PRINT_GRA,
 CASE_PRINT_GRA,
 CASE_PRINT,
 CASE_PRINT,
 /*	d		e		f		g	*/
 CASE_PRINT,
 CASE_PRINT,
-CASE_PRINT,
-CASE_PRINT,
+CASE_PRINT_GRA,
+CASE_PRINT_GRA,
 /*	h		i		j		k	*/
 CASE_PRINT,
-CASE_PRINT,
+CASE_PRINT_GRA,
 CASE_PRINT_GRA,
 CASE_PRINT_GRA,
 /*	l		m		n		o	*/
@@ -5204,13 +5185,13 @@ CASE_PRINT_GRA,
 CASE_PRINT_GRA,
 /*	x		y		z		{	*/
 CASE_PRINT_GRA,
-CASE_PRINT,
-CASE_PRINT,
-CASE_PRINT,
+CASE_PRINT_GRA,
+CASE_PRINT_GRA,
+CASE_PRINT_GRA,
 /*	|		}		~		DEL	*/
-CASE_PRINT,
-CASE_PRINT,
-CASE_PRINT,
+CASE_PRINT_GRA,
+CASE_PRINT_GRA,
+CASE_PRINT_GRA,
 CASE_IGNORE,
 /*      0x80            0x81            0x82            0x83    */
 CASE_UTF8_INSTRING,

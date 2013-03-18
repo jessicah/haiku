@@ -72,6 +72,14 @@ FunctionParameter::~FunctionParameter()
 }
 
 
+// #pragma mark - TemplateParameter
+
+
+TemplateParameter::~TemplateParameter()
+{
+}
+
+
 // #pragma mark - Type
 
 
@@ -84,6 +92,15 @@ Type*
 Type::ResolveRawType(bool nextOneOnly) const
 {
 	return const_cast<Type*>(this);
+}
+
+
+status_t
+Type::CreateDerivedAddressType(address_type_kind kind,
+	AddressType*& _resultType)
+{
+	_resultType = NULL;
+	return B_ERROR;
 }
 
 

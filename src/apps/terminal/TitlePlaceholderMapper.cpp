@@ -4,6 +4,8 @@
  */
 
 
+#include <Catalog.h>
+
 #include "TitlePlaceholderMapper.h"
 
 
@@ -80,10 +82,16 @@ WindowTitlePlaceholderMapper::MapPlaceholder(char placeholder, int64 number,
 	bool numberGiven, BString& _string)
 {
 	switch (placeholder) {
+		case 'T':
+			// The Terminal application name for the current locale
+			_string = B_TRANSLATE_SYSTEM_NAME("Terminal");
+			return true;
+
 		case 'i':
 			// window index
 			_string.Truncate(0);
-			_string << fWindowIndex;
+			if (fWindowIndex != 0)
+				_string << fWindowIndex;
 			return true;
 
 		case 't':

@@ -54,6 +54,7 @@ All rights reserved.
 #include "BarWindow.h"
 #include "DeskbarMenu.h"
 #include "DeskbarUtils.h"
+#include "InlineScrollView.h"
 #include "ResourceSet.h"
 #include "ShowHideMenuItem.h"
 #include "StatusView.h"
@@ -62,7 +63,7 @@ All rights reserved.
 #include "WindowMenuItem.h"
 
 
-const float kDefaultDeskbarMenuWidth = 50.0f;
+const float kMinMenuItemWidth = 50.0f;
 const float kSepItemWidth = 5.0f;
 const float kIconPadding = 8.0f;
 
@@ -78,16 +79,14 @@ TExpandoMenuBar::TExpandoMenuBar(TBarView* bar, BRect frame, const char* name,
 	bool vertical, bool drawLabel)
 	:
 	BMenuBar(frame, name, B_FOLLOW_NONE,
-		vertical ? B_ITEMS_IN_COLUMN : B_ITEMS_IN_ROW, vertical),
+		vertical ? B_ITEMS_IN_COLUMN : B_ITEMS_IN_ROW),
 	fVertical(vertical),
 	fOverflow(false),
 	fDrawLabel(drawLabel),
-	fIsScrolling(false),
 	fShowTeamExpander(static_cast<TBarApp*>(be_app)->Settings()->superExpando),
 	fExpandNewTeams(static_cast<TBarApp*>(be_app)->Settings()->expandNewTeams),
-	fDeskbarMenuWidth(kDefaultDeskbarMenuWidth),
+	fDeskbarMenuWidth(kMinMenuItemWidth),
 	fBarView(bar),
-	fFirstApp(0),
 	fPreviousDragTargetItem(NULL),
 	fLastClickItem(NULL)
 {
@@ -137,24 +136,10 @@ TExpandoMenuBar::AttachedToWindow()
 	// top or bottom mode, add deskbar menu and sep for menubar tracking
 	// consistency
 	if (!fVertical) {
-		TDeskbarMenu* beMenu = new TDeskbarMenu(fBarView);
-		TBarWindow::SetDeskbarMenu(beMenu);
 		const BBitmap* logoBitmap = AppResSet()->FindBitmap(B_MESSAGE_TYPE,
 			R_LeafLogoBitmap);
 		if (logoBitmap != NULL)
 			fDeskbarMenuWidth = logoBitmap->Bounds().Width() + 16;
-
-		fDeskbarMenuItem = new TBarMenuTitle(fDeskbarMenuWidth,
-			Frame().Height(), logoBitmap, beMenu, true);
-		AddItem(fDeskbarMenuItem);
-
-		fSeparatorItem = new TTeamMenuItem(kSepItemWidth, itemHeight, fVertical);
-		AddItem(fSeparatorItem);
-		fSeparatorItem->SetEnabled(false);
-		fFirstApp = 2;
-	} else {
-		fDeskbarMenuItem = NULL;
-		fSeparatorItem = NULL;
 	}
 
 	if (settings->sortRunningApps)
@@ -169,7 +154,7 @@ TExpandoMenuBar::AttachedToWindow()
 				&& !strcmp(barInfo->sig, kTrackerSignature)) {
 				AddItem(new TTeamMenuItem(barInfo->teams, barInfo->icon,
 					barInfo->name, barInfo->sig, itemWidth, itemHeight,
-					fDrawLabel, fVertical), fFirstApp);
+					fDrawLabel, fVertical), 0);
 			} else {
 				AddItem(new TTeamMenuItem(barInfo->teams, barInfo->icon,
 					barInfo->name, barInfo->sig, itemWidth, itemHeight,
@@ -232,7 +217,8 @@ TExpandoMenuBar::MessageReceived(BMessage* message)
 	TTeamMenuItem* item;
 
 	switch (message->what) {
-		case B_SOME_APP_LAUNCHED: {
+		case B_SOME_APP_LAUNCHED:
+		{
 			BList* teams = NULL;
 			message->FindPointer("teams", (void**)&teams);
 
@@ -259,6 +245,32 @@ TExpandoMenuBar::MessageReceived(BMessage* message)
 			message->FindString("name", &name);
 
 			AddTeam(teams, icon, strdup(name), strdup(signature));
+			break;
+		}
+
+		case B_MOUSE_WHEEL_CHANGED:
+		{
+			float deltaY = 0;
+			message->FindFloat("be:wheel_delta_y", &deltaY);
+			if (deltaY == 0)
+				return;
+
+			TInlineScrollView* scrollView
+				= dynamic_cast<TInlineScrollView*>(Parent());
+			if (scrollView == NULL)
+				return;
+
+			float largeStep;
+			float smallStep;
+			scrollView->GetSteps(&smallStep, &largeStep);
+
+			// pressing the option/command/control key scrolls faster
+			if (modifiers() & (B_OPTION_KEY | B_COMMAND_KEY | B_CONTROL_KEY))
+				deltaY *= largeStep;
+			else
+				deltaY *= smallStep;
+
+			scrollView->ScrollBy(deltaY);
 			break;
 		}
 
@@ -325,66 +337,66 @@ TExpandoMenuBar::MouseDown(BPoint where)
 	BMenuItem* menuItem;
 	TTeamMenuItem* item = TeamItemAtPoint(where, &menuItem);
 
-	// check for three finger salute, a.k.a. Vulcan Death Grip
-	if (message != NULL && item != NULL && !fBarView->Dragging()) {
-		int32 modifiers = 0;
-		message->FindInt32("modifiers", &modifiers);
-
-		if ((modifiers & B_COMMAND_KEY) != 0
-			&& (modifiers & B_CONTROL_KEY) != 0
-			&& (modifiers & B_SHIFT_KEY) != 0) {
-			const BList* teams = item->Teams();
-			int32 teamCount = teams->CountItems();
-
-			team_id teamID;
-			for (int32 team = 0; team < teamCount; team++) {
-				teamID = (team_id)teams->ItemAt(team);
-				kill_team(teamID);
-				// remove the team immediately from display
-				RemoveTeam(teamID, false);
-			}
-
-			return;
-		}
-
-		// control click - show all/hide all shortcut
-		if ((modifiers & B_CONTROL_KEY) != 0) {
-			// show/hide item's teams
-			BMessage showMessage((modifiers & B_SHIFT_KEY) != 0
-				? kMinimizeTeam : kBringTeamToFront);
-			showMessage.AddInt32("itemIndex", IndexOf(item));
-			Window()->PostMessage(&showMessage, this);
-			return;
-		}
-
-		// Check the bounds of the expand Team icon
-		if (fShowTeamExpander && fVertical) {
-			BRect expanderRect = item->ExpanderBounds();
-			if (expanderRect.Contains(where)) {
-				// Let the update thread wait...
-				BAutolock locker(sMonLocker);
-
-				// Toggle the item
-				item->ToggleExpandState(true);
-				item->Draw();
-
-				// Absorb the message.
-				return;
-			}
-		}
-
-		// double-click on an item brings the team to front
-		int32 clicks;
-		if (message->FindInt32("clicks", &clicks) == B_OK && clicks > 1
-			&& item == menuItem && item == fLastClickItem) {
-			// activate this team
-			be_roster->ActivateApp((team_id)item->Teams()->ItemAt(0));
-			return;
-		}
-
-		fLastClickItem = item;
+	if (message == NULL || item == NULL || fBarView->Dragging()) {
+		BMenuBar::MouseDown(where);
+		return;
 	}
 
+	int32 modifiers = 0;
+	message->FindInt32("modifiers", &modifiers);
+
+	// check for three finger salute, a.k.a. Vulcan Death Grip
+	if ((modifiers & B_COMMAND_KEY) != 0
+		&& (modifiers & B_CONTROL_KEY) != 0
+		&& (modifiers & B_SHIFT_KEY) != 0) {
+		const BList* teams = item->Teams();
+		int32 teamCount = teams->CountItems();
+		team_id teamID;
+		for (int32 team = 0; team < teamCount; team++) {
+			teamID = (addr_t)teams->ItemAt(team);
+			kill_team(teamID);
+			RemoveTeam(teamID, false);
+				// remove the team from display immediately
+		}
+		return;
+			// absorb the message
+	}
+
+	// control click - show all/hide all shortcut
+	if ((modifiers & B_CONTROL_KEY) != 0) {
+		// show/hide item's teams
+		BMessage showMessage((modifiers & B_SHIFT_KEY) != 0
+			? kMinimizeTeam : kBringTeamToFront);
+		showMessage.AddInt32("itemIndex", IndexOf(item));
+		Window()->PostMessage(&showMessage, this);
+		return;
+			// absorb the message
+	}
+
+	// Check the bounds of the expand Team icon
+	if (fVertical && fShowTeamExpander) {
+		if (item->ExpanderBounds().Contains(where)) {
+			BAutolock locker(sMonLocker);
+				// let the update thread wait...
+			item->ToggleExpandState(true);
+				// toggle the item
+			item->Draw();
+			return;
+				// absorb the message
+		}
+	}
+
+	// double-click on an item brings the team to front
+	int32 clicks;
+	if (message->FindInt32("clicks", &clicks) == B_OK && clicks > 1
+		&& item == menuItem && item == fLastClickItem) {
+		be_roster->ActivateApp((addr_t)item->Teams()->ItemAt(0));
+			// activate this team
+		return;
+			// absorb the message
+	}
+
+	fLastClickItem = item;
 	BMenuBar::MouseDown(where);
 }
 
@@ -400,22 +412,38 @@ TExpandoMenuBar::MouseMoved(BPoint where, uint32 code, const BMessage* message)
 			case B_ENTERED_VIEW:
 			case B_INSIDE_VIEW:
 			{
-				TTeamMenuItem* item = TeamItemAtPoint(where);
-				if (item == fLastMousedOverItem) {
-					// already set the tooltip for this item, break out
-					break;
-				}
-
-				if (item == NULL) {
+				BMenuItem* menuItem;
+				TTeamMenuItem* item = TeamItemAtPoint(where, &menuItem);
+				TWindowMenuItem* windowMenuItem
+					= dynamic_cast<TWindowMenuItem*>(menuItem);
+				if (item == NULL || menuItem == NULL) {
 					// item is NULL, remove the tooltip and break out
 					fLastMousedOverItem = NULL;
 					SetToolTip((const char*)NULL);
 					break;
 				}
 
+				if (menuItem == fLastMousedOverItem) {
+					// already set the tooltip for this item, break out
+					break;
+				}
+
+				if (windowMenuItem != NULL && fBarView->Vertical()
+					&& fBarView->ExpandoState() && item->IsExpanded()) {
+					// expando mode window menu item
+					fLastMousedOverItem = menuItem;
+					if (strcmp(windowMenuItem->Label(),
+							windowMenuItem->FullTitle()) != 0) {
+						// label is truncated, set tooltip
+						SetToolTip(windowMenuItem->FullTitle());
+					} else
+						SetToolTip((const char*)NULL);
+					break;
+				}
+
 				if (item->HasLabel()) {
 					// item has a visible label, remove the tooltip and break out
-					fLastMousedOverItem = item;
+					fLastMousedOverItem = menuItem;
 					SetToolTip((const char*)NULL);
 					break;
 				}
@@ -423,8 +451,8 @@ TExpandoMenuBar::MouseMoved(BPoint where, uint32 code, const BMessage* message)
 				// new item, set the tooltip to the item name
 				SetToolTip(item->Name());
 
-				// save the current item for the next MouseMoved() call
-				fLastMousedOverItem = item;
+				// save the current menuitem for the next MouseMoved() call
+				fLastMousedOverItem = menuItem;
 
 				break;
 			}
@@ -500,20 +528,15 @@ TExpandoMenuBar::MouseUp(BPoint where)
 bool
 TExpandoMenuBar::InDeskbarMenu(BPoint loc) const
 {
-	if (!fVertical) {
-		if (fDeskbarMenuItem && fDeskbarMenuItem->Frame().Contains(loc))
-			return true;
-	} else {
-		TBarWindow* window = dynamic_cast<TBarWindow*>(Window());
-		if (window) {
-			if (TDeskbarMenu* bemenu = window->DeskbarMenu()) {
-				bool inDeskbarMenu = false;
-				if (bemenu->LockLooper()) {
-					inDeskbarMenu = bemenu->Frame().Contains(loc);
-					bemenu->UnlockLooper();
-				}
-				return inDeskbarMenu;
+	TBarWindow* window = dynamic_cast<TBarWindow*>(Window());
+	if (window) {
+		if (TDeskbarMenu* bemenu = window->DeskbarMenu()) {
+			bool inDeskbarMenu = false;
+			if (bemenu->LockLooper()) {
+				inDeskbarMenu = bemenu->Frame().Contains(loc);
+				bemenu->UnlockLooper();
 			}
+			return inDeskbarMenu;
 		}
 	}
 
@@ -532,7 +555,7 @@ TExpandoMenuBar::TeamItemAtPoint(BPoint point, BMenuItem** _item)
 	TTeamMenuItem* lastApp = NULL;
 	int32 count = CountItems();
 
-	for (int32 i = fFirstApp; i < count; i++) {
+	for (int32 i = 0; i < count; i++) {
 		BMenuItem* item = ItemAt(i);
 
 		if (dynamic_cast<TTeamMenuItem*>(item) != NULL)
@@ -578,11 +601,11 @@ TExpandoMenuBar::AddTeam(BList* team, BBitmap* icon, char* name,
 		itemWidth, itemHeight, fDrawLabel, fVertical);
 
 	if (settings->trackerAlwaysFirst && !strcmp(signature, kTrackerSignature))
-		AddItem(item, fFirstApp);
+		AddItem(item, 0);
 	else if (settings->sortRunningApps) {
 		TTeamMenuItem* teamItem
-			= dynamic_cast<TTeamMenuItem*>(ItemAt(fFirstApp));
-		int32 firstApp = fFirstApp;
+			= dynamic_cast<TTeamMenuItem*>(ItemAt(0));
+		int32 firstApp = 0;
 
 		// if Tracker should always be the first item, we need to skip it
 		// when sorting in the current item
@@ -610,10 +633,9 @@ TExpandoMenuBar::AddTeam(BList* team, BBitmap* icon, char* name,
 	if (fVertical) {
 		if (item && fShowTeamExpander && fExpandNewTeams)
 			item->ToggleExpandState(false);
+	}
 
-		fBarView->SizeWindow(BScreen(Window()).Frame());
-	} else
-		CheckItemSizes(1);
+	SizeWindow(1);
 
 	Window()->UpdateIfNeeded();
 }
@@ -623,12 +645,12 @@ void
 TExpandoMenuBar::AddTeam(team_id team, const char* signature)
 {
 	int32 count = CountItems();
-	for (int32 i = fFirstApp; i < count; i++) {
+	for (int32 i = 0; i < count; i++) {
 		// Only add to team menu items
 		if (TTeamMenuItem* item = dynamic_cast<TTeamMenuItem*>(ItemAt(i))) {
 			if (strcasecmp(item->Signature(), signature) == 0) {
-				if (!(item->Teams()->HasItem((void*)team)))
-					item->Teams()->AddItem((void*)team);
+				if (!(item->Teams()->HasItem((void*)(addr_t)team)))
+					item->Teams()->AddItem((void*)(addr_t)team);
 				break;
 			}
 		}
@@ -640,9 +662,9 @@ void
 TExpandoMenuBar::RemoveTeam(team_id team, bool partial)
 {
 	int32 count = CountItems();
-	for (int32 i = fFirstApp; i < count; i++) {
+	for (int32 i = 0; i < count; i++) {
 		if (TTeamMenuItem* item = dynamic_cast<TTeamMenuItem*>(ItemAt(i))) {
-			if (item->Teams()->HasItem((void*)team)) {
+			if (item->Teams()->HasItem((void*)(addr_t)team)) {
 				item->Teams()->RemoveItem(team);
 
 				if (partial)
@@ -655,14 +677,7 @@ TExpandoMenuBar::RemoveTeam(team_id team, bool partial)
 
 				RemoveItem(i);
 
-				if (fVertical) {
-					// instead of resizing the window here and there in the
-					// code the resize method will be centered in one place
-					// thus, the same behavior (good or bad) will be used
-					// whereever window sizing is done
-					fBarView->SizeWindow(BScreen(Window()).Frame());
-				} else
-					CheckItemSizes(-1);
+				SizeWindow(-1);
 
 				Window()->UpdateIfNeeded();
 
@@ -680,63 +695,56 @@ TExpandoMenuBar::CheckItemSizes(int32 delta)
 	if (fBarView->Vertical())
 		return;
 
+	float maxWidth = fBarView->DragRegion()->Frame().left
+		- fDeskbarMenuWidth - kSepItemWidth;
 	int32 iconSize = static_cast<TBarApp*>(be_app)->IconSize();
-	float maxContentWidth = sMinimumWindowWidth + iconSize - kMinimumIconSize;
-
-	// There are 2 extra items:
-	//     The Be Menu
-	//     The little separator item
-	int32 count = CountItems() - 2;
-	float maxWidth = Frame().Width() - fDeskbarMenuWidth - kSepItemWidth * 2;
-	float fullWidth = maxContentWidth * count + fDeskbarMenuWidth
-		+ kSepItemWidth;
 	float iconOnlyWidth = kIconPadding + iconSize + kIconPadding;
+	float minItemWidth = fDrawLabel ? iconOnlyWidth + kMinMenuItemWidth
+									: iconOnlyWidth - kIconPadding;
+	float maxItemWidth = fDrawLabel ? sMinimumWindowWidth + iconSize
+		- kMinimumIconSize : iconOnlyWidth;
+	float menuWidth = maxItemWidth * CountItems() + fDeskbarMenuWidth
+		+ kSepItemWidth;
 
 	bool reset = false;
 	float newWidth = 0.0f;
 
-	if (delta >= 0 && fullWidth > maxWidth) {
+	if (delta >= 0 && menuWidth > maxWidth) {
 		fOverflow = true;
 		reset = true;
-		if (fDrawLabel)
-			newWidth = floorf(maxWidth / count);
-		else
-			newWidth = iconOnlyWidth;
+		newWidth = floorf(maxWidth / CountItems());
 	} else if (delta < 0 && fOverflow) {
 		reset = true;
-		if (fullWidth > maxWidth) {
-			if (fDrawLabel)
-				newWidth = floorf(maxWidth / count);
-			else
-				newWidth = iconOnlyWidth;
-		} else
-			newWidth = maxContentWidth;
+		if (menuWidth > maxWidth)
+			newWidth = floorf(maxWidth / CountItems());
+		else
+			newWidth = maxItemWidth;
 	}
 
-	if (newWidth > maxContentWidth)
-		newWidth = maxContentWidth;
+	if (newWidth > maxItemWidth)
+		newWidth = maxItemWidth;
+	else if (newWidth < minItemWidth)
+		newWidth = minItemWidth;
 
 	if (reset) {
 		SetMaxContentWidth(newWidth);
-		if (newWidth == maxContentWidth)
+		if (newWidth == maxItemWidth)
 			fOverflow = false;
 		InvalidateLayout();
 
-		for (int32 index = fFirstApp; ; index++) {
+		for (int32 index = 0; ; index++) {
 			TTeamMenuItem* item = (TTeamMenuItem*)ItemAt(index);
-			if (!item)
+			if (item == NULL)
 				break;
 
-			if (!fDrawLabel && newWidth > iconOnlyWidth) {
-				item->SetOverrideWidth(iconOnlyWidth);
-			} else {
-				item->SetOverrideWidth(newWidth);
-			}
+			item->SetOverrideWidth(newWidth);
 		}
 
 		Invalidate();
 		Window()->UpdateIfNeeded();
 	}
+
+	fBarView->CheckForScrolling();
 }
 
 
@@ -748,14 +756,14 @@ TExpandoMenuBar::MenuLayout() const
 
 
 void
-TExpandoMenuBar::Draw(BRect update)
+TExpandoMenuBar::Draw(BRect updateRect)
 {
-	BMenu::Draw(update);
+	BMenu::Draw(updateRect);
 }
 
 
 void
-TExpandoMenuBar::DrawBackground(BRect)
+TExpandoMenuBar::DrawBackground(BRect updateRect)
 {
 	if (fVertical)
 		return;
@@ -765,9 +773,9 @@ TExpandoMenuBar::DrawBackground(BRect)
 	rgb_color hilite = tint_color(menuColor, B_DARKEN_1_TINT);
 	rgb_color vlight = tint_color(menuColor, B_LIGHTEN_2_TINT);
 
-	int32 last = CountItems() - 1;
-	if (last >= 0)
-		bounds.left = ItemAt(last)->Frame().right + 1;
+	int32 count = CountItems() - 1;
+	if (count >= 0)
+		bounds.left = ItemAt(count)->Frame().right + 1;
 	else
 		bounds.left = 0;
 
@@ -794,23 +802,46 @@ TExpandoMenuBar::DrawBackground(BRect)
 /*!	Something to help determine if we are showing too many apps
 	need to add in scrolling functionality.
 */
-void
+bool
 TExpandoMenuBar::CheckForSizeOverrun()
 {
-	BRect screenFrame = (BScreen(Window())).Frame();
+	if (fVertical) {
+		BRect screenFrame = (BScreen(Window())).Frame();
+		return Window()->Frame().bottom > screenFrame.bottom;
+	}
 
-	fIsScrolling = fVertical ? Window()->Frame().bottom > screenFrame.bottom
-		: false;
+	// horizontal
+	int32 count = CountItems() - 1;
+	if (count < 0)
+		return false;
+
+	int32 iconSize = static_cast<TBarApp*>(be_app)->IconSize();
+	float iconOnlyWidth = kIconPadding + iconSize + kIconPadding;
+	float minItemWidth = fDrawLabel ? iconOnlyWidth + kMinMenuItemWidth
+									: iconOnlyWidth - kIconPadding;
+	float menuWidth = minItemWidth * CountItems() + fDeskbarMenuWidth
+		+ kSepItemWidth;
+	float maxWidth = fBarView->DragRegion()->Frame().left
+		- fDeskbarMenuWidth - kSepItemWidth;
+
+	return menuWidth > maxWidth;
 }
 
 
 void
-TExpandoMenuBar::SizeWindow()
+TExpandoMenuBar::SizeWindow(int32 delta)
 {
-	if (fVertical)
-		fBarView->SizeWindow(BScreen(Window()).Frame());
-	else
-		CheckItemSizes(1);
+	// instead of resizing the window here and there in the
+	// code the resize method will be centered in one place
+	// thus, the same behavior (good or bad) will be used
+	// wherever window sizing is done
+	if (fVertical) {
+		BRect screenFrame = (BScreen(Window())).Frame();
+		fBarView->SizeWindow(screenFrame);
+		fBarView->PositionWindow(screenFrame);
+		fBarView->CheckForScrolling();
+	} else
+		CheckItemSizes(delta);
 }
 
 
@@ -849,7 +880,7 @@ TExpandoMenuBar::monitor_team_windows(void* arg)
 					for (int32 j = 0; j < teamCount; j++) {
 						// The following code is almost a copy/paste from
 						// WindowMenu.cpp
-						team_id	theTeam = (team_id)teamItem->Teams()->ItemAt(j);
+						team_id	theTeam = (addr_t)teamItem->Teams()->ItemAt(j);
 						int32 count = 0;
 						int32* tokens = get_token_list(theTeam, &count);
 
@@ -915,7 +946,7 @@ TExpandoMenuBar::monitor_team_windows(void* arg)
 			if (itemModified || resize) {
 				teamMenu->Invalidate();
 				if (resize)
-					teamMenu->SizeWindow();
+					teamMenu->SizeWindow(1);
 			}
 
 			teamMenu->Window()->Unlock();

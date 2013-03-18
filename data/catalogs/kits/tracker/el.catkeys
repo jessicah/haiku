@@ -1,4 +1,4 @@
-1	greek, modern (1453-)	x-vnd.Haiku-libtracker	3595866216
+1	greek, modern (1453-)	x-vnd.Haiku-libtracker	3015739927
 common	B_COMMON_DIRECTORY		κοινό
 OK	WidgetAttributeText		Εντάξει
 Icon view	VolumeWindow		Προβολή εικονιδίου
@@ -242,7 +242,6 @@ TiB	WidgetAttributeText		TiB
 The file \"%name\" already exists in the specified folder. Do you want to replace it?	FilePanelPriv		το αρχείο \"%name\" υπάρχει ήδη στον προσδιορισμένο φάκελο. Θέλετε σίγουρα να το αντικαταστήσετε;
 Cancel	ContainerWindow		Άκυρο
 Only the boot disk	AutoMounterSettings		Μόνο ο δίσκος εκκίνησης
-Trash	TrackerSettingsWindow		Απορρίματα
 Unmount	ContainerWindow		Αποπροσάρτηση
 Copy layout	ContainerWindow		Αντιγραφή διάταξης
 label too long	PoseView		ετικέτα πολύ μεγάλη
@@ -369,7 +368,6 @@ Icon view	DeskWindow		Προβολή εικονιδίου
 Select all	QueryContainerWindow		Επιλογή όλων
 Files cannot be moved or deleted from a read-only volume.	PoseView		Τα αρχεία δεν μπορούν να μετακινηθούν ή να διαγραφούν από ένα τόμο μόνο προς ανάγνωση.
 There was a problem trying to replace \"%name\". The item might be open or busy.	FSUtils		Υπήρξε κάποιο πρόβλημα κατά την προσπάθεια αντικατάστασης του \"%name\". Το αντικείμενο μπορεί να είναι ήδη ανοιχτό ή απασχολημένο.
-You cannot put the Trash, home or Desktop directory into the trash.	FSUtils		Δε μπορείτε να τοποθετήσετε τα Απορρίματα, τον αρχικό κατάλογο ή τον κατάλογο της Επιφάνειας Εργασίας στα απορρίματα.
 Owner	FilePermissionsView		Ιδιοκτήτης
 There was a problem trying to save in the folder you specified. Please try another one.	FilePanelPriv		Υπήρξε κάποιο πρόβλημα κατά την προσπάθεια αποθήκευσης στο φάκελο που προσδιορίσατε. Παρακαλώ προσπαθήστε με έναν άλλο.
 Restore	ContainerWindow		Επαναφορά
@@ -388,7 +386,6 @@ Paste layout	ContainerWindow		Επικόλληση διάταξης
 Select	InfoWindow		Επιλογή
 Could not update permissions of file \"%name\". %error	FSUtils		Αδυναμία αναθεώρησης των δικαιωμάτων του αρχείου \"%name\". %error
 Select…	FilePanelPriv		Επιλογή...
-Don't move files to Trash	SettingsView		Να μη μετακινόυνται αρχεία στα απορρίματα
 There was an error resolving the link.	Tracker		Υπήρξε κάποιο σφάλμα κατά την επίλυση του συνδέσμου.
 %BytesPerSecond/s	StatusWindow		%BytesPerSecond/s
 You can't move or copy the trash.	FSUtils		Δεν μπορείτε να μετακινήσετε ή να αντιγράψετε στο καλάθι αχρήστων.
@@ -419,7 +416,6 @@ Automatic disk mounting	AutoMounterSettings		Αυτόματη προσάρτησ
 Original name	ContainerWindow		Πρωτότυπο όνομα
 Find	FSUtils		Εύρεση
 Error copying file \"%name\":\n\t%error\n\nWould you like to continue?	FSUtils		Σφάλμα αντιγραφής του αρχείου\"%name\":\n\t%error\n\nΘέλετε να συνεχίσετε;
-Ask before delete	SettingsView		Ερώτηση πριν τη διαγραφή
 Single window navigation	SettingsView		Πλοήγηση απλού παράθυρου
 parent folder	NavMenu		φάκελος γονέα
 contains	FindPanel		περιέχει

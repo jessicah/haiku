@@ -1,7 +1,9 @@
-1	dutch; flemish	x-vnd.Be-TSKB	1095421712
+1	dutch; flemish	x-vnd.Be-TSKB	3155357024
 Power off	DeskbarMenu		Uitzetten
 Edit menu…	PreferencesWindow		Bewerk menu...
-Applications	PreferencesWindow		Toepassingen
+Suspend	DeskbarMenu		Opschorten
+Time preferences…	TimeView		Tijdsvoorkeuren…
+About Haiku	DeskbarMenu		Over Haiku
 Recent documents:	PreferencesWindow		Recente documenten:
 Recent applications	DeskbarMenu		Recente toepassingen
 Sort running applications	PreferencesWindow		Sorteer lopende toepassingen
@@ -17,14 +19,15 @@ Show all	WindowMenu		Toon alles
 No windows	WindowMenu		Geen vensters
 Deskbar	System name		Deskbar
 Restart system	DeskbarMenu		Systeem herstarten
+Large	PreferencesWindow		Groot
 Auto-raise	PreferencesWindow		Automatisch naar boven
-Hide time	TimeView		Tijd verbergen
 Recent folders:	PreferencesWindow		Recente mappen:
 Show application expander	PreferencesWindow		Toon toepassing-expander
 Restart Tracker	DeskbarMenu		Tracker herstarten
 Close all	WindowMenu		Alles sluiten
 Deskbar preferences	PreferencesWindow		Deskbar-voorkeuren
 Mount	DeskbarMenu		Betrek
+Small	PreferencesWindow		Klein
 Recent applications:	PreferencesWindow		Recente toepassingen:
 Shutdown…	DeskbarMenu		Afsluiten...
 Tracker always first	PreferencesWindow		Tracker altijd eerst
@@ -35,8 +38,9 @@ Show calendar…	TimeView		Toon kalender
 Deskbar preferences…	DeskbarMenu		Deskbar-voorkeuren...
 Expand new applications	PreferencesWindow		Toon nieuwe toepassingen
 Show replicants	DeskbarMenu		Toon replicants
-Clock	PreferencesWindow		Klok
+Hide application names	PreferencesWindow		Programmanamen verbergen
 Demos	B_USER_DESKBAR_DIRECTORY/Demos		Demo's
+Icon size	PreferencesWindow		Pictogramgrootte
 Desktop applets	B_USER_DESKBAR_DIRECTORY/Desktop applets		Bureaubladapplets
 Hide all	WindowMenu		Alles verbergen
 Quit application	WindowMenu		Programma afsluiten

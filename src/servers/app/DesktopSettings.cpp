@@ -1,5 +1,5 @@
 /*
- * Copyright 2005-2009, Haiku.
+ * Copyright 2005-2013, Haiku.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
@@ -293,7 +293,7 @@ DesktopSettingsPrivate::_Load()
 			// colors
 			for (int32 i = 0; i < kNumColors; i++) {
 				char colorName[12];
-				snprintf(colorName, sizeof(colorName), "color%ld",
+				snprintf(colorName, sizeof(colorName), "color%" B_PRId32,
 					(int32)index_to_color_which(i));
 
 				settings.FindInt32(colorName, (int32*)&fShared.colors[i]);
@@ -438,7 +438,7 @@ DesktopSettingsPrivate::Save(uint32 mask)
 
 			for (int32 i = 0; i < kNumColors; i++) {
 				char colorName[12];
-				snprintf(colorName, sizeof(colorName), "color%ld",
+				snprintf(colorName, sizeof(colorName), "color%" B_PRId32,
 					(int32)index_to_color_which(i));
 				settings.AddInt32(colorName, (const int32&)fShared.colors[i]);
 			}
@@ -575,13 +575,6 @@ bool
 DesktopSettingsPrivate::AcceptFirstClick() const
 {
 	return fAcceptFirstClick;
-}
-
-
-bool
-DesktopSettingsPrivate::FocusFollowsMouse() const
-{
-	return MouseMode() == B_FOCUS_FOLLOWS_MOUSE;
 }
 
 
@@ -813,13 +806,6 @@ mode_focus_follows_mouse
 DesktopSettings::FocusFollowsMouseMode() const
 {
 	return fSettings->FocusFollowsMouseMode();
-}
-
-
-bool
-DesktopSettings::FocusFollowsMouse() const
-{
-	return fSettings->FocusFollowsMouse();
 }
 
 

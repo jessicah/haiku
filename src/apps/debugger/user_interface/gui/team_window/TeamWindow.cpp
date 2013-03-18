@@ -9,8 +9,10 @@
 
 #include <stdio.h>
 
+#include <Alert.h>
 #include <Button.h>
 #include <FilePanel.h>
+#include <FindDirectory.h>
 #include <LayoutBuilder.h>
 #include <Menu.h>
 #include <MenuBar.h>
@@ -42,8 +44,10 @@
 #include "StackTraceView.h"
 #include "Tracing.h"
 #include "TypeComponentPath.h"
+#include "UiUtils.h"
 #include "UserInterface.h"
 #include "Variable.h"
+#include "WatchPromptWindow.h"
 
 
 enum {
@@ -53,6 +57,8 @@ enum {
 
 
 enum {
+	MSG_CHOOSE_DEBUG_REPORT_LOCATION = 'ccrl',
+	MSG_DEBUG_REPORT_SAVED = 'drsa',
 	MSG_LOCATE_SOURCE_IF_NEEDED = 'lsin'
 };
 
@@ -110,7 +116,7 @@ TeamWindow::TeamWindow(::Team* team, UserInterfaceListener* listener)
 	fStepIntoButton(NULL),
 	fStepOutButton(NULL),
 	fInspectorWindow(NULL),
-	fSourceLocatePanel(NULL)
+	fFilePanel(NULL)
 {
 	fTeam->Lock();
 	BString name = fTeam->Name();
@@ -142,7 +148,7 @@ TeamWindow::~TeamWindow()
 	_SetActiveImage(NULL);
 	_SetActiveThread(NULL);
 
-	delete fSourceLocatePanel;
+	delete fFilePanel;
 }
 
 
@@ -214,6 +220,49 @@ void
 TeamWindow::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
+		case MSG_CHOOSE_DEBUG_REPORT_LOCATION:
+		{
+			try {
+				char filename[B_FILE_NAME_LENGTH];
+				UiUtils::ReportNameForTeam(fTeam, filename, sizeof(filename));
+				BMessenger msgr(this);
+				fFilePanel = new BFilePanel(B_SAVE_PANEL, &msgr,
+					NULL, 0, false, new BMessage(MSG_GENERATE_DEBUG_REPORT));
+				fFilePanel->SetSaveText(filename);
+				fFilePanel->Show();
+			} catch (...) {
+				delete fFilePanel;
+				fFilePanel = NULL;
+			}
+			break;
+		}
+		case MSG_GENERATE_DEBUG_REPORT:
+		{
+			delete fFilePanel;
+			fFilePanel = NULL;
+
+			BPath path;
+			entry_ref ref;
+			if (message->FindRef("directory", &ref) == B_OK
+				&& message->HasString("name")) {
+				path.SetTo(&ref);
+				path.Append(message->FindString("name"));
+				if (get_ref_for_path(path.Path(), &ref) == B_OK)
+					fListener->DebugReportRequested(&ref);
+			}
+			break;
+		}
+		case MSG_DEBUG_REPORT_SAVED:
+		{
+			BString data;
+			data.SetToFormat("Debug report successfully saved to '%s'",
+				message->FindString("path"));
+			BAlert *alert = new BAlert("Report saved", data.String(),
+				"OK");
+			alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
+			alert->Go();
+			break;
+		}
 		case MSG_SHOW_INSPECTOR_WINDOW:
 		{
 			if (fInspectorWindow) {
@@ -247,6 +296,28 @@ TeamWindow::MessageReceived(BMessage* message)
 			break;
 
 		}
+		case MSG_SHOW_WATCH_VARIABLE_PROMPT:
+		{
+			target_addr_t address;
+			uint32 type;
+			int32 length;
+
+			if (message->FindUInt64("address", &address) != B_OK
+				|| message->FindUInt32("type", &type) != B_OK
+				|| message->FindInt32("length", &length) != B_OK) {
+				break;
+			}
+
+			try {
+				WatchPromptWindow* window = WatchPromptWindow::Create(
+					fTeam->GetArchitecture(), address, type, length,
+					fListener);
+				window->Show();
+			} catch (...) {
+				// TODO: notify user
+			}
+			break;
+		}
 		case B_REFS_RECEIVED:
 		{
 			entry_ref locatedPath;
@@ -261,14 +332,14 @@ TeamWindow::MessageReceived(BMessage* message)
 					->SourceFile() != NULL && fActiveSourceCode != NULL
 				&& fActiveSourceCode->GetSourceFile() == NULL) {
 				try {
-					if (fSourceLocatePanel == NULL) {
-						fSourceLocatePanel = new BFilePanel(B_OPEN_PANEL,
+					if (fFilePanel == NULL) {
+						fFilePanel = new BFilePanel(B_OPEN_PANEL,
 							new BMessenger(this));
 					}
-					fSourceLocatePanel->Show();
+					fFilePanel->Show();
 				} catch (...) {
-					delete fSourceLocatePanel;
-					fSourceLocatePanel = NULL;
+					delete fFilePanel;
+					fFilePanel = NULL;
 				}
 			}
 			break;
@@ -332,6 +403,18 @@ TeamWindow::MessageReceived(BMessage* message)
 
 			_HandleUserBreakpointChanged(breakpoint);
 			break;
+		}
+
+		case MSG_WATCHPOINT_CHANGED:
+		{
+			Watchpoint* watchpoint;
+			if (message->FindPointer("watchpoint", (void**)&watchpoint) != B_OK)
+				break;
+			BReference<Watchpoint> watchpointReference(watchpoint, true);
+
+			_HandleWatchpointChanged(watchpoint);
+			break;
+
 		}
 
 		case MSG_FUNCTION_SOURCE_CODE_CHANGED:
@@ -563,6 +646,28 @@ TeamWindow::ClearBreakpointRequested(target_addr_t address)
 
 
 void
+TeamWindow::WatchpointSelectionChanged(Watchpoint* watchpoint)
+{
+	fBreakpointsView->SetBreakpoint(NULL, watchpoint);
+}
+
+
+void
+TeamWindow::SetWatchpointEnabledRequested(Watchpoint* watchpoint,
+	bool enabled)
+{
+	fListener->SetWatchpointEnabledRequested(watchpoint, enabled);
+}
+
+
+void
+TeamWindow::ClearWatchpointRequested(Watchpoint* watchpoint)
+{
+	fListener->ClearWatchpointRequested(watchpoint);
+}
+
+
+void
 TeamWindow::ValueNodeValueRequested(CpuState* cpuState,
 	ValueNodeContainer* container, ValueNode* valueNode)
 {
@@ -615,6 +720,27 @@ TeamWindow::UserBreakpointChanged(const Team::UserBreakpointEvent& event)
 		&& PostMessage(&message) == B_OK) {
 		breakpointReference.Detach();
 	}
+}
+
+
+void
+TeamWindow::WatchpointChanged(const Team::WatchpointEvent& event)
+{
+	BMessage message(MSG_WATCHPOINT_CHANGED);
+	BReference<Watchpoint> watchpointReference(event.GetWatchpoint());
+	if (message.AddPointer("watchpoint", event.GetWatchpoint()) == B_OK
+		&& PostMessage(&message) == B_OK) {
+		watchpointReference.Detach();
+	}
+}
+
+
+void
+TeamWindow::DebugReportChanged(const Team::DebugReportEvent& event)
+{
+	BMessage message(MSG_DEBUG_REPORT_SAVED);
+	message.AddString("path", event.GetReportPath());
+	PostMessage(&message);
 }
 
 
@@ -730,6 +856,10 @@ TeamWindow::_Init()
 	item->SetTarget(this);
 	menu = new BMenu("Tools");
 	fMenuBar->AddItem(menu);
+	item = new BMenuItem("Save Debug Report",
+		new BMessage(MSG_CHOOSE_DEBUG_REPORT_LOCATION));
+	menu->AddItem(item);
+	item->SetTarget(this);
 	item = new BMenuItem("Inspect Memory",
 		new BMessage(MSG_SHOW_INSPECTOR_WINDOW), 'I');
 	menu->AddItem(item);
@@ -901,7 +1031,7 @@ TeamWindow::_SetActiveBreakpoint(UserBreakpoint* breakpoint)
 		_ScrollToActiveFunction();
 	}
 
-	fBreakpointsView->SetBreakpoint(fActiveBreakpoint);
+	fBreakpointsView->SetBreakpoint(fActiveBreakpoint, NULL);
 }
 
 
@@ -1241,6 +1371,13 @@ TeamWindow::_HandleUserBreakpointChanged(UserBreakpoint* breakpoint)
 {
 	fSourceView->UserBreakpointChanged(breakpoint);
 	fBreakpointsView->UserBreakpointChanged(breakpoint);
+}
+
+
+void
+TeamWindow::_HandleWatchpointChanged(Watchpoint* watchpoint)
+{
+	fBreakpointsView->WatchpointChanged(watchpoint);
 }
 
 

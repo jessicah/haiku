@@ -90,7 +90,7 @@ TTeamMenuItem::InitData(BList* team, BBitmap* icon, char* name, char* sig,
 	fSig = sig;
 	if (fName == NULL) {
 		char temp[32];
-		snprintf(temp, sizeof(temp), "team %ld", (int32)team->ItemAt(0));
+		snprintf(temp, sizeof(temp), "team %ld", (addr_t)team->ItemAt(0));
 		fName = strdup(temp);
 	}
 
@@ -240,7 +240,7 @@ TTeamMenuItem::GetContentSize(float* width, float* height)
 			if (fDrawLabel && iconBounds.Width() > 32)
 				*height += fLabelAscent + fLabelDescent;
 		} else {
-			*height = iconBounds.Height() - kVPad * 8;
+			*height = iconBounds.Height() + kVPad * 4;
 		}
 	}
 	*height += 2;
@@ -395,9 +395,6 @@ TTeamMenuItem::DrawContent()
 		menu->MovePenTo(drawLoc);
 	}
 
-	// set the pen to black so that either method will draw in the same color
-	// low color is set in inherited::DrawContent, override makes sure its
-	// what we want
 	if (fDrawLabel) {
 		menu->SetDrawingMode(B_OP_OVER);
 		menu->SetHighColor(ui_color(B_MENU_ITEM_TEXT_COLOR));
@@ -513,6 +510,11 @@ TTeamMenuItem::DrawContentLabel()
 	else
 		menu->SetLowColor(menu->LowColor());
 
+	if (IsSelected())
+		menu->SetHighColor(ui_color(B_MENU_SELECTED_ITEM_TEXT_COLOR));
+	else
+		menu->SetHighColor(ui_color(B_MENU_ITEM_TEXT_COLOR));
+
 	menu->DrawString(label);
 
 	free(truncLabel);
@@ -559,7 +561,7 @@ TTeamMenuItem::ToggleExpandState(bool resizeWindow)
 				sub->SetExpanded(true, myindex + childIndex);
 
 				if (resizeWindow)
-					parent->SizeWindow();
+					parent->SizeWindow(-1);
 			}
 		}
 	} else {
@@ -581,7 +583,7 @@ TTeamMenuItem::ToggleExpandState(bool resizeWindow)
 			sub->SetExpanded(false, 0);
 
 			if (resizeWindow)
-				parent->SizeWindow();
+				parent->SizeWindow(1);
 		}
 	}
 }

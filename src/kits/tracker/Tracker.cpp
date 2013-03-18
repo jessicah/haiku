@@ -233,7 +233,7 @@ TTracker::TTracker()
 	setrlimit(RLIMIT_NOFILE, &rl);
 
 	fNodeMonitorCount = DEFAULT_MON_NUM;
-	
+
 	gLocalizedNamePreferred
 		= BLocaleRoster::Default()->IsFilesystemTranslationPreferred();
 
@@ -415,7 +415,7 @@ TTracker::MessageReceived(BMessage* message)
 		case kCloseWindowAndChildren:
 			{
 				const node_ref* itemNode;
-				int32 bytes;
+				ssize_t bytes;
 				message->FindData("node_ref", B_RAW_TYPE,
 					(const void**)&itemNode, &bytes);
 				CloseWindowAndChildren(itemNode);
@@ -1488,7 +1488,7 @@ TTracker::CloseParent(node_ref parent)
 void
 TTracker::ShowSettingsWindow()
 {
-	if (!fSettingsWindow) {
+	if (fSettingsWindow == NULL) {
 		fSettingsWindow = new TrackerSettingsWindow();
 		fSettingsWindow->Show();
 	} else {

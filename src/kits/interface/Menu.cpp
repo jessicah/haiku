@@ -68,9 +68,9 @@ public:
 	// TODO: make this work with Unicode characters!
 
 	bool HasTrigger(uint32 c)
-		{ return fList.HasItem((void*)tolower(c)); }
+		{ return fList.HasItem((void*)(addr_t)tolower(c)); }
 	bool AddTrigger(uint32 c)
-		{ return fList.AddItem((void*)tolower(c)); }
+		{ return fList.AddItem((void*)(addr_t)tolower(c)); }
 
 private:
 	BList	fList;
@@ -1107,11 +1107,26 @@ BMenu::FindMarked()
 {
 	for (int32 i = 0; i < fItems.CountItems(); i++) {
 		BMenuItem* item = ItemAt(i);
+
 		if (item->IsMarked())
 			return item;
 	}
 
 	return NULL;
+}
+
+
+int32
+BMenu::FindMarkedIndex()
+{
+	for (int32 i = 0; i < fItems.CountItems(); i++) {
+		BMenuItem* item = ItemAt(i);
+
+		if (item->IsMarked())
+			return i;
+	}
+
+	return -1;
 }
 
 
@@ -2883,7 +2898,7 @@ bool
 BMenu::_OkToProceed(BMenuItem* item, bool keyDown)
 {
 	BPoint where;
-	ulong buttons;
+	uint32 buttons;
 	GetMouse(&where, &buttons, false);
 	bool stickyMode = _IsStickyMode();
 	// Quit if user clicks the mouse button in sticky mode

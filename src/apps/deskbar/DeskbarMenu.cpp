@@ -379,6 +379,7 @@ TDeskbarMenu::ResetTargets()
 				case kShowSplash:
 				case kToggleDraggers:
 				case kConfigShow:
+				case kConfigQuit:
 				case kAlwaysTop:
 				case kExpandNewTeams:
 				case kHideLabels:
@@ -388,13 +389,12 @@ TDeskbarMenu::ResetTargets()
 				case kRebootSystem:
 				case kSuspendSystem:
 				case kShutdownSystem:
-					item->SetTarget(be_app);
-					break;
-
 				case kShowHideTime:
 				case kShowSeconds:
 				case kShowDayOfWeek:
-					item->SetTarget(fBarView->fReplicantTray);
+				case kShowTimeZone:
+				case kGetClockSettings:
+					item->SetTarget(be_app);
 					break;
 			}
 		}

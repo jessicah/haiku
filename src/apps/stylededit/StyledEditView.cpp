@@ -50,8 +50,8 @@ void
 StyledEditView::Select(int32 start, int32 finish)
 {
 	fMessenger->SendMessage(start == finish ? DISABLE_ITEMS : ENABLE_ITEMS);
-	fMessenger->SendMessage(UPDATE_LINE);
-	BTextView::Select(start, finish);	
+	BTextView::Select(start, finish);
+	_UpdateStatus();
 }
 
 
@@ -73,8 +73,11 @@ StyledEditView::SetSuppressChanges(bool suppressChanges)
 
 
 status_t
-StyledEditView::GetStyledText(BPositionIO* stream)
+StyledEditView::GetStyledText(BPositionIO* stream, const char* forceEncoding)
 {
+	if (forceEncoding != NULL)
+		fEncoding = strcmp(forceEncoding, "auto") != 0 ? forceEncoding : "";
+
 	fSuppressChanges = true;
 	status_t result = BTranslationUtils::GetStyledText(stream, this,
 		fEncoding.String());
@@ -85,24 +88,25 @@ StyledEditView::GetStyledText(BPositionIO* stream)
 
 	BNode* node = dynamic_cast<BNode*>(stream);
 	if (node != NULL) {
-		// get encoding
-		if (node->ReadAttrString("be:encoding", &fEncoding) != B_OK) {
-			// try to read as "int32"
-			int32 encoding;
-			ssize_t bytesRead = node->ReadAttr("be:encoding", B_INT32_TYPE, 0,
-				&encoding, sizeof(encoding));
-			if (bytesRead == (ssize_t)sizeof(encoding)) {
-				if (encoding == 65535) {
-					fEncoding = "UTF-8";
-				} else {
-					const BCharacterSet* characterSet
-						= BCharacterSetRoster::GetCharacterSetByConversionID(encoding);
-					if (characterSet != NULL)
-						fEncoding = characterSet->GetName();
+		if (forceEncoding == NULL) {
+			// get encoding
+			if (node->ReadAttrString("be:encoding", &fEncoding) != B_OK) {
+				// try to read as "int32"
+				int32 encoding;
+				ssize_t bytesRead = node->ReadAttr("be:encoding", B_INT32_TYPE, 0,
+					&encoding, sizeof(encoding));
+				if (bytesRead == (ssize_t)sizeof(encoding)) {
+					if (encoding == 65535) {
+						fEncoding = "UTF-8";
+					} else {
+						const BCharacterSet* characterSet
+							= BCharacterSetRoster::GetCharacterSetByConversionID(encoding);
+						if (characterSet != NULL)
+							fEncoding = characterSet->GetName();
+					}
 				}
 			}
 		}
-
 		// TODO: move those into BTranslationUtils::GetStyledText() as well?
 
 		// restore alignment
@@ -177,7 +181,7 @@ StyledEditView::DeleteText(int32 start, int32 finish)
 		fMessenger-> SendMessage(TEXT_CHANGED);
 
 	BTextView::DeleteText(start, finish);
-	fMessenger->SendMessage(UPDATE_LINE);
+	_UpdateStatus();
 }
 
 
@@ -189,7 +193,7 @@ StyledEditView::InsertText(const char* text, int32 length, int32 offset,
 		fMessenger->SendMessage(TEXT_CHANGED);
 
 	BTextView::InsertText(text, length, offset, runs);
-	fMessenger->SendMessage(UPDATE_LINE);
+	_UpdateStatus();
 }
 
 
@@ -205,5 +209,34 @@ StyledEditView::FrameResized(float width, float height)
 		textRect.InsetBy(TEXT_INSET, TEXT_INSET);
 		SetTextRect(textRect);
 	}
-}				
+}
+
+
+void
+StyledEditView::_UpdateStatus()
+{
+	int32 selStart, selFinish;
+	GetSelection(&selStart, &selFinish);
+
+	int32 line = CurrentLine();
+	int32 lineStart = OffsetAt(line);
+
+	int32 column = 1;
+	int32 tabSize = (int32)ceilf(TabWidth() / StringWidth("s"));
+	for (int i = lineStart; i < selStart; i++) {
+		unsigned char ch = ByteAt(i);
+		if ((ch & 0xC0) != 0x80) {
+			if (ch == '\t')
+				while (column % tabSize)
+					column++;
+			column++;
+		}
+	}
+
+	BMessage* message = new BMessage(UPDATE_STATUS);
+	message->AddInt32("line", line + 1);
+	message->AddInt32("column", column);
+	message->AddString("encoding", fEncoding.String());
+	fMessenger->SendMessage(message);
+}
 

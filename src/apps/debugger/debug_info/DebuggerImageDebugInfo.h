@@ -35,6 +35,8 @@ public:
 	virtual	status_t			CreateFrame(Image* image,
 									FunctionInstance* functionInstance,
 									CpuState* cpuState,
+									bool getFullFrameInfo,
+									target_addr_t returnFunctionAddress,
 									StackFrame*& _previousFrame,
 									CpuState*& _previousCpuState);
 	virtual	status_t			GetStatement(FunctionDebugInfo* function,
@@ -53,10 +55,6 @@ public:
 
 	virtual	status_t			AddSourceCodeInfo(LocatableFile* file,
 									FileSourceCode* sourceCode);
-
-private:
-	static	int					_CompareSymbols(const SymbolInfo* a,
-									const SymbolInfo* b);
 
 private:
 			ImageInfo			fImageInfo;

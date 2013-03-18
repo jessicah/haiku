@@ -33,7 +33,7 @@ local sources =
 
 AddResources IMAP : IMAP.rdef ;
 
-if $(HAIKU_OPENSSL_ENABLED) {
+if $(HAIKU_BUILD_FEATURE_OPENSSL_ENABLED) {
 	SubDirC++Flags -DUSE_SSL ;
 	SetupFeatureObjectsDir ssl ;
 } else {

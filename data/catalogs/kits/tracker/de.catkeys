@@ -1,4 +1,4 @@
-1	german	x-vnd.Haiku-libtracker	2606149823
+1	german	x-vnd.Haiku-libtracker	4167158175
 common	B_COMMON_DIRECTORY		Allgemein
 OK	WidgetAttributeText		OK
 Icon view	VolumeWindow		Icon-Ansicht
@@ -74,6 +74,7 @@ Arrange by	ContainerWindow		Icons ordnen nach
 Mount server error	AutoMounterSettings		Mountserver-Fehler
 Search	FindPanel		Suchen
 Preparing to empty Trash…	StatusWindow		Leeren des Papierkorbs wird vorbereitet…
+You cannot put the selected item(s) into the trash.	FSUtils		Die ausgewählten Objekte können nicht in den Papierkorb verschoben werden.
 Disks	Model		Datenträger
 Create link	ContainerWindow		Verknüpfung erstellen
 develop	B_COMMON_DEVELOP_DIRECTORY		Programmierung
@@ -164,7 +165,6 @@ no supporting apps	OpenWithWindow		keine unterstützenden Anwendungen
 That name is already taken. Please type another one.	InfoWindow		Dieser Name wird bereits verwendet. Bitte einen anderen wählen.
 Sorry, you can't create links in the Trash.	PoseView		Im Papierkorb können leider keine Verknüpfungen erstellt werden.
 An item named \"%name\" already exists in this folder, and may contain\nitems with the same names. Would you like to replace them with those contained in the folder you are %verb?	FSUtils		Ein Objekt mit dem Namen \"%name\" existiert bereits in diesem Ordner und könnte\nObjekte mit gleichen Namen enthalten. Sollen sie mit denen des Ordners ersetzt werden, der %verb werden soll?
-Tracker preferences…	ContainerWindow		Tracker-Einstellungen…
 Link \"%name\" to:	InfoWindow	File dialog title for new sym link	Verknüpfe \"%name\" mit:
 Mount settings…	VolumeWindow		Einhänge-Einstellungen…
 Select…	VolumeWindow		Auswählen…
@@ -257,7 +257,6 @@ TiB	WidgetAttributeText		TiB
 The file \"%name\" already exists in the specified folder. Do you want to replace it?	FilePanelPriv		Die Datei \"%name\" existiert bereits in diesem Ordner. Soll sie ersetzt werden?
 Cancel	ContainerWindow		Abbrechen
 Only the boot disk	AutoMounterSettings		Nur das Boot-Laufwerk
-Trash	TrackerSettingsWindow		Papierkorb
 If you %ifYouDoAction the config folder, %osName may not behave properly!\n\nAre you sure you want to do this?	FSUtils		Wird der Konfiguration-Ordner %ifYouDoAction, kann %osName vielleicht nicht mehr fehlerfrei arbeiten!
 Unmount	ContainerWindow		Aushängen
 Copy layout	ContainerWindow		Anordnung kopieren
@@ -379,6 +378,7 @@ Modified	FindPanel		Geändert
 Error moving \"%name\" to Trash. (%error)	FSUtils		Fehler beim Verschieben von \"%name\" in den Papierkorb. (%error)
 You can't replace a folder with one of its sub-folders.	FSUtils		Ordner können nicht mit einem seiner Unterordner ersetzt werden.
 <No recent items>	FavoritesMenu		<Keine letzten Objekte>
+Preferences…	ContainerWindow		Einstellungen...
 Move	PoseView		Verschieben
 Open and make preferred	OpenWithWindow		Öffnen und zur Bevorzugten machen
 Are you sure you want to delete the selected item(s)? This operation cannot be reverted.	FSUtils		Sollen die ausgewählten Objekte wirklich gelöscht werden? Diese Aktion kann nicht rückgängig gemacht werden.
@@ -392,7 +392,6 @@ Icon view	DeskWindow		Icon-Ansicht
 Select all	QueryContainerWindow		Alles auswählen
 Files cannot be moved or deleted from a read-only volume.	PoseView		Dateien können auf einem schreibgeschützten Datenträger nicht verschoben oder gelöscht werden.
 There was a problem trying to replace \"%name\". The item might be open or busy.	FSUtils		Es ist ein Problem beim Ersetzen von \"%name\" aufgetreten. Das Objekt könnte geöffnet oder gerade in Benutzung sein.
-You cannot put the Trash, home or Desktop directory into the trash.	FSUtils		Der Papierkorb, der home-Ordner und der Desktop können nicht in den Papierkorb verschoben werden.
 Owner	FilePermissionsView		Besitzer
 There was a problem trying to save in the folder you specified. Please try another one.	FilePanelPriv		Es ist ein Problem beim Speichern in den angegebenen Ordner aufgetreten. Bitte einen anderen wählen.
 Restore	ContainerWindow		Wiederherstellen
@@ -411,7 +410,6 @@ Paste layout	ContainerWindow		Anordnung einfügen
 Select	InfoWindow		Auswählen
 Could not update permissions of file \"%name\". %error	FSUtils		Konnte die Berechtigungen der Datei \"%name\" nicht aktualisieren. %error
 Select…	FilePanelPriv		Auswählen…
-Don't move files to Trash	SettingsView		Dateien nicht in den Papierkorb verschieben
 There was an error resolving the link.	Tracker		Fehler beim Auflösen der Verknüpfung.
 %BytesPerSecond/s	StatusWindow		%BytesPerSecond/s
 You can't move or copy the trash.	FSUtils		Der Papierkorb kann nicht verschoben oder kopiert werden.
@@ -442,7 +440,6 @@ Automatic disk mounting	AutoMounterSettings		Automatisch Einhängen
 Original name	ContainerWindow		Ursprung
 Find	FSUtils		Suchen
 Error copying file \"%name\":\n\t%error\n\nWould you like to continue?	FSUtils		Fehler beim Kopieren der Datei \"%name\":\n\t%error\n\nSoll fortgefahren werden?
-Ask before delete	SettingsView		Vor dem Leeren nachfragen
 Single window navigation	SettingsView		Einzelfenster-Modus
 parent folder	NavMenu		Übergeordneter Ordner
 contains	FindPanel		enthält
@@ -452,6 +449,7 @@ Mount	DeskWindow		Einhängen
 Mount	ContainerWindow		Einhängen
 %capacity (%used used -- %free free)	InfoWindow		%capacity (%used benutzt -- %free frei)
 Cancel	FSClipBoard		Abbrechen
+Restart Deskbar	DeskWindow		Deskbar neu starten
 Cut more	ContainerWindow		Mehr ausschneiden
 Deleting: 	StatusWindow		Löschen:
 Empty Trash	InfoWindow		Papierkorb leeren
