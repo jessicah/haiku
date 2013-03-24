@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2012, Haiku, Inc. All rights reserved.
+ * Copyright 2007-2013, Haiku, Inc. All rights reserved.
  * Copyright 2001-2002 Dr. Zoidberg Enterprises. All rights reserved.
  * Copyright 2011, Clemens Zeidler <haiku@clemens-zeidler.de>
  * Distributed under the terms of the MIT License.
@@ -37,6 +37,9 @@
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "MailDaemon"
+
+
+static const uint32 kMsgAutoCheck = 'moto';
 
 
 struct send_mails_info {
@@ -304,7 +307,7 @@ void
 MailDaemonApplication::MessageReceived(BMessage* msg)
 {
 	switch (msg->what) {
-		case 'moto':
+		case kMsgAutoCheck:
 			// TODO: check whether internet is up and running!
 
 			// supposed to fall through
@@ -842,8 +845,13 @@ MailDaemonApplication::_UpdateAutoCheck(bigtime_t interval)
 			fAutoCheckRunner->SetInterval(interval);
 			fAutoCheckRunner->SetCount(-1);
 		} else {
-			fAutoCheckRunner = new BMessageRunner(be_app_messenger,
-				new BMessage('moto'), interval);
+			BMessage update(kMsgAutoCheck);
+			fAutoCheckRunner = new BMessageRunner(be_app_messenger, &update,
+				interval);
+
+			// Send one right away -- the message runner will wait until the
+			// first interval has passed before sending a message
+			PostMessage(&update);
 		}
 	} else {
 		delete fAutoCheckRunner;
