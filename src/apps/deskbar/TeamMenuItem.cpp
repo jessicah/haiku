@@ -50,6 +50,7 @@ All rights reserved.
 
 #include "BarApp.h"
 #include "BarMenuBar.h"
+#include "BarView.h"
 #include "ExpandoMenuBar.h"
 #include "ResourceSet.h"
 #include "ShowHideMenuItem.h"
@@ -66,14 +67,16 @@ const float kSwitchWidth = 12;
 
 TTeamMenuItem::TTeamMenuItem(BList* team, BBitmap* icon, char* name, char* sig,
 	float width, float height, bool drawLabel, bool vertical)
-	:	BMenuItem(new TWindowMenu(team, sig))
+	:
+	BMenuItem(new TWindowMenu(team, sig))
 {
 	_InitData(team, icon, name, sig, width, height, drawLabel, vertical);
 }
 
 
 TTeamMenuItem::TTeamMenuItem(float width, float height, bool vertical)
-	:	BMenuItem("", NULL)
+	:
+	BMenuItem("", NULL)
 {
 	_InitData(NULL, NULL, strdup(""), strdup(""), width, height, false,
 		vertical);
@@ -155,7 +158,7 @@ TTeamMenuItem::GetContentSize(float* width, float* height)
 {
 	BRect iconBounds;
 
-	if (fIcon)
+	if (fIcon != NULL)
 		iconBounds = fIcon->Bounds();
 	else
 		iconBounds = BRect(0, 0, kMinimumIconSize - 1, kMinimumIconSize - 1);
@@ -190,6 +193,7 @@ TTeamMenuItem::Draw()
 {
 	BRect frame(Frame());
 	BMenu* menu = Menu();
+
 	menu->PushState();
 
 	rgb_color menuColor = menu->LowColor();
@@ -224,6 +228,7 @@ TTeamMenuItem::Draw()
 
 	menu->MovePenTo(ContentLocation());
 	DrawContent();
+
 	menu->PopState();
 }
 
