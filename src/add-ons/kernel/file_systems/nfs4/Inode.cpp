@@ -60,6 +60,7 @@ Inode::CreateInode(FileSystem* fs, const FileInfo& fi, Inode** _inode)
 	inode->fInfo = fi;
 	inode->fFileSystem = fs;
 
+	uint32 attempt = 0;
 	uint64 size;
 	do {
 		RPC::Server* serv = fs->Server();
@@ -78,7 +79,7 @@ Inode::CreateInode(FileSystem* fs, const FileInfo& fi, Inode** _inode)
 
 		ReplyInterpreter& reply = request.Reply();
 
-		if (inode->HandleErrors(reply.NFS4Error(), serv))
+		if (inode->HandleErrors(attempt, reply.NFS4Error(), serv))
 			continue;
 
 		reply.PutFH();
@@ -86,7 +87,7 @@ Inode::CreateInode(FileSystem* fs, const FileInfo& fi, Inode** _inode)
 		AttrValue* values;
 		uint32 count;
 		result = reply.GetAttr(&values, &count);
-		if (result != B_OK || count < 4)
+		if (result != B_OK)
 			return result;
 
 		if (fi.fFileId == 0) {
@@ -109,6 +110,7 @@ Inode::CreateInode(FileSystem* fs, const FileInfo& fi, Inode** _inode)
 
 		// FATTR4_SIZE is mandatory
 		size = values[2].fData.fValue64;
+		inode->fMaxFileSize = size;
 
 		// FATTR4_FSID is mandatory
 		FileSystemId* fsid
@@ -169,13 +171,14 @@ Inode::RevalidateFileCache()
 	if (change == fChange)
 		return B_OK;
 
+	SyncAndCommit(true);
+	file_cache_delete(fFileCache);
+
 	struct stat st;
+	fMetaCache.InvalidateStat();
 	result = Stat(&st);
 	if (result != B_OK)
 		return result;
-
-	SyncAndCommit(true);
-	file_cache_delete(fFileCache);
 
 	fFileCache = file_cache_create(fFileSystem->DevId(), ID(), st.st_size);
 
@@ -232,14 +235,7 @@ Inode::Link(Inode* dir, const char* name)
 		return result;
 
 	fFileSystem->Root()->MakeInfoInvalid();
-
-	FileInfo fi = fInfo;
-	fi.fParent = dir->fInfo.fHandle;
-	result = fi.CreateName(fInfo.fPath, name);
-	if (result != B_OK)
-		return result;
-
-	fFileSystem->InoIdMap()->AddEntry(fi, fInfo.fFileId);
+	fInfo.fNames->AddName(dir->fInfo.fNames, name);
 
 	dir->fCache->Lock();
 	if (dir->fCache->Valid()) {
@@ -311,7 +307,7 @@ Inode::Remove(const char* name, FileType type, ino_t* id)
 
 status_t
 Inode::Rename(Inode* from, Inode* to, const char* fromName, const char* toName,
-	bool attribute, ino_t* id)
+	bool attribute, ino_t* id, ino_t* oldID)
 {
 	ASSERT(from != NULL);
 	ASSERT(fromName != NULL);
@@ -341,8 +337,12 @@ Inode::Rename(Inode* from, Inode* to, const char* fromName, const char* toName,
 			return B_NO_MEMORY;
 	}
 
-	ChangeInfo fromChange, toChange;
+	uint64 oldFileID = 0;
+	if (!attribute)
+		to->NFS4Inode::LookUp(toName, NULL, &oldFileID, NULL);
+
 	uint64 fileID;
+	ChangeInfo fromChange, toChange;
 	status_t result = NFS4Inode::RenameNode(from, to, fromName, toName,
 		&fromChange, &toChange, &fileID, attribute);
 	if (result != B_OK)
@@ -350,32 +350,37 @@ Inode::Rename(Inode* from, Inode* to, const char* fromName, const char* toName,
 
 	from->fFileSystem->Root()->MakeInfoInvalid();
 
+	if (id != NULL)
+		*id = FileIdToInoT(fileID);
+	if (oldID != NULL)
+		*oldID = FileIdToInoT(oldFileID);
+
 	DirectoryCache* cache = attribute ? from->fAttrCache : from->fCache;
 	cache->Lock();
 	if (cache->Valid()) {
-		if (fromChange.fAtomic
-			&& cache->ChangeInfo() == fromChange.fBefore) {
+		if (fromChange.fAtomic && cache->ChangeInfo() == fromChange.fBefore) {
 			cache->RemoveEntry(fromName);
+			if (to == from)
+				cache->AddEntry(toName, fileID, true);
 			cache->SetChangeInfo(fromChange.fAfter);
-		} else if (cache->ChangeInfo() != fromChange.fBefore)
+		} else
 			cache->Trash();
 	}
 	cache->Unlock();
 
-	if (id != NULL)
-		*id = FileIdToInoT(fileID);
-
-	cache = attribute ? to->fAttrCache : to->fCache;
-	cache->Lock();
-	if (cache->Valid()) {
-		if (toChange.fAtomic
-			&& cache->ChangeInfo() == toChange.fBefore) {
-			cache->AddEntry(toName, fileID, true);
-			cache->SetChangeInfo(toChange.fAfter);
-		} else if (to->fCache->ChangeInfo() != toChange.fBefore)
-			cache->Trash();
+	if (to != from) {
+		cache = attribute ? to->fAttrCache : to->fCache;
+		cache->Lock();
+		if (cache->Valid()) {
+			if (toChange.fAtomic
+				&& (cache->ChangeInfo() == toChange.fBefore)) {
+				cache->AddEntry(toName, fileID, true);
+				cache->SetChangeInfo(toChange.fAfter);
+			} else
+				cache->Trash();
+		}
+		cache->Unlock();
 	}
-	cache->Unlock();
 
 	if (attribute) {
 		notify_attribute_changed(from->fFileSystem->DevId(), from->ID(),
@@ -409,16 +414,16 @@ Inode::CreateObject(const char* name, const char* path, int mode, FileType type,
 	uint64 fileID;
 	FileHandle handle;
 
-	status_t result = NFS4Inode::CreateObject(name, path, mode, type, &changeInfo,
-		&fileID, &handle);
+	status_t result = NFS4Inode::CreateObject(name, path, mode, type,
+		&changeInfo, &fileID, &handle);
 	if (result != B_OK)
-		return B_OK;
+		return result;
 
 	fFileSystem->Root()->MakeInfoInvalid();
 
 	result = ChildAdded(name, fileID, handle);
 	if (result != B_OK)
-		return B_OK;
+		return result;
 
 	fCache->Lock();
 	if (fCache->Valid()) {
@@ -597,6 +602,9 @@ Inode::WriteStat(const struct stat* st, uint32 mask, OpenAttrCookie* cookie)
 	uint32 i = 0;
 
 	if ((mask & B_STAT_SIZE) != 0) {
+		fMaxFileSize = st->st_size;
+		file_cache_set_size(fFileCache, st->st_size);
+
 		attr[i].fAttribute = FATTR4_SIZE;
 		attr[i].fFreePointer = false;
 		attr[i].fData.fValue64 = st->st_size;
@@ -642,17 +650,16 @@ Inode::WriteStat(const struct stat* st, uint32 mask, OpenAttrCookie* cookie)
 
 	if (cookie == NULL) {
 		MutexLocker stateLocker(fStateLock);
-		ASSERT(fOpenState != NULL);
+		ASSERT(fOpenState != NULL || !(mask & B_STAT_SIZE));
 		result = NFS4Inode::WriteStat(fOpenState, attr, i);
-		stateLocker.Unlock();
-
-		fMetaCache.InvalidateStat();
-		if ((mask & B_STAT_MODE) != 0 || (mask & B_STAT_UID) != 0
-			|| (mask & B_STAT_GID) != 0) {
-			fMetaCache.InvalidateAccess();
-		}
 	} else
 		result = NFS4Inode::WriteStat(cookie->fOpenState, attr, i);
+
+	fMetaCache.InvalidateStat();
+
+	const uint32 kAccessMask = B_STAT_MODE | B_STAT_UID | B_STAT_GID;
+	if ((mask & kAccessMask) != 0)
+		fMetaCache.InvalidateAccess();
 
 	return result;
 }
@@ -755,8 +762,10 @@ Inode::AcquireLock(OpenFileCookie* cookie, const struct flock* lock,
 	linfo->fType = sGetLockType(lock->l_type, wait);
 
 	result = NFS4Inode::AcquireLock(cookie, linfo, wait);
-	if (result != B_OK)
+	if (result != B_OK) {
+		delete linfo;
 		return result;
+	}
 
 	MutexLocker _(state->fLocksLock);
 	state->AddLock(linfo);
@@ -865,19 +874,17 @@ Inode::ChildAdded(const char* name, uint64 fileID,
 	FileInfo fi;
 	fi.fFileId = fileID;
 	fi.fHandle = fileHandle;
-	fi.fParent = fInfo.fHandle;
-	status_t result = fi.CreateName(fInfo.fPath, name);
-	if (result != B_OK)
-		return result;
 
-	return fFileSystem->InoIdMap()->AddEntry(fi, FileIdToInoT(fileID));
+	return fFileSystem->InoIdMap()->AddName(fi, fInfo.fNames, name,
+		FileIdToInoT(fileID));
 }
 
 
 const char*
 Inode::Name() const
 {
-	return fInfo.fName;
+	ASSERT(fInfo.fNames->fNames.Head() != NULL);
+	return fInfo.fNames->fNames.Head()->fName;
 }
 
 

@@ -55,6 +55,18 @@ public:
 
 	static	X86PagingMethod64Bit* Method();
 
+	static	uint64*				PageDirectoryForAddress(uint64* virtualPML4,
+									addr_t virtualAddress, bool isKernel,
+									bool allocateTables,
+									vm_page_reservation* reservation,
+									TranslationMapPhysicalPageMapper*
+										pageMapper, int32& mapCount);
+	static	uint64*				PageDirectoryEntryForAddress(
+									uint64* virtualPML4, addr_t virtualAddress,
+									bool isKernel, bool allocateTables,
+									vm_page_reservation* reservation,
+									TranslationMapPhysicalPageMapper*
+										pageMapper, int32& mapCount);
 	static	uint64*				PageTableForAddress(uint64* virtualPML4,
 									addr_t virtualAddress, bool isKernel,
 									bool allocateTables,
@@ -84,6 +96,8 @@ public:
 									uint32 memoryType);
 
 private:
+	static	void				_EnableExecutionDisable(void* dummy, int cpu);
+
 			phys_addr_t			fKernelPhysicalPML4;
 			uint64*				fKernelVirtualPML4;
 

@@ -12,6 +12,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <util/Random.h>
+
 #include "Cookie.h"
 #include "OpenState.h"
 #include "RPCCallback.h"
@@ -516,11 +518,9 @@ RequestBuilder::Read(const uint32* id, uint32 stateSeq, uint64 pos, uint32 len)
 
 
 status_t
-RequestBuilder::ReadDir(uint32 count, uint64 cookie, uint64 cookieVerf,
-	Attribute* attrs, uint32 attrCount)
+RequestBuilder::ReadDir(uint64 cookie, uint64 cookieVerf, Attribute* attrs,
+	uint32 attrCount)
 {
-	(void)count;
-
 	if (fProcedure != ProcCompound)
 		return B_BAD_VALUE;
 	if (fRequest == NULL)
@@ -661,8 +661,7 @@ RequestBuilder::SetClientID(RPC::Server* server)
 		return B_NO_MEMORY;
 
 	fRequest->Stream().AddUInt(OpSetClientID);
-	uint64 verifier = rand();
-	verifier = verifier << 32 | rand();
+	uint64 verifier = get_random<uint64>();
 	fRequest->Stream().AddUHyper(verifier);
 
 	status_t result = _GenerateClientId(fRequest->Stream(), server);

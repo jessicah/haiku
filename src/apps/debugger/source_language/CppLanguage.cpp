@@ -1,11 +1,13 @@
 /*
  * Copyright 2009, Ingo Weinhold, ingo_weinhold@gmx.de.
- * Copyright 2012, Rene Gollent, rene@gollent.com.
+ * Copyright 2012-2013, Rene Gollent, rene@gollent.com.
  * Distributed under the terms of the MIT License.
  */
 
 
 #include "CppLanguage.h"
+
+#include <stdlib.h>
 
 #include "TeamTypeInformation.h"
 #include "Type.h"
@@ -39,19 +41,26 @@ CppLanguage::ParseTypeExpression(const BString &expression,
 
 	BString parsedName = expression;
 	BString baseTypeName;
+	BString arraySpecifier;
 	parsedName.RemoveAll(" ");
 
 	int32 modifierIndex = -1;
-	for (int32 i = parsedName.Length() - 1; i >= 0; i--) {
-		if (parsedName[i] == '*' || parsedName[i] == '&')
-			modifierIndex = i;
-	}
+	modifierIndex = parsedName.FindFirst('*');
+	if (modifierIndex == -1)
+		modifierIndex = parsedName.FindFirst('&');
+	if (modifierIndex == -1)
+		modifierIndex = parsedName.FindFirst('[');
 
-	if (modifierIndex >= 0) {
-		parsedName.CopyInto(baseTypeName, 0, modifierIndex);
-		parsedName.Remove(0, modifierIndex);
-	} else
+	if (modifierIndex >= 0)
+		parsedName.MoveInto(baseTypeName, 0, modifierIndex);
+	else
 		baseTypeName = parsedName;
+
+	modifierIndex = parsedName.FindFirst('[');
+	if (modifierIndex >= 0) {
+		parsedName.MoveInto(arraySpecifier, modifierIndex,
+			parsedName.Length() - modifierIndex);
+	}
 
 	result = info->LookupTypeByName(baseTypeName, TypeLookupConstraints(),
 		baseType);
@@ -100,6 +109,47 @@ CppLanguage::ParseTypeExpression(const BString &expression,
 		_resultType = derivedType;
 	} else
 		_resultType = baseType;
+
+
+	if (!arraySpecifier.IsEmpty()) {
+		ArrayType* arrayType = NULL;
+
+		int32 startIndex = 1;
+		do {
+			int32 size = strtoul(arraySpecifier.String() + startIndex,
+				NULL, 10);
+			if (size < 0)
+				return B_ERROR;
+
+			if (arrayType == NULL) {
+				result = _resultType->CreateDerivedArrayType(0, size, true,
+					arrayType);
+			} else {
+				result = arrayType->CreateDerivedArrayType(0, size, true,
+					arrayType);
+			}
+
+			if (result != B_OK)
+				return result;
+
+			typeRef.SetTo(arrayType, true);
+
+			startIndex = arraySpecifier.FindFirst('[', startIndex + 1);
+
+		} while (startIndex >= 0);
+
+		// since a C/C++ array is essentially pointer math,
+		// the resulting array has to be wrapped in a pointer to
+		// ensure the element addresses wind up being against the
+		// correct address.
+		AddressType* addressType = NULL;
+		result = arrayType->CreateDerivedAddressType(DERIVED_TYPE_POINTER,
+			addressType);
+		if (result != B_OK)
+			return result;
+
+		_resultType = addressType;
+	}
 
 	typeRef.Detach();
 

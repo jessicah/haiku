@@ -30,8 +30,6 @@
 #include <Application.h>
 #include <Beep.h>
 #include <Catalog.h>
-#include <CharacterSet.h>
-#include <CharacterSetRoster.h>
 #include <Clipboard.h>
 #include <Debug.h>
 #include <Directory.h>
@@ -66,8 +64,6 @@
 #include "TerminalCharClassifier.h"
 #include "VTkeymap.h"
 
-
-using namespace BPrivate ; // BCharacterSet stuff
 
 // defined in VTKeyTbl.c
 extern int function_keycode_table[];
@@ -364,10 +360,7 @@ TermView::_InitObject(const ShellParameters& shellParameters)
 
 	// set the shell parameters' encoding
 	ShellParameters modifiedShellParameters(shellParameters);
-
-	const BCharacterSet* charset
-		= BCharacterSetRoster::GetCharacterSetByConversionID(fEncoding);
-	modifiedShellParameters.SetEncoding(charset ? charset->GetName() : "UTF-8");
+	modifiedShellParameters.SetEncoding(fEncoding);
 
 	error = fShell->Open(fRows, fColumns, modifiedShellParameters);
 
@@ -505,8 +498,9 @@ TermView::_ConvertFromTerminal(const TermPos &pos)
 inline void
 TermView::_InvalidateTextRect(int32 x1, int32 y1, int32 x2, int32 y2)
 {
+	// assume the worst case with full-width characters - invalidate 2 cells
 	BRect rect(x1 * fFontWidth, _LineOffset(y1),
-		(x2 + 1) * fFontWidth - 1, _LineOffset(y2 + 1) - 1);
+		(x2 + 1) * fFontWidth * 2 - 1, _LineOffset(y2 + 1) - 1);
 //debug_printf("Invalidate((%f, %f) - (%f, %f))\n", rect.left, rect.top,
 //rect.right, rect.bottom);
 	Invalidate(rect);
@@ -699,6 +693,9 @@ void
 TermView::SetEncoding(int encoding)
 {
 	fEncoding = encoding;
+
+	if (fShell != NULL)
+		fShell->SetEncoding(fEncoding);
 
 	BAutolock _(fTextBuffer);
 	fTextBuffer->SetEncoding(fEncoding);
@@ -1034,12 +1031,8 @@ TermView::_DrawCursor()
 	if (fVisibleTextBuffer->GetChar(fCursor.y - firstVisible, fCursor.x,
 			character, attr) == A_CHAR
 			&& (fCursorStyle == BLOCK_CURSOR || !cursorVisible)) {
-		int32 width;
-		if (IS_WIDTH(attr))
-			width = 2;
-		else
-			width = 1;
 
+		int32 width = IS_WIDTH(attr) ? FULL_WIDTH : HALF_WIDTH;
 		char buffer[5];
 		int32 bytes = UTF8Char::ByteCount(character.bytes[0]);
 		memcpy(buffer, character.bytes, bytes);
@@ -1067,6 +1060,9 @@ TermView::_DrawCursor()
 				rgb_back = fTextBuffer->PaletteColor(IS_BACKCOLOR(attr));
 			SetHighColor(rgb_back);
 		}
+
+		if (IS_WIDTH(attr) && fCursorStyle != IBEAM_CURSOR)
+			rect.right += fFontWidth;
 
 		FillRect(rect);
 	}
@@ -1291,8 +1287,13 @@ TermView::Draw(BRect updateRect)
 					continue;
 				}
 
+				// Note: full-width characters GetString()-ed always
+				// with count 1, so this hardcoding is safe. From the other
+				// side - drawing the whole string with one call render the
+				// characters not aligned to cells grid - that looks much more
+				// inaccurate for full-width strings than for half-width ones.
 				if (IS_WIDTH(attr))
-					count = 2;
+					count = FULL_WIDTH;
 
 				_DrawLinePart(fFontWidth * i, (int32)_LineOffset(j),
 					attr, buf, count, insideSelection, false, this);

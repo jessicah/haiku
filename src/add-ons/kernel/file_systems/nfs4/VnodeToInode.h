@@ -28,7 +28,7 @@ public:
 			Inode*		Get();
 			void		Replace(Inode* newInode);
 
-	inline	void		Remove();
+			bool		Unlink(InodeNames* parent, const char* name);
 	inline	void		Clear();
 
 	inline	ino_t		ID() const;
@@ -72,7 +72,7 @@ VnodeToInode::VnodeToInode(ino_t id, FileSystem* fileSystem)
 inline
 VnodeToInode::~VnodeToInode()
 {
-	Remove();
+	Clear();
 	if (fFileSystem != NULL && !IsRoot())
 		fFileSystem->InoIdMap()->RemoveEntry(fID);
 	rw_lock_destroy(&fLock);
@@ -94,19 +94,9 @@ VnodeToInode::Unlock()
 
 
 inline void
-VnodeToInode::Remove()
-{
-	Replace(NULL);
-}
-
-
-inline void
 VnodeToInode::Clear()
 {
-	WriteLocker _(fLock);
-	if (!IsRoot())
-		delete fInode;
-	fInode = NULL;
+	Replace(NULL);
 }
 
 

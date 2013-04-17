@@ -1,4 +1,4 @@
-1	russian	x-vnd.Haiku-Terminal	766764238
+1	russian	x-vnd.Haiku-Terminal	328707356
 Not found.	Terminal TermWindow		Текст не найден
 Switch Terminals	Terminal TermWindow		Переключить терминалы
 Change directory	Terminal TermView		Сменить каталог
@@ -21,6 +21,7 @@ Font:	Terminal AppearancePrefView		Шрифт:
 Copy here	Terminal TermView		Копировать сюда
 Really close?	Terminal TermWindow		Действительно закрыть?
 Copy	Terminal TermWindow		Копировать
+Terminal	Terminal TermWindow	The title for the main window menubar entry related to terminal sessions	Терминал
 Color scheme:	Terminal AppearancePrefView		Цветовая схема:
 Window title:	Terminal TermWindow		Заголовок окна:
 Unrecognized option \"%s\"\n	Terminal arguments parsing		Нераспознанная опция \"%s\"\n

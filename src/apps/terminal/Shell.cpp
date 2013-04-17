@@ -74,7 +74,7 @@
 
 // TODO: should extract from /etc/passwd instead???
 const char *kDefaultShell = "/bin/sh";
-const char *kTerminalType = "xterm-256color";
+const char *kTerminalType = "xterm";
 
 /*
  * Set environment variable.
@@ -412,6 +412,8 @@ Shell::_Spawn(int row, int col, const ShellParameters& parameters)
 	} else
 		fShellInfo.SetDefaultShell(false);
 
+	fShellInfo.SetEncoding(parameters.Encoding());
+
 	signal(SIGTTOU, SIG_IGN);
 
 	// get a pseudo-tty
@@ -548,7 +550,7 @@ Shell::_Spawn(int row, int col, const ShellParameters& parameters)
 		 */
 		setenv("TERM", kTerminalType, true);
 		setenv("TTY", ttyName, true);
-		setenv("TTYPE", parameters.Encoding(), true);
+		setenv("TTYPE", fShellInfo.EncodingName(), true);
 
 		// set the current working directory, if one is given
 		if (parameters.CurrentDirectory().Length() > 0)

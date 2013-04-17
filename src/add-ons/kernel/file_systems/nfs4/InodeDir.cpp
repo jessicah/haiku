@@ -146,6 +146,7 @@ Inode::ReadDirUp(struct dirent* de, uint32 pos, uint32 size)
 {
 	ASSERT(de != NULL);
 
+	uint32 attempt = 0;
 	do {
 		RPC::Server* serv = fFileSystem->Server();
 		Request request(serv, fFileSystem);
@@ -166,7 +167,7 @@ Inode::ReadDirUp(struct dirent* de, uint32 pos, uint32 size)
 
 		ReplyInterpreter& reply = request.Reply();
 
-		if (HandleErrors(reply.NFS4Error(), serv))
+		if (HandleErrors(attempt, reply.NFS4Error(), serv))
 			continue;
 
 		reply.PutFH();
@@ -181,7 +182,7 @@ Inode::ReadDirUp(struct dirent* de, uint32 pos, uint32 size)
 		if (fFileSystem->IsAttrSupported(FATTR4_FILEID)) {
 			AttrValue* values;
 			uint32 count;
-			reply.GetAttr(&values, &count);
+			result = reply.GetAttr(&values, &count);
 			if (result != B_OK)
 				return result;
 

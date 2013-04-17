@@ -36,13 +36,12 @@ Inode::CreateState(const char* name, int mode, int perms, OpenState* state,
 	if (result != B_OK)
 		return result;
 
-	FileInfo fi;
-	fi.fFileId = fileID;
-	fi.fHandle = handle;
-	fi.fParent = fInfo.fHandle;
-	fi.CreateName(fInfo.fPath, name);
+	FileInfo fileInfo;
+	fileInfo.fFileId = fileID;
+	fileInfo.fHandle = handle;
 
-	fFileSystem->InoIdMap()->AddEntry(fi, FileIdToInoT(fileID));
+	fFileSystem->InoIdMap()->AddName(fileInfo, fInfo.fNames, name,
+		FileIdToInoT(fileID));
 
 	fCache->Lock();
 	if (fCache->Valid()) {
@@ -56,7 +55,7 @@ Inode::CreateState(const char* name, int mode, int perms, OpenState* state,
 	fCache->Unlock();
 
 	state->fFileSystem = fFileSystem;
-	state->fInfo = fi;
+	state->fInfo = fileInfo;
 	state->fMode = mode & O_RWMASK;
 
 	return B_OK;
@@ -74,10 +73,15 @@ Inode::Create(const char* name, int mode, int perms, OpenFileCookie* cookie,
 	cookie->fMode = mode;
 	cookie->fLocks = NULL;
 
-	OpenState* state = new OpenState;
+	OpenState* state = new(std::nothrow) OpenState;
+	if (state == NULL)
+		return B_NO_MEMORY;
+
 	status_t result = CreateState(name, mode, perms, state, data);
-	if (result != B_OK)
+	if (result != B_OK) {
+		delete state;
 		return result;
+	}
 
 	cookie->fOpenState = state;
 	cookie->fFileSystem = fFileSystem;
@@ -105,7 +109,7 @@ Inode::Open(int mode, OpenFileCookie* cookie)
 	if (fOpenState == NULL) {
 		RevalidateFileCache();
 
-		OpenState* state = new OpenState;
+		OpenState* state = new(std::nothrow) OpenState;
 		if (state == NULL)
 			return B_NO_MEMORY;
 
@@ -113,8 +117,10 @@ Inode::Open(int mode, OpenFileCookie* cookie)
 		state->fFileSystem = fFileSystem;
 		state->fMode = mode & O_RWMASK;
 		status_t result = OpenFile(state, mode, &data);
-		if (result != B_OK)
+		if (result != B_OK) {
+			delete state;
 			return result;
+		}
 
 		fFileSystem->AddOpenFile(state);
 		fOpenState = state;
@@ -246,8 +252,6 @@ Inode::OpenAttr(const char* _name, int mode, OpenAttrCookie* cookie,
 	if (state == NULL)
 		return B_NO_MEMORY;
 
-	state->fInfo.fName = strdup(name);
-	state->fInfo.fParent = fInfo.fAttrDir;
 	state->fFileSystem = fFileSystem;
 	result = NFS4Inode::OpenAttr(state, name, mode, &data, create);
 	if (result != B_OK) {
@@ -406,25 +410,28 @@ Inode::Write(OpenFileCookie* cookie, off_t pos, const void* _buffer,
 	ASSERT(_buffer != NULL);
 	ASSERT(_length != NULL);
 
-	struct stat st;
-	status_t result = Stat(&st);
-	if (result != B_OK)
-		return result;
+	if (pos < 0)
+		pos = 0;
+
+	if ((cookie->fMode & O_RWMASK) == O_RDONLY)
+		return B_NOT_ALLOWED;
 
 	if ((cookie->fMode & O_APPEND) != 0)
-		pos = st.st_size;
+		pos = fMaxFileSize;
 
-	uint64 fileSize = max_c(st.st_size, pos + *_length);
-	fMaxFileSize = max_c(fMaxFileSize, fileSize);
+	uint64 fileSize = max_c((off_t)fMaxFileSize, pos + *_length);
+	if (fileSize > fMaxFileSize) {
+		status_t result = file_cache_set_size(fFileCache, fileSize);
+		if (result != B_OK)
+			return result;
+		fMaxFileSize = fileSize;
+		fMetaCache.GrowFile(fMaxFileSize);
+	}
 
 	if ((cookie->fMode & O_NOCACHE) != 0) {
 		WriteDirect(cookie, pos, _buffer, _length);
 		Commit();
 	}
-
-	result = file_cache_set_size(fFileCache, fileSize);
-	if (result != B_OK)
-		return result;
 
 	return file_cache_write(fFileCache, cookie, pos, _buffer, _length);
 }

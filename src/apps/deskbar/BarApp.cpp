@@ -37,8 +37,6 @@ All rights reserved.
 #include "BarApp.h"
 
 #include <locale.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include <AppFileInfo.h>
 #include <Autolock.h>
@@ -94,10 +92,11 @@ main()
 
 
 TBarApp::TBarApp()
-	:	BApplication(kDeskbarSignature),
-		fSettingsFile(NULL),
-		fClockSettingsFile(NULL),
-		fPreferencesWindow(NULL)
+	:
+	BApplication(kDeskbarSignature),
+	fSettingsFile(NULL),
+	fClockSettingsFile(NULL),
+	fPreferencesWindow(NULL)
 {
 	InitSettings();
 	InitIconPreloader();
@@ -126,17 +125,14 @@ TBarApp::TBarApp()
 	}
 
 	sSubscribers.MakeEmpty();
-
 	fSwitcherMessenger = BMessenger(new TSwitchManager(fSettings.switcherLoc));
-
 	fBarWindow->Show();
 
-	// Call UpdatePlacement() after the window is shown because expanded apps
-	// need to resize the window.
-	if (fBarWindow->Lock()) {
-		fBarView->UpdatePlacement();
-		fBarWindow->Unlock();
-	}
+	// Call UpdatePlacement() after the window is shown because expanded
+	// apps need to resize the window.
+	fBarWindow->Lock();
+	fBarView->UpdatePlacement();
+	fBarWindow->Unlock();
 
 	// this messenger now targets the barview instead of the
 	// statusview so that all additions to the tray
@@ -195,7 +191,7 @@ TBarApp::SaveSettings()
 		prefs.AddBool("vertical", fSettings.vertical);
 		prefs.AddBool("left", fSettings.left);
 		prefs.AddBool("top", fSettings.top);
-		prefs.AddUInt32("state", fSettings.state);
+		prefs.AddInt32("state", fSettings.state);
 		prefs.AddFloat("width", fSettings.width);
 		prefs.AddPoint("switcherLoc", fSettings.switcherLoc);
 		prefs.AddBool("showClock", fSettings.showClock);
@@ -295,7 +291,7 @@ TBarApp::InitSettings()
 				fDefaultSettings.left);
 			settings.top = prefs.GetBool("top",
 				fDefaultSettings.top);
-			settings.state = prefs.GetUInt32("state",
+			settings.state = prefs.GetInt32("state",
 				fDefaultSettings.state);
 			settings.width = prefs.GetFloat("width",
 				fDefaultSettings.width);
@@ -470,10 +466,12 @@ TBarApp::MessageReceived(BMessage* message)
 
 		case kAlwaysTop:
 			fSettings.alwaysOnTop = !fSettings.alwaysOnTop;
-			fBarWindow->SetFeel(fSettings.alwaysOnTop ?
-				B_FLOATING_ALL_WINDOW_FEEL : B_NORMAL_WINDOW_FEEL);
+
 			if (fPreferencesWindow != NULL)
 				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			fBarWindow->SetFeel(fSettings.alwaysOnTop ?
+				B_FLOATING_ALL_WINDOW_FEEL : B_NORMAL_WINDOW_FEEL);
 			break;
 
 		case kAutoRaise:
@@ -487,34 +485,44 @@ TBarApp::MessageReceived(BMessage* message)
 		case kAutoHide:
 			fSettings.autoHide = !fSettings.autoHide;
 
+			if (fPreferencesWindow != NULL)
+				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
 			fBarWindow->Lock();
 			fBarView->HideDeskbar(fSettings.autoHide);
 			fBarWindow->Unlock();
-
-			if (fPreferencesWindow != NULL)
-				fPreferencesWindow->PostMessage(kUpdatePreferences);
 			break;
 
 		case kTrackerFirst:
 			fSettings.trackerAlwaysFirst = !fSettings.trackerAlwaysFirst;
 
-			fBarWindow->Lock();
-			fBarView->PlaceApplicationBar();
-			fBarWindow->Unlock();
-
 			if (fPreferencesWindow != NULL)
 				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			// if mini mode we don't need to update the view
+			if (fBarView->MiniState())
+				break;
+
+			fBarWindow->Lock();
+			fBarView->SaveExpandedItems();
+			fBarView->PlaceApplicationBar();
+			fBarWindow->Unlock();
 			break;
 
 		case kSortRunningApps:
 			fSettings.sortRunningApps = !fSettings.sortRunningApps;
 
-			fBarWindow->Lock();
-			fBarView->PlaceApplicationBar();
-			fBarWindow->Unlock();
-
 			if (fPreferencesWindow != NULL)
 				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			// if mini mode we don't need to update the view
+			if (fBarView->MiniState())
+				break;
+
+			fBarWindow->Lock();
+			fBarView->SaveExpandedItems();
+			fBarView->PlaceApplicationBar();
+			fBarWindow->Unlock();
 			break;
 
 		case kUnsubscribe:
@@ -528,65 +536,89 @@ TBarApp::MessageReceived(BMessage* message)
 		case kSuperExpando:
 			fSettings.superExpando = !fSettings.superExpando;
 
-			fBarWindow->Lock();
-			fBarView->PlaceApplicationBar();
-			fBarWindow->Unlock();
-
 			if (fPreferencesWindow != NULL)
 				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			// if mini mode we don't need to update the view
+			if (fBarView->MiniState())
+				break;
+
+			fBarWindow->Lock();
+			fBarView->SaveExpandedItems();
+			fBarView->PlaceApplicationBar();
+			fBarWindow->Unlock();
 			break;
 
 		case kExpandNewTeams:
 			fSettings.expandNewTeams = !fSettings.expandNewTeams;
 
-			fBarWindow->Lock();
-			fBarView->PlaceApplicationBar();
-			fBarWindow->Unlock();
-
 			if (fPreferencesWindow != NULL)
 				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			// if mini mode we don't need to update the view
+			if (fBarView->MiniState())
+				break;
+
+			fBarWindow->Lock();
+			fBarView->SaveExpandedItems();
+			fBarView->PlaceApplicationBar();
+			fBarWindow->Unlock();
 			break;
 
 		case kHideLabels:
 			fSettings.hideLabels = !fSettings.hideLabels;
 
-			fBarWindow->Lock();
-			fBarView->PlaceApplicationBar();
-			fBarWindow->Unlock();
-
 			if (fPreferencesWindow != NULL)
 				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			// if mini mode we don't need to update the view
+			if (fBarView->MiniState())
+				break;
+
+			fBarWindow->Lock();
+			fBarView->SaveExpandedItems();
+			fBarView->PlaceApplicationBar();
+			fBarWindow->Unlock();
 			break;
 
 		case kResizeTeamIcons:
 		{
+			int32 oldIconSize = fSettings.iconSize;
 			int32 iconSize;
-
 			if (message->FindInt32("be:value", &iconSize) != B_OK)
 				break;
 
 			fSettings.iconSize = iconSize * kIconSizeInterval;
 
+			// pin icon size between min and max values
 			if (fSettings.iconSize < kMinimumIconSize)
 				fSettings.iconSize = kMinimumIconSize;
 			else if (fSettings.iconSize > kMaximumIconSize)
 				fSettings.iconSize = kMaximumIconSize;
 
+			// don't resize if icon size hasn't changed
+			if (fSettings.iconSize == oldIconSize)
+				break;
+
 			ResizeTeamIcons();
 
+			if (fPreferencesWindow != NULL)
+				fPreferencesWindow->PostMessage(kUpdatePreferences);
+
+			// if mini mode we don't need to update the view
 			if (fBarView->MiniState())
 				break;
 
 			fBarWindow->Lock();
-			if (fBarView->Vertical())
-				fBarView->PlaceApplicationBar();
-			else
-				fBarView->UpdatePlacement();
-
+			fBarView->SaveExpandedItems();
+			if (!fBarView->Vertical()) {
+				// Must also resize the Deskbar menu and replicant tray in
+				// horizontal mode
+				fBarView->PlaceDeskbarMenu();
+				fBarView->PlaceTray(false, false);
+			}
+			fBarView->PlaceApplicationBar();
 			fBarWindow->Unlock();
-
-			if (fPreferencesWindow != NULL)
-				fPreferencesWindow->PostMessage(kUpdatePreferences);
 			break;
 		}
 
@@ -719,6 +751,12 @@ TBarApp::Unsubscribe(const BMessenger &subscriber)
 void
 TBarApp::AddTeam(team_id team, uint32 flags, const char* sig, entry_ref* ref)
 {
+	if ((flags & B_BACKGROUND_APP) != 0
+		|| strcasecmp(sig, kDeskbarSignature) == 0) {
+		// it's a background app or Deskbar itself, don't add it
+		return;
+	}
+
 	BAutolock autolock(sSubscriberLock);
 	if (!autolock.IsLocked())
 		return;
@@ -761,15 +799,9 @@ TBarApp::AddTeam(team_id team, uint32 flags, const char* sig, entry_ref* ref)
 	}
 
 	BarTeamInfo* barInfo = new BarTeamInfo(new BList(), flags, strdup(sig),
-		new BBitmap(IconRect(), kIconColorSpace), strdup(name.String()));
-
-	if ((barInfo->flags & B_BACKGROUND_APP) == 0
-		&& strcasecmp(barInfo->sig, kDeskbarSignature) != 0) {
-		FetchAppIcon(barInfo->sig, barInfo->icon);
-	}
-
+		NULL, strdup(name.String()));
+	FetchAppIcon(barInfo);
 	barInfo->teams->AddItem((void*)(addr_t)team);
-
 	sBarTeamInfoList.AddItem(barInfo);
 
 	if (fSettings.expandNewTeams)
@@ -835,13 +867,11 @@ TBarApp::RemoveTeam(team_id team)
 void
 TBarApp::ResizeTeamIcons()
 {
-	for (int32 i = 0; i < sBarTeamInfoList.CountItems(); i++) {
+	for (int32 i = sBarTeamInfoList.CountItems() - 1; i >= 0; i--) {
 		BarTeamInfo* barInfo = (BarTeamInfo*)sBarTeamInfoList.ItemAt(i);
 		if ((barInfo->flags & B_BACKGROUND_APP) == 0
 			&& strcasecmp(barInfo->sig, kDeskbarSignature) != 0) {
-			delete barInfo->icon;
-			barInfo->icon = new BBitmap(IconRect(), kIconColorSpace);
-			FetchAppIcon(barInfo->sig, barInfo->icon);
+			FetchAppIcon(barInfo);
 		}
 	}
 }
@@ -886,26 +916,40 @@ TBarApp::QuitPreferencesWindow()
 
 
 void
-TBarApp::FetchAppIcon(const char* signature, BBitmap* icon)
+TBarApp::FetchAppIcon(BarTeamInfo* barInfo)
 {
-	app_info appInfo;
-	icon_size size = icon->Bounds().IntegerHeight() >= 31
-		? B_LARGE_ICON : B_MINI_ICON;
+	int32 width = IconSize();
+	int32 index = (width - kMinimumIconSize) / kIconSizeInterval;
 
-	if (be_roster->GetAppInfo(signature, &appInfo) == B_OK) {
+	// first look in the icon cache
+	barInfo->icon = barInfo->iconCache[index];
+	if (barInfo->icon != NULL)
+		return;
+
+	// icon wasn't in cache, get it from be_roster and cache it
+	app_info appInfo;
+	icon_size size = width >= 31 ? B_LARGE_ICON : B_MINI_ICON;
+	BBitmap* icon = new BBitmap(IconRect(), kIconColorSpace);
+	if (be_roster->GetAppInfo(barInfo->sig, &appInfo) == B_OK) {
 		// fetch the app icon
 		BFile file(&appInfo.ref, B_READ_ONLY);
 		BAppFileInfo appMime(&file);
-		if (appMime.GetIcon(icon, size) == B_OK)
+		if (appMime.GetIcon(icon, size) == B_OK) {
+			delete barInfo->iconCache[index];
+			barInfo->iconCache[index] = barInfo->icon = icon;
 			return;
+		}
 	}
 
 	// couldn't find the app icon
-	// fetch the generic 3 boxes icon
+	// fetch the generic 3 boxes icon and cache it
 	BMimeType defaultAppMime;
 	defaultAppMime.SetTo(B_APP_MIME_TYPE);
-	if (defaultAppMime.GetIcon(icon, size) == B_OK)
+	if (defaultAppMime.GetIcon(icon, size) == B_OK) {
+		delete barInfo->iconCache[index];
+		barInfo->iconCache[index] = barInfo->icon = icon;
 		return;
+	}
 
 	// couldn't find generic 3 boxes icon
 	// fill with transparent
@@ -923,6 +967,9 @@ TBarApp::FetchAppIcon(const char* signature, BBitmap* icon)
 		for (int32 i = 0; i < icon->BitsLength(); i++)
 			iconBits[i] = B_TRANSPARENT_MAGIC_CMAP8;
 	}
+
+	delete barInfo->iconCache[index];
+	barInfo->iconCache[index] = NULL;
 }
 
 
@@ -939,22 +986,26 @@ TBarApp::IconRect()
 
 BarTeamInfo::BarTeamInfo(BList* teams, uint32 flags, char* sig, BBitmap* icon,
 	char* name)
-	:	teams(teams),
-		flags(flags),
-		sig(sig),
-		icon(icon),
-		name(name)
+	:
+	teams(teams),
+	flags(flags),
+	sig(sig),
+	icon(icon),
+	name(name)
 {
+	_Init();
 }
 
 
 BarTeamInfo::BarTeamInfo(const BarTeamInfo &info)
-	:	teams(new BList(*info.teams)),
-		flags(info.flags),
-		sig(strdup(info.sig)),
-		icon(new BBitmap(*info.icon)),
-		name(strdup(info.name))
+	:
+	teams(new BList(*info.teams)),
+	flags(info.flags),
+	sig(strdup(info.sig)),
+	icon(new BBitmap(*info.icon)),
+	name(strdup(info.name))
 {
+	_Init();
 }
 
 
@@ -962,6 +1013,15 @@ BarTeamInfo::~BarTeamInfo()
 {
 	delete teams;
 	free(sig);
-	delete icon;
 	free(name);
+	for (int32 i = 0; i < kIconCacheCount; i++)
+		delete iconCache[i];
+}
+
+
+void
+BarTeamInfo::_Init()
+{
+	for (int32 i = 0; i < kIconCacheCount; i++)
+		iconCache[i] = NULL;
 }

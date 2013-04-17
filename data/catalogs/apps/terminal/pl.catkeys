@@ -1,4 +1,4 @@
-1	polish	x-vnd.Haiku-Terminal	2997644674
+1	polish	x-vnd.Haiku-Terminal	328707356
 Not found.	Terminal TermWindow		Nie znaleziono.
 Switch Terminals	Terminal TermWindow		Przełącz Terminal
 Change directory	Terminal TermView		Zmień folder
@@ -69,6 +69,7 @@ The pattern specifying the tab titles. The following placeholders\ncan be used:\
 Selected background	Terminal AppearancePrefView		Wybrane tło
 Slate	Terminal colors scheme		Ciemnopopielaty
 Text under cursor	Terminal AppearancePrefView		Tekst pod kursorem
+Midnight	Terminal colors scheme		O północy
 Decrease	Terminal TermWindow		Zmniejsz
 Default	Terminal colors scheme		Domyślny
 Create link here	Terminal TermView		Utwórz link tutaj
