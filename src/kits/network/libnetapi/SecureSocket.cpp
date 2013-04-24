@@ -1,5 +1,5 @@
 /*
- * Copyright 2011, Axel Dörfler, axeld@pinc-software.de.
+ * Copyright 2011-2013, Axel Dörfler, axeld@pinc-software.de.
  * Copyright 2010, Clemens Zeidler <haiku@clemens-zeidler.de>
  * Distributed under the terms of the MIT License.
  */
@@ -28,7 +28,29 @@ public:
 			SSL_CTX*			fCTX;
 			SSL*				fSSL;
 			BIO*				fBIO;
+
+	status_t ErrorCode(int returnValue)
+	{
+		int error = SSL_get_error(fSSL, returnValue);
+		// TODO: translate SSL error codes!
+		fprintf(stderr, "SSL error: %d\n", error);
+		switch (error) {
+			case SSL_ERROR_ZERO_RETURN:
+			case SSL_ERROR_WANT_READ:
+			case SSL_ERROR_WANT_WRITE:
+			case SSL_ERROR_WANT_CONNECT:
+			case SSL_ERROR_WANT_ACCEPT:
+			case SSL_ERROR_WANT_X509_LOOKUP:
+			case SSL_ERROR_SYSCALL:
+			case SSL_ERROR_SSL:
+				break;
+		}
+		return B_ERROR;
+	}
 };
+
+
+// #pragma mark -
 
 
 BSecureSocket::BSecureSocket()
@@ -84,11 +106,11 @@ BSecureSocket::Connect(const BNetworkAddress& peer, bigtime_t timeout)
 	fPrivate->fBIO = BIO_new_socket(fSocket, BIO_NOCLOSE);
 	SSL_set_bio(fPrivate->fSSL, fPrivate->fBIO, fPrivate->fBIO);
 
-	if (SSL_connect(fPrivate->fSSL) <= 0) {
+	int returnValue = SSL_connect(fPrivate->fSSL);
+	if (returnValue <= 0) {
 		TRACE("SSLConnection can't connect\n");
 		BSocket::Disconnect();
-		// TODO: translate ssl to Haiku error
-		return B_ERROR;
+		return fPrivate->ErrorCode(returnValue);
 	}
 
 	return B_OK;
@@ -144,8 +166,7 @@ BSecureSocket::Read(void* buffer, size_t size)
 	if (bytesRead >= 0)
 		return bytesRead;
 
-	// TODO: translate SSL error codes!
-	return B_ERROR;
+	return fPrivate->ErrorCode(bytesRead);
 }
 
 
@@ -159,8 +180,7 @@ BSecureSocket::Write(const void* buffer, size_t size)
 	if (bytesWritten >= 0)
 		return bytesWritten;
 
-	// TODO: translate SSL error codes!
-	return B_ERROR;
+	return fPrivate->ErrorCode(bytesWritten);
 }
 
 
