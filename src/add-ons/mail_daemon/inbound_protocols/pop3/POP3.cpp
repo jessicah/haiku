@@ -23,9 +23,9 @@
 #include <arpa/inet.h>
 
 #if USE_SSL
-#include <openssl/md5.h>
+#	include <openssl/md5.h>
 #else
-#include "md5.h"
+#	include "md5.h"
 #endif
 
 #include <Alert.h>
@@ -485,7 +485,8 @@ POP3Protocol::Stat()
 
 	int32 messages;
 	int32 dropSize;
-	if (sscanf(fLog.String(), "+OK %ld %ld", &messages, &dropSize) < 2)
+	if (sscanf(fLog.String(), "+OK %" B_SCNd32" %" B_SCNd32, &messages,
+			&dropSize) < 2)
 		return B_ERROR;
 
 	fNumMessages = messages;
@@ -581,11 +582,11 @@ POP3Protocol::Retrieve(int32 message, BPositionIO* to)
 		int32 size = MessageSize(message);
  		to->Seek(0, SEEK_END);
 		if (to->Position() != size) {
-			printf("POP3Protocol::Retrieve Note: message size is %d, was "
-				"expecting %ld, for message #%ld.  Could be a transmission "
-				"error or a bad POP server implementation (does it remove "
-				"escape codes when it counts size?).\n",
-				(int)to->Position(), size, message);
+			printf("POP3Protocol::Retrieve Note: message size is %" B_PRIdOFF
+				", was expecting %" B_PRId32 ", for message #%" B_PRId32 ".  "
+				"Could be a transmission error or a bad POP server "
+				"implementation (does it remove escape codes when it counts "
+				"size?).\n", to->Position(), size, message);
 		}
 	}
 
@@ -898,7 +899,7 @@ POP3Protocol::_RetrieveUniqueIDs()
 			size = 0;
 
 		fTotalSize += size;
-		fSizes.AddItem((void*)size);
+		fSizes.AddItem((void*)(addr_t)size);
 	}
 
 	return B_OK;

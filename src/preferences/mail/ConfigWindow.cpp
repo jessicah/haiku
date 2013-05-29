@@ -677,7 +677,6 @@ ConfigWindow::_SetToGeneralSettings(BMailSettings* settings)
 
 	if (interval == 0)
 		interval = 5;
-
 	BString intervalText;
 	intervalText.SetToFormat("%" B_PRIu32, interval);
 	fIntervalControl->SetText(intervalText.String());
