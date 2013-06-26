@@ -218,7 +218,9 @@ TeamDebugger::TeamDebugger(Listener* listener, UserInterface* userInterface,
 	fDebugEventListener(-1),
 	fUserInterface(userInterface),
 	fTerminating(false),
-	fKillTeamOnQuit(false)
+	fKillTeamOnQuit(false),
+	fCommandLineArgc(0),
+	fCommandLineArgv(NULL)
 {
 	fUserInterface->AcquireReference();
 }
@@ -293,12 +295,20 @@ TeamDebugger::~TeamDebugger()
 	delete fTeam;
 	delete fFileManager;
 
+	for (int i = 0; i < fCommandLineArgc; i++) {
+		if (fCommandLineArgv[i] != NULL)
+			free(const_cast<char*>(fCommandLineArgv[i]));
+	}
+
+	delete [] fCommandLineArgv;
+
 	fListener->TeamDebuggerQuit(this);
 }
 
 
 status_t
-TeamDebugger::Init(team_id teamID, thread_id threadID, bool stopInMain)
+TeamDebugger::Init(team_id teamID, thread_id threadID, int argc,
+	const char* const* argv, bool stopInMain)
 {
 	bool targetIsLocal = true;
 		// TODO: Support non-local targets!
@@ -308,12 +318,16 @@ TeamDebugger::Init(team_id teamID, thread_id threadID, bool stopInMain)
 
 	fTeamID = teamID;
 
+	status_t error = _HandleSetArguments(argc, argv);
+	if (error != B_OK)
+		return error;
+
 	// create debugger interface
 	fDebuggerInterface = new(std::nothrow) DebuggerInterface(fTeamID);
 	if (fDebuggerInterface == NULL)
 		return B_NO_MEMORY;
 
-	status_t error = fDebuggerInterface->Init();
+	error = fDebuggerInterface->Init();
 	if (error != B_OK)
 		return error;
 
@@ -568,10 +582,14 @@ TeamDebugger::MessageReceived(BMessage* message)
 				if (message->FindBool("enabled", &enabled) != B_OK)
 					enabled = true;
 
+				bool hidden;
+				if (message->FindBool("hidden", &hidden) != B_OK)
+					hidden = false;
+
 				if (breakpoint != NULL)
 					_HandleSetUserBreakpoint(breakpoint, enabled);
 				else
-					_HandleSetUserBreakpoint(address, enabled);
+					_HandleSetUserBreakpoint(address, enabled, hidden);
 			} else {
 				if (breakpoint != NULL)
 					_HandleClearUserBreakpoint(breakpoint);
@@ -717,6 +735,16 @@ TeamDebugger::MessageReceived(BMessage* message)
 			Activate();
 			break;
 
+		case MSG_TEAM_RESTART_REQUESTED:
+		{
+			if (fCommandLineArgc == 0)
+				break;
+
+			_SaveSettings();
+			fListener->TeamDebuggerRestartRequested(this);
+			break;
+		}
+
 		default:
 			BLooper::MessageReceived(message);
 			break;
@@ -734,22 +762,27 @@ TeamDebugger::SourceEntryLocateRequested(const char* sourcePath,
 
 
 void
-TeamDebugger::FunctionSourceCodeRequested(FunctionInstance* functionInstance)
+TeamDebugger::FunctionSourceCodeRequested(FunctionInstance* functionInstance,
+	bool forceDisassembly)
 {
 	Function* function = functionInstance->GetFunction();
 
 	// mark loading
 	AutoLocker< ::Team> locker(fTeam);
 
-	if (functionInstance->SourceCodeState() != FUNCTION_SOURCE_NOT_LOADED)
+	if (forceDisassembly && functionInstance->SourceCodeState()
+			!= FUNCTION_SOURCE_NOT_LOADED) {
 		return;
-	if (function->SourceCodeState() == FUNCTION_SOURCE_LOADED)
+	} else if (!forceDisassembly && function->SourceCodeState()
+			== FUNCTION_SOURCE_LOADED) {
 		return;
+	}
 
 	functionInstance->SetSourceCode(NULL, FUNCTION_SOURCE_LOADING);
 
 	bool loadForFunction = false;
-	if (function->SourceCodeState() == FUNCTION_SOURCE_NOT_LOADED) {
+	if (!forceDisassembly && function->SourceCodeState()
+			== FUNCTION_SOURCE_NOT_LOADED) {
 		loadForFunction = true;
 		function->SetSourceCode(NULL, FUNCTION_SOURCE_LOADING);
 	}
@@ -816,11 +849,13 @@ TeamDebugger::ThreadActionRequested(thread_id threadID,
 
 
 void
-TeamDebugger::SetBreakpointRequested(target_addr_t address, bool enabled)
+TeamDebugger::SetBreakpointRequested(target_addr_t address, bool enabled,
+	bool hidden)
 {
 	BMessage message(MSG_SET_BREAKPOINT);
 	message.AddUInt64("address", (uint64)address);
 	message.AddBool("enabled", enabled);
+	message.AddBool("hidden", hidden);
 	PostMessage(&message);
 }
 
@@ -925,6 +960,13 @@ TeamDebugger::DebugReportRequested(entry_ref* targetPath)
 	BMessage message(MSG_GENERATE_DEBUG_REPORT);
 	message.AddRef("target", targetPath);
 	PostMessage(&message);
+}
+
+
+void
+TeamDebugger::TeamRestartRequested()
+{
+	PostMessage(MSG_TEAM_RESTART_REQUESTED);
 }
 
 
@@ -1240,11 +1282,21 @@ bool
 TeamDebugger::_HandleTeamDeleted(TeamDeletedEvent* event)
 {
 	char message[64];
-	snprintf(message, sizeof(message), "Team %" B_PRId32 " has terminated.",
+	fDebuggerInterface->Close(false);
+
+	snprintf(message, sizeof(message), "Team %" B_PRId32 " has terminated. ",
 		event->Team());
-	fUserInterface->SynchronouslyAskUser("Quit Debugger", message, "Quit",
-		NULL, NULL);
-	PostMessage(B_QUIT_REQUESTED);
+
+	int32 result = fUserInterface->SynchronouslyAskUser("Team terminated",
+		message, "Do nothing", "Quit", fCommandLineArgc != 0
+			? "Restart team" : NULL);
+
+	if (result == 1)
+		PostMessage(B_QUIT_REQUESTED);
+	else if (result == 2) {
+		_SaveSettings();
+		fListener->TeamDebuggerRestartRequested(this);
+	}
 
 	return true;
 }
@@ -1390,10 +1442,11 @@ TeamDebugger::_HandleImageFileChanged(image_id imageID)
 
 
 void
-TeamDebugger::_HandleSetUserBreakpoint(target_addr_t address, bool enabled)
+TeamDebugger::_HandleSetUserBreakpoint(target_addr_t address, bool enabled,
+	bool hidden)
 {
 	TRACE_CONTROL("TeamDebugger::_HandleSetUserBreakpoint(%#" B_PRIx64
-		", %d)\n", address, enabled);
+		", %d, %d)\n", address, enabled, hidden);
 
 	// check whether there already is a breakpoint
 	AutoLocker< ::Team> locker(fTeam);
@@ -1464,6 +1517,8 @@ TeamDebugger::_HandleSetUserBreakpoint(target_addr_t address, bool enabled)
 		if (userBreakpoint == NULL)
 			return;
 		userBreakpointReference.SetTo(userBreakpoint, true);
+
+		userBreakpoint->SetHidden(hidden);
 
 		TRACE_CONTROL("  created user breakpoint: %p\n", userBreakpoint);
 
@@ -1635,11 +1690,11 @@ TeamDebugger::_HandleInspectAddress(target_addr_t address,
 		return;
 	}
 
-	if (!memoryBlock->HasListener(listener))
-		memoryBlock->AddListener(listener);
-
 	if (!memoryBlock->IsValid()) {
 		AutoLocker< ::Team> teamLocker(fTeam);
+
+		if (!memoryBlock->HasListener(listener))
+			memoryBlock->AddListener(listener);
 
 		TeamMemory* memory = fTeam->GetTeamMemory();
 		// schedule the job
@@ -1648,13 +1703,36 @@ TeamDebugger::_HandleInspectAddress(target_addr_t address,
 			new(std::nothrow) RetrieveMemoryBlockJob(fTeam, memory,
 				memoryBlock),
 			this)) != B_OK) {
+
+			memoryBlock->NotifyDataRetrieved(result);
 			memoryBlock->ReleaseReference();
+
 			_NotifyUser("Inspect Address", "Failed to retrieve memory data: %s",
 				strerror(result));
 		}
 	} else
 		memoryBlock->NotifyDataRetrieved();
 
+}
+
+
+status_t
+TeamDebugger::_HandleSetArguments(int argc, const char* const* argv)
+{
+	fCommandLineArgc = argc;
+	fCommandLineArgv = new(std::nothrow) const char*[argc];
+	if (fCommandLineArgv == NULL)
+		return B_NO_MEMORY;
+
+	memset(const_cast<char **>(fCommandLineArgv), 0, sizeof(char*) * argc);
+
+	for (int i = 0; i < argc; i++) {
+		fCommandLineArgv[i] = strdup(argv[i]);
+		if (fCommandLineArgv[i] == NULL)
+			return B_NO_MEMORY;
+	}
+
+	return B_OK;
 }
 
 
@@ -1733,6 +1811,8 @@ TeamDebugger::_LoadSettings()
 		if (breakpoint == NULL)
 			return;
 		BReference<UserBreakpoint> breakpointReference(breakpoint, true);
+
+		breakpoint->SetHidden(breakpointSetting->IsHidden());
 
 		// install it
 		fBreakpointManager->InstallUserBreakpoint(breakpoint,

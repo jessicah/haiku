@@ -1,6 +1,6 @@
 /*
  * Copyright 2009-2012, Ingo Weinhold, ingo_weinhold@gmx.de.
- * Copyright 2010-2012, Rene Gollent, rene@gollent.com.
+ * Copyright 2010-2013, Rene Gollent, rene@gollent.com.
  * Distributed under the terms of the MIT License.
  */
 
@@ -31,6 +31,7 @@
 #include "Breakpoint.h"
 #include "CpuState.h"
 #include "DisassembledCode.h"
+#include "ExceptionConfigWindow.h"
 #include "FileSourceCode.h"
 #include "GuiSettingsUtils.h"
 #include "GuiTeamUiSettings.h"
@@ -115,6 +116,7 @@ TeamWindow::TeamWindow(::Team* team, UserInterfaceListener* listener)
 	fStepOverButton(NULL),
 	fStepIntoButton(NULL),
 	fStepOutButton(NULL),
+	fExceptionConfigWindow(NULL),
 	fInspectorWindow(NULL),
 	fFilePanel(NULL)
 {
@@ -220,6 +222,11 @@ void
 TeamWindow::MessageReceived(BMessage* message)
 {
 	switch (message->what) {
+		case MSG_TEAM_RESTART_REQUESTED:
+		{
+			fListener->TeamRestartRequested();
+			break;
+		}
 		case MSG_CHOOSE_DEBUG_REPORT_LOCATION:
 		{
 			try {
@@ -257,8 +264,11 @@ TeamWindow::MessageReceived(BMessage* message)
 			BString data;
 			data.SetToFormat("Debug report successfully saved to '%s'",
 				message->FindString("path"));
-			BAlert *alert = new BAlert("Report saved", data.String(),
-				"OK");
+			BAlert *alert = new(std::nothrow) BAlert("Report saved",
+				data.String(), "Close");
+			if (alert == NULL)
+				break;
+
 			alert->SetFlags(alert->Flags() | B_CLOSE_ON_ESCAPE);
 			alert->Go();
 			break;
@@ -296,6 +306,27 @@ TeamWindow::MessageReceived(BMessage* message)
 			break;
 
 		}
+		case MSG_SHOW_EXCEPTION_CONFIG_WINDOW:
+		{
+			if (fExceptionConfigWindow) {
+				fExceptionConfigWindow->Activate(true);
+			} else {
+				try {
+					fExceptionConfigWindow = ExceptionConfigWindow::Create(
+						fTeam, fListener, this);
+					if (fExceptionConfigWindow != NULL)
+						fExceptionConfigWindow->Show();
+	           	} catch (...) {
+	           		// TODO: notify user
+	           	}
+			}
+			break;
+		}
+		case MSG_EXCEPTION_CONFIG_WINDOW_CLOSED:
+		{
+			fExceptionConfigWindow = NULL;
+			break;
+		}
 		case MSG_SHOW_WATCH_VARIABLE_PROMPT:
 		{
 			target_addr_t address;
@@ -321,7 +352,9 @@ TeamWindow::MessageReceived(BMessage* message)
 		case B_REFS_RECEIVED:
 		{
 			entry_ref locatedPath;
-			message->FindRef("refs", &locatedPath);
+			if (message->FindRef("refs", &locatedPath) != B_OK)
+				break;
+
 			_HandleResolveMissingSourceFile(locatedPath);
 			break;
 		}
@@ -330,7 +363,9 @@ TeamWindow::MessageReceived(BMessage* message)
 			if (fActiveFunction != NULL
 				&& fActiveFunction->GetFunctionDebugInfo()
 					->SourceFile() != NULL && fActiveSourceCode != NULL
-				&& fActiveSourceCode->GetSourceFile() == NULL) {
+				&& fActiveSourceCode->GetSourceFile() == NULL
+				&& fActiveFunction->GetFunction()->SourceCodeState()
+					!= FUNCTION_SOURCE_NOT_LOADED) {
 				try {
 					if (fFilePanel == NULL) {
 						fFilePanel = new BFilePanel(B_OPEN_PANEL,
@@ -662,6 +697,14 @@ TeamWindow::ThreadActionRequested(::Thread* thread, uint32 action,
 
 
 void
+TeamWindow::FunctionSourceCodeRequested(FunctionInstance* function,
+	bool forceDisassembly)
+{
+	fListener->FunctionSourceCodeRequested(function, forceDisassembly);
+}
+
+
+void
 TeamWindow::SetWatchpointEnabledRequested(Watchpoint* watchpoint,
 	bool enabled)
 {
@@ -782,9 +825,9 @@ TeamWindow::_Init()
 				.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
 					.AddGroup(B_HORIZONTAL, B_USE_SMALL_SPACING)
 						.Add(fRunButton = new BButton("Run"))
-						.Add(fStepOverButton = new BButton("Step Over"))
-						.Add(fStepIntoButton = new BButton("Step Into"))
-						.Add(fStepOutButton = new BButton("Step Out"))
+						.Add(fStepOverButton = new BButton("Step over"))
+						.Add(fStepIntoButton = new BButton("Step into"))
+						.Add(fStepOutButton = new BButton("Step out"))
 						.AddGlue()
 					.End()
 					.Add(fSourcePathView = new BStringView(
@@ -854,7 +897,11 @@ TeamWindow::_Init()
 	// add menus and menu items
 	BMenu* menu = new BMenu("Team");
 	fMenuBar->AddItem(menu);
-	BMenuItem* item = new BMenuItem("Close", new BMessage(B_QUIT_REQUESTED),
+	BMenuItem* item = new BMenuItem("Restart", new BMessage(
+		MSG_TEAM_RESTART_REQUESTED), 'R', B_SHIFT_KEY);
+	menu->AddItem(item);
+	item->SetTarget(this);
+	item = new BMenuItem("Close", new BMessage(B_QUIT_REQUESTED),
 		'W');
 	menu->AddItem(item);
 	item->SetTarget(this);
@@ -863,16 +910,16 @@ TeamWindow::_Init()
 	item = new BMenuItem("Copy", new BMessage(B_COPY), 'C');
 	menu->AddItem(item);
 	item->SetTarget(this);
-	item = new BMenuItem("Select All", new BMessage(B_SELECT_ALL), 'A');
+	item = new BMenuItem("Select all", new BMessage(B_SELECT_ALL), 'A');
 	menu->AddItem(item);
 	item->SetTarget(this);
 	menu = new BMenu("Tools");
 	fMenuBar->AddItem(menu);
-	item = new BMenuItem("Save Debug Report",
+	item = new BMenuItem("Save debug report",
 		new BMessage(MSG_CHOOSE_DEBUG_REPORT_LOCATION));
 	menu->AddItem(item);
 	item->SetTarget(this);
-	item = new BMenuItem("Inspect Memory",
+	item = new BMenuItem("Inspect memory",
 		new BMessage(MSG_SHOW_INSPECTOR_WINDOW), 'I');
 	menu->AddItem(item);
 	item->SetTarget(this);
@@ -1211,15 +1258,17 @@ TeamWindow::_UpdateSourcePathState()
 		if (sourceFile != NULL && !sourceFile->GetLocatedPath(sourceText))
 			sourceFile->GetPath(sourceText);
 
-		if (fActiveSourceCode->GetSourceFile() == NULL && sourceFile != NULL) {
+		if (fActiveFunction->GetFunction()->SourceCodeState()
+			!= FUNCTION_SOURCE_NOT_LOADED
+			&& fActiveSourceCode->GetSourceFile() == NULL
+			&& sourceFile != NULL) {
 			sourceText.Prepend("Click to locate source file '");
 			sourceText += "'";
 			truncatedText = sourceText;
 			fSourcePathView->TruncateString(&truncatedText, B_TRUNCATE_MIDDLE,
 				fSourcePathView->Bounds().Width());
-		} else if (sourceFile != NULL) {
+		} else if (sourceFile != NULL)
 			sourceText.Prepend("File: ");
-		}
 	}
 
 	if (!truncatedText.IsEmpty() && truncatedText != sourceText) {
@@ -1371,8 +1420,11 @@ TeamWindow::_HandleSourceCodeChanged()
 	// get a reference to the source code
 	AutoLocker< ::Team> locker(fTeam);
 
-	SourceCode* sourceCode = fActiveFunction->GetFunction()->GetSourceCode();
-	if (sourceCode == NULL)
+	SourceCode* sourceCode = NULL;
+	if (fActiveFunction->GetFunction()->SourceCodeState()
+		== FUNCTION_SOURCE_LOADED) {
+		sourceCode = fActiveFunction->GetFunction()->GetSourceCode();
+	} else
 		sourceCode = fActiveFunction->GetSourceCode();
 
 	BReference<SourceCode> sourceCodeReference(sourceCode);
@@ -1406,11 +1458,32 @@ TeamWindow::_HandleResolveMissingSourceFile(entry_ref& locatedPath)
 			->SourceFile();
 		if (sourceFile != NULL) {
 			BString sourcePath;
-			BString targetPath;
 			sourceFile->GetPath(sourcePath);
-			BPath path(&locatedPath);
-			targetPath = path.Path();
-			fListener->SourceEntryLocateRequested(sourcePath, targetPath);
+			BString sourceFileName(sourcePath);
+			int32 index = sourcePath.FindLast('/');
+			if (index >= 0)
+				sourceFileName.Remove(0, index + 1);
+
+			BPath targetFilePath(&locatedPath);
+			if (targetFilePath.InitCheck() != B_OK)
+				return;
+
+			if (strcmp(sourceFileName.String(), targetFilePath.Leaf()) != 0) {
+				BString message;
+				message.SetToFormat("The names of source file '%s' and located"
+					" file '%s' differ. Use file anyway?",
+					sourceFileName.String(), targetFilePath.Leaf());
+				BAlert* alert = new(std::nothrow) BAlert(
+					"Source path mismatch", message.String(), "Cancel", "Use");
+				if (alert == NULL)
+					return;
+
+				int32 choice = alert->Go();
+				if (choice <= 0)
+					return;
+			}
+			fListener->SourceEntryLocateRequested(sourcePath,
+				targetFilePath.Path());
 			fListener->FunctionSourceCodeRequested(fActiveFunction);
 		}
 	}

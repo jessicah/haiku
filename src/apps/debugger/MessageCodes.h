@@ -1,5 +1,6 @@
 /*
  * Copyright 2009, Ingo Weinhold, ingo_weinhold@gmx.de.
+ * Copyright 2013, Rene Gollent, rene@gollent.com.
  * Distributed under the terms of the MIT License.
  */
 #ifndef MESSAGE_CODES_H
@@ -48,8 +49,11 @@ enum {
 	MSG_VALUE_NODE_VALUE_CHANGED				= 'vnvc',
 
 	MSG_TEAM_DEBUGGER_QUIT						= 'dbqt',
+	MSG_TEAM_RESTART_REQUESTED					= 'trrq',
 	MSG_SHOW_TEAMS_WINDOW						= 'stsw',
 	MSG_TEAMS_WINDOW_CLOSED						= 'tswc',
+	MSG_SHOW_EXCEPTION_CONFIG_WINDOW			= 'secw',
+	MSG_EXCEPTION_CONFIG_WINDOW_CLOSED			= 'ecwc',
 	MSG_START_NEW_TEAM							= 'sttt',
 	MSG_DEBUG_THIS_TEAM							= 'dbtt',
 	MSG_SHOW_INSPECTOR_WINDOW					= 'sirw',

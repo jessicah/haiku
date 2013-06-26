@@ -59,6 +59,7 @@ static const char* kEnableBreakpointMessage = "Click to enable breakpoint at "
 	"line %" B_PRId32 ".";
 
 static const uint32 MSG_OPEN_SOURCE_FILE = 'mosf';
+static const uint32 MSG_SWITCH_DISASSEMBLY_STATE = 'msds';
 
 static const char* kTrackerSignature = "application/x-vnd.Be-TRAK";
 
@@ -205,6 +206,8 @@ struct SourceView::MarkerManager::InstructionPointerMarker : Marker {
 									bool topIP, bool currentIP);
 
 	virtual	void				Draw(BView* view, BRect rect);
+
+			bool				IsCurrentIP() const { return fIsCurrentIP; }
 
 private:
 			void				_DrawArrow(BView* view, BPoint tip, BSize size,
@@ -686,6 +689,8 @@ SourceView::MarkerManager::_UpdateBreakpointMarkers()
 
 		for (int32 i = 0; UserBreakpoint* breakpoint = breakpoints.ItemAt(i);
 				i++) {
+			if (breakpoint->IsHidden())
+				continue;
 			UserBreakpointInstance* breakpointInstance
 				= breakpoint->InstanceAt(0);
 			FunctionInstance* functionInstance;
@@ -1093,6 +1098,7 @@ SourceView::TextView::Draw(BRect updateRect)
 	SetHighColor(fTextColor);
 	SetFont(&fFontInfo->font);
 	SourceView::MarkerManager::Marker* marker;
+	SourceView::MarkerManager::InstructionPointerMarker* ipMarker;
 	int32 markerIndex = 0;
 	for (int32 i = minLine; i <= maxLine; i++) {
 		SetLowColor(ViewColor());
@@ -1107,10 +1113,15 @@ SourceView::TextView::Draw(BRect updateRect)
 			 	continue;
 			 } else if (marker->Line() == (uint32)i) {
 			 	++markerIndex;
-			 	if (dynamic_cast<SourceView::MarkerManager
-			 		::InstructionPointerMarker*>(marker) != NULL)
-			 		SetLowColor(96, 216, 216, 255);
-			 	else
+			 	 ipMarker = dynamic_cast<SourceView::MarkerManager
+			 	 	::InstructionPointerMarker*>(marker);
+			 	if (ipMarker != NULL) {
+			 		if (ipMarker->IsCurrentIP())
+			 			SetLowColor(96, 216, 216, 255);
+			 		else
+			 			SetLowColor(216, 216, 216, 255);
+
+			 	} else
 					SetLowColor(255, 255, 0, 255);
 				FillRect(BRect(kLeftTextMargin, y, Bounds().right,
 					y + fFontInfo->lineHeight), B_SOLID_LOW);
@@ -1747,13 +1758,51 @@ SourceView::TextView::_ScrollToBottom(void)
 bool
 SourceView::TextView::_AddGeneralActions(BPopUpMenu* menu, int32 line)
 {
-	BMessage* message = new(std::nothrow) BMessage(MSG_OPEN_SOURCE_FILE);
+	if (fSourceCode == NULL)
+		return true;
+
+	BMessage* message = NULL;
+	if (fSourceCode->GetSourceFile() != NULL) {
+		message = new(std::nothrow) BMessage(MSG_OPEN_SOURCE_FILE);
+		if (message == NULL)
+			return false;
+		message->AddInt32("line", line);
+
+		if (!_AddGeneralActionItem(menu, "Open source file", message))
+			return false;
+	}
+
+	if (fSourceView->fStackFrame == NULL)
+		return true;
+
+	FunctionInstance* instance = fSourceView->fStackFrame->Function();
+	if (instance == NULL)
+		return true;
+
+	FileSourceCode* code = instance->GetFunction()->GetSourceCode();
+
+	// if we only have disassembly, this option doesn't apply.
+	if (code == NULL)
+		return true;
+
+	// verify that we do in fact know the source file of the function,
+	// since we can't switch to it if it wasn't found and hasn't been
+	// located.
+	BString sourcePath;
+	code->GetSourceFile()->GetLocatedPath(sourcePath);
+	if (sourcePath.IsEmpty())
+		return true;
+
+	message = new(std::nothrow) BMessage(
+		MSG_SWITCH_DISASSEMBLY_STATE);
 	if (message == NULL)
 		return false;
-	message->AddInt32("line", line);
 
-	if (!_AddGeneralActionItem(menu, "Open source file", message))
+	if (!_AddGeneralActionItem(menu, dynamic_cast<DisassembledCode*>(
+			fSourceCode) != NULL ? "Show source" : "Show disassembly",
+			message)) {
 		return false;
+	}
 
 	return true;
 }
@@ -1924,6 +1973,40 @@ SourceView::MessageReceived(BMessage* message)
 
 			BMessenger messenger(kTrackerSignature);
 			messenger.SendMessage(&trackerMessage);
+			break;
+		}
+
+		case MSG_SWITCH_DISASSEMBLY_STATE:
+		{
+			if (fStackFrame == NULL)
+				break;
+
+			FunctionInstance* instance = fStackFrame->Function();
+			if (instance == NULL)
+					break;
+
+			SourceCode* code = NULL;
+			if (dynamic_cast<FileSourceCode*>(fSourceCode) != NULL) {
+				if (instance->SourceCodeState()
+					== FUNCTION_SOURCE_NOT_LOADED) {
+					fListener->FunctionSourceCodeRequested(instance, true);
+					break;
+				}
+
+				code = instance->GetSourceCode();
+			} else {
+				Function* function = instance->GetFunction();
+				if (function->SourceCodeState()
+					== FUNCTION_SOURCE_NOT_LOADED) {
+					fListener->FunctionSourceCodeRequested(instance, false);
+					break;
+				}
+
+				code = function->GetSourceCode();
+			}
+
+			if (code != NULL)
+				SetSourceCode(code);
 			break;
 		}
 
