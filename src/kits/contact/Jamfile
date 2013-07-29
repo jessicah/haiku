@@ -1,0 +1,17 @@
+SubDir HAIKU_TOP src kits contact ;
+
+UsePrivateHeaders contact ;
+UsePrivateHeaders shared ;
+UsePrivateSystemHeaders ;
+
+SharedLibrary libcontact.so :
+	AddressBook.cpp
+	Contact.cpp
+	ContactField.cpp
+	ContactGroup.cpp
+	ContactRef.cpp
+	ContactRoster.cpp
+	RawContact.cpp
+
+	: be translation $(TARGET_LIBSTDC++)
+;

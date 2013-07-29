@@ -61,7 +61,12 @@ enum {
 	B_AU_FORMAT				= 'AU  ',
 
 	// Text formats
-	B_STYLED_TEXT_FORMAT	= 'STXT'
+	B_STYLED_TEXT_FORMAT	= 'STXT',
+
+	// Contact formats
+	B_CONTACT_FORMAT		= 'BCFM',
+	B_PERSON_FORMAT			= 'BPFM',
+	B_VCARD_FORMAT			= 'BVFM'
 };
 
 

@@ -24,15 +24,12 @@ class PictureView : public BView {
 public:
 								PictureView(float width, float height,
 									const entry_ref* ref);
-								PictureView(float width, float height,
-									BBitmap* bitmap);
 	virtual						~PictureView();
 
 			bool				HasChanged();
 			void				Revert();
 			void				Update();
 			void				Update(const entry_ref* ref);
-			void				Update(BBitmap* bitmap);
 
 			BBitmap*			Bitmap();
 			uint32				SuggestedType();
@@ -46,7 +43,6 @@ public:
 	virtual	void				MakeFocus(bool focused);
 
 private:
-			void				_Init(float width, float height);
 			void				_BeginDrag(BPoint sourcePoint);
 			void				_HandleDrop(BMessage* message);
 			void				_ShowPopUpMenu(BPoint screen);

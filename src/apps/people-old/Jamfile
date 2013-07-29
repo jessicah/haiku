@@ -1,19 +1,16 @@
 SubDir HAIKU_TOP src apps people ;
 
-UsePrivateHeaders shared contact ;
+UsePrivateHeaders shared ;
 
 Application People :
 	main.cpp
-	ContactFieldTextControl.cpp
-	AddressView.cpp
+	AttributeTextControl.cpp
 	PeopleApp.cpp
 	PersonView.cpp
 	PersonWindow.cpp
 	PictureView.cpp
-	AddressWindow.cpp
-	GroupsWindow.cpp
-	: be tracker translation libcontact.so
-		$(TARGET_LIBSUPC++) localestub
+	: be tracker translation
+		$(TARGET_LIBSUPC++) $(HAIKU_LOCALE_LIBS)
 	: People.rdef
 ;
 

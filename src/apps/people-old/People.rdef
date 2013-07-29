@@ -12,15 +12,13 @@ resource app_version {
 	internal = 0,
 
 	short_info = "People",
-	long_info  = "People ©1999 Be, Inc. ©2005-2012 Haiku, Inc."
+	long_info  = "People ©1999 Be, Inc. ©2005-2011 Haiku, Inc."
 };
 
 resource app_flags B_SINGLE_LAUNCH;
 
 resource(1, "BEOS:FILE_TYPES") message {
-	"types" = "application/x-person",
-	"types" = "application/x-hcontact",
-	"types" = "text/x-vCard"
+	"types" = "application/x-person"
 };
 
 resource vector_icon {

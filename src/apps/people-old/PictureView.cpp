@@ -4,7 +4,6 @@
  *
  * Authors:
  *		Philippe Houdoin
- *      Dario Casalinuovo
  */
 
 
@@ -86,31 +85,6 @@ PictureView::PictureView(float width, float height, const entry_ref* ref)
 	fFocusChanging(false),
 	fOpenPanel(new BFilePanel(B_OPEN_PANEL))
 {
-
-	_Init(width, height);
-	Update(ref);
-}
-
-
-PictureView::PictureView(float width, float height, BBitmap* bitmap)
-	:
-	BView("pictureview", B_WILL_DRAW | B_FULL_UPDATE_ON_RESIZE | B_NAVIGABLE),
-	fPicture(NULL),
-	fOriginalPicture(NULL),
-	fDefaultPicture(NULL),
-	fShowingPopUpMenu(false),
-	fPictureType(0),
-	fFocusChanging(false),
-	fOpenPanel(new BFilePanel(B_OPEN_PANEL))
-{
-	_Init(width, height);
-	Update(bitmap);
-}
-
-
-void
-PictureView::_Init(float width, float height)
-{
 	SetViewColor(255, 255, 255);
 
 	SetToolTip(B_TRANSLATE(
@@ -135,6 +109,8 @@ PictureView::_Init(float width, float height)
 			fDefaultPicture = NULL;
 		}
 	}
+
+	Update(ref);
 }
 
 
@@ -184,21 +160,6 @@ PictureView::Update(const entry_ref* ref)
 		return;
 
 	if (_LoadPicture(ref) == B_OK) {
-		delete fOriginalPicture;
-		fOriginalPicture = fPicture;
-	}
-}
-
-
-void
-PictureView::Update(BBitmap* bitmap)
-{
-	// Don't update when user has modified the picture
-	if (HasChanged())
-		return;
-
-	if (bitmap != NULL) {
-		fPicture = bitmap;
 		delete fOriginalPicture;
 		fOriginalPicture = fPicture;
 	}
@@ -484,8 +445,10 @@ PictureView::_BeginDrag(BPoint sourcePoint)
 	drag.AddString("be:clip_name", name.String());
 
 	BTranslatorRoster* roster = BTranslatorRoster::Default();
-	if (roster == NULL)
+	if (roster == NULL) {
+		delete bitmap;
 		return;
+	}
 
 	int32 infoCount;
 	translator_info* info;

@@ -13,64 +13,92 @@
 #define PERSON_VIEW_H
 
 
+#include <ContactDefs.h>
+#include <Contact.h>
+#include <ContactField.h>
+#include <File.h>
 #include <GridView.h>
+#include <GroupView.h>
+#include <Messenger.h>
 #include <ObjectList.h>
 #include <String.h>
+#include <TextControl.h>
 
-
-class AttributeTextControl;
-class BFile;
-class BPopUpMenu;
-class PictureView;
+#include "AddressWindow.h"
 
 enum {
-	M_SAVE			= 'save',
-	M_REVERT		= 'rvrt',
-	M_SELECT		= 'slct',
-	M_GROUP_MENU	= 'grmn',
+	M_SAVE				= 'save',
+	M_REVERT			= 'rvrt',
+	M_SELECT			= 'slct',
+	M_GROUP_MENU		= 'grmn',
+	M_ADD_FIELD			= 'adfl',
+	M_REMOVE_FIELD		= 'rmfd',
+	M_SHOW_GROUPS		= 'swgr',
+	M_SHOW_LOCATIONS	= 'swlc'
 };
 
+
+class AddressWindow;
+class ContactFieldTextControl;
+class ContactVisitor;
+class BBox;
+class BFile;
+class BPopUpMenu;
+class BTabView;
+class PictureView;
 
 class PersonView : public BGridView {
 public:
 								PersonView(const char* name,
-									const char* categoryAttribute,
-									const entry_ref* ref);
+									BContact* contact, BFile* file);
 	virtual						~PersonView();
 
 	virtual	void				MakeFocus(bool focus = true);
 	virtual	void				MessageReceived(BMessage* message);
 	virtual void				Draw(BRect updateRect);
 
-			void				AddAttribute(const char* label,
-									const char* attribute);
+			void				BuildGroupMenu(BStringContactField* field);
 
-			void				BuildGroupMenu();
-
-			void				CreateFile(const entry_ref* ref);
+			void				CreateFile(const entry_ref* ref, int32 format);
 
 			bool				IsSaved() const;
 			void				Save();
 
-			const char*			AttributeValue(const char* attribute) const;
-			void				SetAttribute(const char* attribute, bool update);
-			void				SetAttribute(const char* attribute,
-									const char* value, bool update);
+			void				AddField(BContactField* field);
+			void				AddNewField(BContactField* field);
 
-			void				UpdatePicture(const entry_ref* ref);
+			void				UpdatePicture(BBitmap* bitmap);
+			void				Reload(const entry_ref* ref = NULL);
 
 			bool				IsTextSelected() const;
 
+			BContact*			GetContact() const;
+			AddressWindow*		AddrWindow() const;
+
 private:
-			const entry_ref*		fRef;
-			time_t				fLastModificationTime;
+			void				_LoadFieldsFromContact();
+			void				_RemoveField(ContactFieldTextControl* control);
+//			time_t				fLastModificationTime;
 			BPopUpMenu*			fGroups;
-			typedef BObjectList<AttributeTextControl> AttributeList;
-			AttributeList		fControls;
+
+			typedef BObjectList<ContactFieldTextControl> FieldList;
+			FieldList			fControls;
 
 			BString				fCategoryAttribute;
 			PictureView*		fPictureView;
 			bool				fSaving;
+			bool				fSaved;
+			bool				fReloading;
+
+			BContact*			fContact;
+
+			BPhotoContactField*	fPhotoField;
+			AddressWindow*		fAddressWindow;
+			int					fFieldsCount;
+			BFile*				fContactFile;
+			time_t				fLastModificationTime;
+
+	friend class ContactVisitor;
 };
 
 #endif // PERSON_VIEW_H

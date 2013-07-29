@@ -1,10 +1,11 @@
 /*
- * Copyright 2010, Haiku, Inc. All rights reserved.
+ * Copyright 2010-2012, Haiku, Inc. All rights reserved.
  * Distributed under the terms of the MIT license.
  *
  * Authors:
  *		Robert Polic
  *		Stephan Aßmus <superstippi@gmx.de>
+ * 	 	Dario Casalinuovo
  *
  * Copyright 1999, Be Incorporated.   All Rights Reserved.
  * This file may be used under the terms of the Be Sample Code License.
@@ -17,23 +18,26 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <Alert.h>
 #include <BitmapStream.h>
 #include <Catalog.h>
-#include <fs_attr.h>
 #include <Box.h>
 #include <ControlLook.h>
+#include <File.h>
+#include <fs_attr.h>
 #include <GridLayout.h>
 #include <Locale.h>
 #include <MenuField.h>
 #include <MenuItem.h>
 #include <PopUpMenu.h>
 #include <Query.h>
+#include <TabView.h>
 #include <TranslationUtils.h>
 #include <Translator.h>
 #include <VolumeRoster.h>
 #include <Window.h>
 
-#include "AttributeTextControl.h"
+#include "ContactFieldTextControl.h"
 #include "PictureView.h"
 
 
@@ -41,83 +45,121 @@
 #define B_TRANSLATION_CONTEXT "People"
 
 
-PersonView::PersonView(const char* name, const char* categoryAttribute,
-		const entry_ref *ref)
+struct ContactVisitor : public BContactFieldVisitor {
+public:
+					ContactVisitor(PersonView* owner)
+					:
+					fOwner(owner)
+					{
+					}
+
+	virtual		 	~ContactVisitor()
+					{
+					}
+
+	virtual void 	Visit(BStringContactField* field)
+	{
+		int count = fOwner->fControls.CountItems();
+		BGridLayout* layout = fOwner->GridLayout();
+		if (field->FieldType() != B_CONTACT_SIMPLE_GROUP) {
+			ContactFieldTextControl* control = new ContactFieldTextControl(field);
+
+			layout->AddItem(control->CreateLabelLayoutItem(), 1, count);
+			layout->AddItem(control->CreateTextViewLayoutItem(), 2, count);
+			fOwner->fControls.AddItem(control);
+		} else {
+			const char* label = 
+				BContactField::ExtendedLabel(field);
+
+			fOwner->fGroups = new BPopUpMenu(label);
+			fOwner->fGroups->SetRadioMode(false);
+			fOwner->BuildGroupMenu(field);
+
+			BMenuField* field = new BMenuField("", "", fOwner->fGroups);
+			BTextControl* control = new BTextControl("simpleGroup",
+				NULL, NULL, NULL);
+
+			field->SetEnabled(true);
+			layout->AddItem(field->CreateLabelLayoutItem(), 1, 0, count);
+			layout->AddItem(field->CreateMenuBarLayoutItem(), 1, 1, count);
+			layout->AddItem(control->CreateLabelLayoutItem(), 2, 0, count);
+			layout->AddItem(control->CreateTextViewLayoutItem(), 2, 1, count);
+		}
+	}
+
+	virtual void 	Visit(BAddressContactField* field)
+	{
+		printf("%s \n\n", field->Value().String());
+		// Handed by AddressWindow
+	}
+
+	virtual void 	Visit(BPhotoContactField* field)
+	{
+		if (field != NULL) {
+			BBitmap* bitmap = field->Photo();
+			fOwner->UpdatePicture(bitmap);
+		}
+	}
+
+private:
+	PersonView* fOwner;
+};
+
+
+PersonView::PersonView(const char* name, BContact* contact, BFile* file)
 	:
 	BGridView(),
-	fLastModificationTime(0),
-	fGroups(NULL),
+//	fGroups(NULL),
 	fControls(20, false),
-	fCategoryAttribute(categoryAttribute),
 	fPictureView(NULL),
-	fSaving(false)
+	fSaving(false),
+	fSaved(true),
+	fContact(contact),
+	fPhotoField(NULL),
+	fContactFile(file)
 {
 	SetName(name);
 	SetFlags(Flags() | B_WILL_DRAW);
 
-	fRef = ref;
-	BFile* file = NULL;
-	if (fRef != NULL)
-		file = new BFile(fRef, B_READ_ONLY);
+	UpdatePicture(NULL);
+	fAddressWindow = NULL;
 
 	float spacing = be_control_look->DefaultItemSpacing();
-	BGridLayout* layout = GridLayout();
-	layout->SetInsets(spacing, spacing, spacing, spacing);
+		
+	GridLayout()->SetInsets(spacing, spacing, spacing, spacing);
 
-	// Add picture "field", using ID photo 35mm x 45mm ratio
-	fPictureView = new PictureView(70, 90, ref);
+	_LoadFieldsFromContact();
 
-	layout->AddView(fPictureView, 0, 0, 1, 5);
-	layout->ItemAt(0, 0)->SetExplicitAlignment(
-		BAlignment(B_ALIGN_CENTER, B_ALIGN_TOP));
-
-	if (file != NULL)
-		file->GetModificationTime(&fLastModificationTime);
-	delete file;
+	if (fContactFile)
+		fContactFile->GetModificationTime(&fLastModificationTime);
 }
 
 
 PersonView::~PersonView()
 {
+	delete fContact;
+
+	//if (fAddressWindow != NULL)
+	//	fAddressWindow->Quit();
 }
 
 
 void
-PersonView::AddAttribute(const char* label, const char* attribute)
+PersonView::AddNewField(BContactField* field)
 {
-	// Check if this attribute has already been added.
-	AttributeTextControl* control = NULL;
-	for (int32 i = fControls.CountItems() - 1; i >= 0; i--) {
-		if (fControls.ItemAt(i)->Attribute() == attribute) {
-			return;
-		}
-	}
+	AddField(field);
+	fSaved = false;
+}
 
-	control = new AttributeTextControl(label, attribute);
-	fControls.AddItem(control);
+void
+PersonView::AddField(BContactField* field)
+{
+	if (field == NULL)
+		return;
 
-	BGridLayout* layout = GridLayout();
-	int32 row = fControls.CountItems();
+	ContactVisitor visitor(this);
 
-	if (fCategoryAttribute == attribute) {
-		// Special case the category attribute. The Group popup field will
-		// be added as the label instead.
-		fGroups = new BPopUpMenu(label);
-		fGroups->SetRadioMode(false);
-		BuildGroupMenu();
-
-		BMenuField* field = new BMenuField("", "", fGroups);
-		field->SetEnabled(true);
-		layout->AddView(field, 1, row);
-
-		control->SetLabel("");
-		layout->AddView(control, 2, row);
-	} else {
-		layout->AddItem(control->CreateLabelLayoutItem(), 1, row);
-		layout->AddItem(control->CreateTextViewLayoutItem(), 2, row);
-	}
-
-	SetAttribute(attribute, true);
+	field->Accept(&visitor);
 }
 
 
@@ -134,6 +176,7 @@ PersonView::MakeFocus(bool focus)
 void
 PersonView::MessageReceived(BMessage* msg)
 {
+	msg->PrintToStream();
 	switch (msg->what) {
 		case M_SAVE:
 			Save();
@@ -143,8 +186,11 @@ PersonView::MessageReceived(BMessage* msg)
 			if (fPictureView)
 				fPictureView->Revert();
 
+			if (fAddressWindow)
+				fAddressWindow->Reload();
+
 			for (int32 i = fControls.CountItems() - 1; i >= 0; i--)
-				fControls.ItemAt(i)->Revert();
+				fControls.ItemAt(i)->Reload();
 			break;
 
 		case M_SELECT:
@@ -159,12 +205,45 @@ PersonView::MessageReceived(BMessage* msg)
 
 		case M_GROUP_MENU:
 		{
-			const char* name = NULL;
+			/*const char* name = NULL;
 			if (msg->FindString("group", &name) == B_OK)
-				SetAttribute(fCategoryAttribute, name, false);
+				SetAttribute(fCategoryAttribute, name, false);*/
 			break;
 		}
 
+		case M_SHOW_LOCATIONS:
+		{
+			if (fAddressWindow == NULL) {
+				fAddressWindow = new AddressWindow(fContact);
+			}
+			fAddressWindow->Show();
+			fAddressWindow->Activate(true);
+			break;
+		}
+
+		case M_ADD_FIELD:
+		{
+			field_type type;
+			if (msg->FindInt32("field_type", (int32*)&type) == B_OK) {
+				BContactField* contactField 
+					= BContactField::InstantiateChildClass(type);
+				fContact->AddField(contactField);
+				AddNewField(contactField);
+				fSaved = false;
+			}
+			break;
+		}
+
+		case M_REMOVE_FIELD:
+		{
+			ContactFieldTextControl* control;
+			if (msg->FindPointer("fieldtextcontrol",
+				(void**)&control) == B_OK) {
+				_RemoveField(control);
+				fSaved = false;
+			}
+			break;
+		}
 	}
 }
 
@@ -184,8 +263,9 @@ PersonView::Draw(BRect updateRect)
 }
 
 
+
 void
-PersonView::BuildGroupMenu()
+PersonView::BuildGroupMenu(BStringContactField* field)
 {
 	if (fGroups == NULL)
 		return;
@@ -217,7 +297,7 @@ PersonView::BuildGroupMenu()
 			if (file.InitCheck() == B_OK
 				&& file.GetAttrInfo(fCategoryAttribute, &info) == B_OK
 				&& info.size > 1) {
-				if (info.size > (off_t)sizeof(buffer))
+				if (info.size > sizeof(buffer))
 					info.size = sizeof(buffer);
 
 				if (file.ReadAttr(fCategoryAttribute.String(), B_STRING_TYPE,
@@ -267,9 +347,13 @@ PersonView::BuildGroupMenu()
 
 
 void
-PersonView::CreateFile(const entry_ref* ref)
+PersonView::CreateFile(const entry_ref* ref, int32 format)
 {
-	fRef = ref;
+	delete fContactFile;
+	fContactFile = new BFile(ref,
+		B_READ_WRITE | B_CREATE_FILE);
+	fContact->Append(new BRawContact(format, fContactFile));
+
 	Save();
 }
 
@@ -277,7 +361,13 @@ PersonView::CreateFile(const entry_ref* ref)
 bool
 PersonView::IsSaved() const
 {
+	if (!fSaved)
+		return false;
+
 	if (fPictureView && fPictureView->HasChanged())
+		return false;
+
+	if (fAddressWindow && fAddressWindow->HasChanged())
 		return false;
 
 	for (int32 i = fControls.CountItems() - 1; i >= 0; i--) {
@@ -292,145 +382,100 @@ PersonView::IsSaved() const
 void
 PersonView::Save()
 {
-	BFile file(fRef, B_READ_WRITE);
-	if (file.InitCheck() != B_NO_ERROR)
-		return;
-
 	fSaving = true;
 
 	int32 count = fControls.CountItems();
 	for (int32 i = 0; i < count; i++) {
-		AttributeTextControl* control = fControls.ItemAt(i);
-		const char* value = control->Text();
-		file.WriteAttr(control->Attribute().String(), B_STRING_TYPE, 0,
-			value, strlen(value) + 1);
-		control->Update();
+		ContactFieldTextControl* control = fControls.ItemAt(i);
+		control->UpdateField();
 	}
 
-	// Write the picture, if any, in the person file content
-	if (fPictureView) {
-		// Trim any previous content
-		file.Seek(0, SEEK_SET);
-		file.SetSize(0);
+	if (fAddressWindow)
+		fAddressWindow->UpdateAddressField();
 
-		BBitmap* picture = fPictureView->Bitmap();
-		if (picture) {
-			BBitmapStream stream(picture);
-			// Detach *our* bitmap from stream to avoid its deletion
-			// at stream object destruction
-			stream.DetachBitmap(&picture);
-
-			BTranslatorRoster* roster = BTranslatorRoster::Default();
-			roster->Translate(&stream, NULL, NULL, &file,
-				fPictureView->SuggestedType(), B_TRANSLATOR_BITMAP,
-				fPictureView->SuggestedMIMEType());
-
-		}
-
+	if (fPictureView && fPictureView->HasChanged()) {
 		fPictureView->Update();
+		BBitmap* bitmap = fPictureView->Bitmap();
+
+		if (fPhotoField == NULL) {
+			fPhotoField = new BPhotoContactField(bitmap);
+			fContact->AddField(fPhotoField);
+		} else {
+			fPhotoField->SetPhoto(bitmap);
+		}
 	}
 
-	file.GetModificationTime(&fLastModificationTime);
+	if (fContact->Commit() != B_OK) {
+		BAlert* panel = new BAlert( "",
+			"Error : BContact::Commit() != B_OK!\n", "OK");
+		panel->Go();
+	}
+
+	fContactFile->GetModificationTime(&fLastModificationTime);
 
 	fSaving = false;
-}
-
-
-const char*
-PersonView::AttributeValue(const char* attribute) const
-{
-	for (int32 i = fControls.CountItems() - 1; i >= 0; i--) {
-		if (fControls.ItemAt(i)->Attribute() == attribute)
-			return fControls.ItemAt(i)->Text();
-	}
-
-	return "";
+	fSaved = true;
 }
 
 
 void
-PersonView::SetAttribute(const char* attribute, bool update)
+PersonView::Reload(const entry_ref* ref)
 {
-	char* value = NULL;
-	attr_info info;
-	BFile* file = NULL;	
+	if (fReloading == true)
+		return;
+	else
+		fReloading = true;
 
-	if (fRef != NULL)
-		file = new(std::nothrow) BFile(fRef, B_READ_ONLY);
+	BAlert* panel = new BAlert( "",
+		"The file has been modified by another application\n"
+		"Do you want to reload it?\n\n",
+		"Reload", "No");
 
-	if (file != NULL && file->GetAttrInfo(attribute, &info) == B_OK) {
-		value = (char*)calloc(info.size, 1);
-		file->ReadAttr(attribute, B_STRING_TYPE, 0, value, info.size);
+	int32 index = panel->Go();
+	if (index == 1) {
+		fSaved = false;
+		fReloading = false;
+		return;
 	}
 
-	SetAttribute(attribute, value, update);
+	if (ref != NULL) {
+		delete fContactFile;
+		fContactFile = new BFile(ref, B_READ_WRITE);
+		fContact->Append(new BRawContact(B_CONTACT_ANY, fContactFile));
+	}
 
-	free(value);
-	delete file;
+	fContact->Reload();
+
+	for (int i = 0; i < fControls.CountItems(); i++) {
+		ContactFieldTextControl* control = fControls.ItemAt(i);
+		fControls.RemoveItem(control);
+		RemoveChild(control);
+		delete control;
+	}
+
+	_LoadFieldsFromContact();
+
+	fSaved = true;
+	fReloading = false;
 }
 
 
 void
-PersonView::SetAttribute(const char* attribute, const char* value,
-	bool update)
+PersonView::UpdatePicture(BBitmap* bitmap)
 {
-	if (!LockLooper())
-		return;
+	if (fPictureView == NULL) {
+		fPictureView = new PictureView(70, 90, bitmap);
 
-	AttributeTextControl* control = NULL;
-	for (int32 i = fControls.CountItems() - 1; i >= 0; i--) {
-		if (fControls.ItemAt(i)->Attribute() == attribute) {
-			control = fControls.ItemAt(i);
-			break;
-		}
+		GridLayout()->AddView(fPictureView, 0, 0, 1, 5);
+		GridLayout()->ItemAt(0, 0)->SetExplicitAlignment(
+			BAlignment(B_ALIGN_CENTER, B_ALIGN_TOP));
+		return;
 	}
-
-	if (control == NULL)
-		return;
-
-	if (update) {
-		control->SetText(value);
-		control->Update();
-	} else {
-		BTextView* text = control->TextView();
-
-		int32 start, end;
-		text->GetSelection(&start, &end);
-		if (start != end) {
-			text->Delete();
-			text->Insert(value);
-		} else if ((end = text->TextLength())) {
-			text->Select(end, end);
-			text->Insert(",");
-			text->Insert(value);
-			text->Select(text->TextLength(), text->TextLength());
-		} else
-			control->SetText(value);
-	}
-
-	UnlockLooper();
-}
-
-
-void
-PersonView::UpdatePicture(const entry_ref* ref)
-{
-	if (fPictureView == NULL)
-		return;
 
 	if (fSaving)
 		return;
 
-	time_t modificationTime = 0;
-	BEntry entry(ref);
-	entry.GetModificationTime(&modificationTime);
-
-	if (entry.InitCheck() == B_OK
-		&& modificationTime <= fLastModificationTime) {
-		return;
-	}
-
-	fPictureView->Update(ref);
+	fPictureView->Update(bitmap);
 }
 
 
@@ -446,4 +491,43 @@ PersonView::IsTextSelected() const
 			return true;
 	}
 	return false;
+}
+
+
+BContact*
+PersonView::GetContact() const
+{
+	return fContact;
+}
+
+
+AddressWindow*
+PersonView::AddrWindow() const
+{
+	return fAddressWindow;
+}
+
+
+void
+PersonView::_LoadFieldsFromContact()
+{
+	if (fContact->CountFields() == 0)
+		fContact->CreateDefaultFields();
+
+	for (int i = 0; i < fContact->CountFields(); i++) {
+		BContactField* field = fContact->FieldAt(i);
+		if (field != NULL)
+			AddField(field);
+	}
+}
+
+
+void
+PersonView::_RemoveField(ContactFieldTextControl* control)
+{
+	fControls.RemoveItem(control);
+	RemoveChild(control);
+	fContact->RemoveField(control->Field());
+	delete control;
+	fSaved = false;
 }

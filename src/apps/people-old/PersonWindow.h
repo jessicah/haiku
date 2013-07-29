@@ -12,10 +12,9 @@
 #define PERSON_WINDOW_H
 
 
-#include <Contact.h>
-#include <File.h>
 #include <String.h>
 #include <Window.h>
+
 
 #define	TITLE_BAR_HEIGHT	 25
 #define	WIND_WIDTH			420
@@ -30,11 +29,10 @@ class BMenuItem;
 class PersonWindow : public BWindow {
 public:
 
-								PersonWindow(BRect frame,
-									const char* title,
-									const entry_ref* ref,
-									BFile* file,
-									BContact* contact);
+								PersonWindow(BRect frame, const char* title,
+									const char* nameAttribute,
+									const char* categoryAttribute,
+									const entry_ref* ref);
 	virtual						~PersonWindow();
 
 	virtual	void				MenusBeginning();
@@ -42,16 +40,20 @@ public:
 	virtual	bool				QuitRequested();
 	virtual	void				Show();
 
-			void				SaveAs(int32 format = 0);
+			void				AddAttribute(const char* label,
+									const char* attribute);
 
-			bool				RefersContactFile(const entry_ref& ref) const;
+			void				SaveAs();
+
+			bool				RefersPersonFile(const entry_ref& ref) const;
+
 private:
+			void				_GetDefaultFileName(char* name);
+			void				_SetToRef(entry_ref* ref);
 			void				_WatchChanges(bool doIt);
 
-			const char* 		_FieldLabel(field_type code) const;
-			BString				_GetDefaultFileName();
-			BString				_GetProposedName();
-			void				_SetToRef(entry_ref* ref);
+private:
+			entry_ref*			fRef;
 
 			BFilePanel*			fPanel;
 			BMenuItem*			fCopy;
@@ -61,7 +63,8 @@ private:
 			BMenuItem*			fSave;
 			BMenuItem*			fUndo;
 			PersonView*			fView;
-			const entry_ref*	fRef;
+
+			BString				fNameAttribute;
 };
 
 
