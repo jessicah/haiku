@@ -100,8 +100,8 @@ private:
 };
 
 
-static vint32 idCounter = 0;
-static HashMap<HashKey32<int32>, Partition*> idPartitionMap;
+static vint32 sIdCounter = 0;
+static HashMap<HashKey32<int32>, Partition*> sIdPartitionMap;
 
 
 //	#pragma mark -
@@ -117,8 +117,8 @@ Partition::Partition(int fd)
 
 	memset((partition_data *)this, 0, sizeof(partition_data));
 
-	id = atomic_add(&idCounter, 1);
-	idPartitionMap.Put(id, this);
+	id = atomic_add(&sIdCounter, 1);
+	sIdPartitionMap.Put(id, this);
 
 	// it's safe to close the file
 	fFD = dup(fd);
@@ -139,7 +139,7 @@ Partition::~Partition()
 			child->SetParent(NULL);
 	}
 
-	idPartitionMap.Remove(id);
+	sIdPartitionMap.Remove(id);
 	close(fFD);
 }
 
@@ -477,7 +477,7 @@ partition_data *
 create_child_partition(partition_id id, int32 index, off_t offset, off_t size,
 	partition_id childID)
 {
-	Partition *partition = idPartitionMap.Get(id);
+	Partition *partition = sIdPartitionMap.Get(id);
 	if (partition == NULL) {
 		dprintf("creating partition failed: could not find partition.\n");
 		return NULL;
@@ -514,7 +514,7 @@ get_child_partition(partition_id id, int32 index)
 partition_data *
 get_parent_partition(partition_id id)
 {
-	Partition *partition = idPartitionMap.Get(id);
+	Partition *partition = sIdPartitionMap.Get(id);
 	if (partition == NULL) {
 		dprintf("could not find parent partition.\n");
 		return NULL;
