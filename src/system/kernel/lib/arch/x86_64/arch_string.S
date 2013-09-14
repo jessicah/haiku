@@ -3,10 +3,18 @@
  * Distributed under the terms of the MIT License.
  */
 
+#if !_BOOT_MODE
+#	include "asm_offsets.h"
+#endif
 
 #include <asm_defs.h>
 
-#include "asm_offsets.h"
+
+// We don't need the indirection in the boot loader.
+#if _BOOT_MODE
+#	define memcpy_generic	memcpy
+#	define memset_generic	memset
+#endif
 
 
 .align 8
@@ -86,6 +94,9 @@ FUNCTION_END(memset_generic)
 SYMBOL(memset_generic_end):
 
 
+#if !_BOOT_MODE
+
+.align 8
 FUNCTION(memcpy):
 	jmp		*(gOptimizedFunctions + X86_OPTIMIZED_FUNCTIONS_memcpy)
 FUNCTION_END(memcpy)
@@ -94,3 +105,4 @@ FUNCTION(memset):
 	jmp		*(gOptimizedFunctions + X86_OPTIMIZED_FUNCTIONS_memset)
 FUNCTION_END(memset)
 
+#endif	// !_BOOT_MODE
