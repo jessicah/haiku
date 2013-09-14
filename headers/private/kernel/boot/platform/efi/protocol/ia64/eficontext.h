@@ -2,28 +2,28 @@
  * Copyright (c) 1999, 2000
  * Intel Corporation.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- * 
+ *
  *    This product includes software developed by Intel Corporation and
  *    its contributors.
- * 
+ *
  * 4. Neither the name of Intel Corporation or its contributors may be
  *    used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY INTEL CORPORATION AND CONTRIBUTORS ``AS IS''
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -35,7 +35,7 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  */
 
 
@@ -65,7 +65,7 @@
 typedef
 struct {
 	UINT64 reserved;	// necessary to preserve alignment for the correct bits in UNAT and to insure F2 is 16 byte aligned...
-    
+
     UINT64 r1;
     UINT64 r2;
     UINT64 r3;
@@ -97,7 +97,7 @@ struct {
     UINT64 r29;
     UINT64 r30;
     UINT64 r31;
-    
+
     UINT64 f2[2];
     UINT64 f3[2];
     UINT64 f4[2];
@@ -128,9 +128,9 @@ struct {
     UINT64 f29[2];
     UINT64 f30[2];
     UINT64 f31[2];
-    
+
     UINT64 pr;
-    
+
     UINT64 b0;
     UINT64 b1;
     UINT64 b2;
@@ -139,7 +139,7 @@ struct {
     UINT64 b5;
     UINT64 b6;
     UINT64 b7;
-    
+
     // application registers
     UINT64 ar_rsc;
     UINT64 ar_bsp;
@@ -161,11 +161,11 @@ struct {
     UINT64 ar_unat;
 
     UINT64 ar_fpsr;
-    
+
     UINT64 ar_pfs;
     UINT64 ar_lc;
     UINT64 ar_ec;
-    
+
     // control registers
     UINT64 cr_dcr;
     UINT64 cr_itm;
@@ -180,7 +180,7 @@ struct {
     UINT64 cr_ifs;
     UINT64 cr_iim;
     UINT64 cr_iha;
-    
+
     // debug registers
     UINT64 dbr0;
     UINT64 dbr1;
@@ -190,7 +190,7 @@ struct {
     UINT64 dbr5;
     UINT64 dbr6;
     UINT64 dbr7;
-    
+
     UINT64 ibr0;
     UINT64 ibr1;
     UINT64 ibr2;
@@ -199,10 +199,10 @@ struct {
     UINT64 ibr5;
     UINT64 ibr6;
     UINT64 ibr7;
-    
+
     // virtual registers
     UINT64 int_nat;	// nat bits for R1-R31
-    
+
 } SYSTEM_CONTEXT;
 
 #endif /* _EFI_CONTEXT_H_ */
