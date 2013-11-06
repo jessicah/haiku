@@ -446,6 +446,13 @@ rule KernelArchitectureSetup architecture
 			}
 	}
 
+	if $(HAIKU_BOOT_PLATFORM) = efi {
+		HAIKU_BOOT_CCFLAGS += -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
+			-maccumulate-outgoing-args ;
+		HAIKU_BOOT_C++FLAGS += -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
+			-maccumulate-outgoing-args ;
+	}
+
 	# warning flags
 	HAIKU_KERNEL_WARNING_CCFLAGS = -Wall -Wno-trigraphs -Wmissing-prototypes
 		-Wno-multichar ;
