@@ -48,7 +48,6 @@ BootStaticLibrary boot_packagefs :
 	ZlibCompressionBase.cpp
 	ZlibDecompressor.cpp
 
-	: -fno-pic
 ;
 
 Includes [

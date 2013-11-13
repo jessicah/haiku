@@ -41,7 +41,6 @@ BootMergeObject boot_libroot.o :
 	strchr.c
 	strrchr.c
 	strtol.c
-	: -fno-pic
 ;
 
 local extraLinkerArgs = ;

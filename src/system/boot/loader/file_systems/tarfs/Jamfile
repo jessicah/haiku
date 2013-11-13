@@ -28,7 +28,6 @@ Depends [ FGristFiles $(zlibSources) ]
 
 BootStaticLibrary boot_zlib :
 	$(zlibSources)
-	: -fno-pic
 	;
 
 
@@ -40,5 +39,4 @@ Includes [ FGristFiles tarfs.cpp ] : [ BuildFeatureAttribute zlib : sources ] ;
 
 BootStaticLibrary boot_tarfs :
 	tarfs.cpp
-	: -fno-pic
 	;
