@@ -70,7 +70,7 @@ BootLd boot_loader_$(TARGET_BOOT_PLATFORM) :
 	boot_libroot.o
 
 	: $(HAIKU_TOP)/src/system/ldscripts/$(TARGET_ARCH)/boot_loader_$(TARGET_BOOT_PLATFORM).ld
-	: $(TARGET_BOOTLD_FLAGS)
+	: $(TARGET_BOOT_LDFLAGS)
 ;
 
 rule BuildCoffLoader {

@@ -396,7 +396,7 @@ rule KernelArchitectureSetup architecture
 	HAIKU_BOOT_CCFLAGS = $(HAIKU_CCFLAGS_$(architecture)) $(gccBaseFlags) ;
 	HAIKU_BOOT_C++FLAGS = $(HAIKU_C++FLAGS_$(architecture)) $(g++BaseFlags) ;
 	HAIKU_BOOT_LINKFLAGS = ;
-	HAIKU_BOOTLD_FLAGS = -Bstatic ;
+	HAIKU_BOOT_LDFLAGS = -Bstatic ;
 
 	HAIKU_KERNEL_PIC_CCFLAGS = -fno-pic ;
 	HAIKU_KERNEL_PIC_LINKFLAGS = ;
@@ -407,7 +407,7 @@ rule KernelArchitectureSetup architecture
 		include [ FDirName $(HAIKU_BUILD_RULES_DIR) board $(HAIKU_BOOT_BOARD)
 			BoardSetup ] ;
 		if $(HAIKU_BOARD_LOADER_BASE) {
-			HAIKU_BOOTLD_FLAGS +=
+			HAIKU_BOOT_LDFLAGS +=
 				--defsym BOARD_LOADER_BASE=$(HAIKU_BOARD_LOADER_BASE) ;
 		}
 	}
@@ -456,7 +456,7 @@ rule KernelArchitectureSetup architecture
 			-maccumulate-outgoing-args ;
 		HAIKU_BOOT_C++FLAGS += -fpic -fno-stack-protector -fshort-wchar -mno-red-zone
 			-maccumulate-outgoing-args ;
-		HAIKU_BOOTLD_FLAGS = -Bstatic -Bsymbolic -shared -nostdlib -znocombreloc -nostartfiles ;
+		HAIKU_BOOT_LDFLAGS = -Bstatic -Bsymbolic -shared -nostdlib -znocombreloc -nostartfiles ;
 	} else {
 		HAIKU_BOOT_CCFLAGS += -fno-pic ;
 		HAIKU_BOOT_C++FLAGS += -fno-pic ;
