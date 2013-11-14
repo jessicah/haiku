@@ -444,7 +444,7 @@ rule KernelArchitectureSetup architecture
 			HAIKU_KERNEL_ADDON_LINKFLAGS += -z max-page-size=0x1000 ;
 
 			# BIOS Bootloader is 32-bit.
-			if $HAIKU_BOOT_PLATFORM = bios_ia32 {
+			if $(HAIKU_BOOT_PLATFORM) = bios_ia32 {
 				HAIKU_BOOT_LINKFLAGS += -m elf_i386_haiku ;
 				HAIKU_BOOT_CCFLAGS += -m32 -march=pentium ;
 				HAIKU_BOOT_C++FLAGS += -m32 -march=pentium ;
