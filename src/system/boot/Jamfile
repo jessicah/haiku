@@ -124,6 +124,8 @@ rule BuildEFILoader {
 
 	Depends $(efiLoader) : $(bootLoader) ;
 	MakeLocateDebug $(efiApplication) ;
+
+	on $(1) ResAttr $(1) : $(RESFILES) : false ;
 }
 
 actions BuildEFILoader {
