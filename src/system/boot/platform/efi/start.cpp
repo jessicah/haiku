@@ -44,13 +44,6 @@ extern "C" void _start(void);
 
 
 static void
-clear_bss(void)
-{
-	memset(&__bss_start, 0, &_end - &__bss_start);
-}
-
-
-static void
 call_ctors(void)
 {
 	void (**f)(void);
