@@ -34,8 +34,6 @@
 
 extern void (*__ctor_list)(void);
 extern void (*__ctor_end)(void);
-extern uint8 __bss_start;
-extern uint8 _end;
 
 
 const EFI_SYSTEM_TABLE *kSystemTable;
@@ -100,7 +98,6 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systemTable)
 	 * No direct support
 	 * New and Delete can be mapped to malloc/free
 	 */
-	clear_bss();
 	call_ctors();
 		// call C++ constructors before doing anything else
 
