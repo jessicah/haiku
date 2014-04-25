@@ -4,6 +4,7 @@ HaikuSubInclude 3dmov ;
 HaikuSubInclude aboutsystem ;
 HaikuSubInclude activitymonitor ;
 HaikuSubInclude autoraise ;
+HaikuSubInclude bigfoot ;
 HaikuSubInclude bsnow ;
 HaikuSubInclude bootmanager ;
 HaikuSubInclude cdplayer ;
