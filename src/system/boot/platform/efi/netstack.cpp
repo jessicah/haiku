@@ -1,0 +1,161 @@
+/*
+ * Copyright 2014, Jessica Hamilton, jessica.l.hamilton@gmail.com.
+ * Distributed under the terms of the MIT License.
+ */
+
+
+#include "efi_platform.h"
+#include "efinet.h"
+
+#include <boot/net/NetStack.h>
+#include <boot/net/Ethernet.h>
+
+#include <time.h>
+
+static EFI_GUID sSimpleNetworkGuid = EFI_SIMPLE_NETWORK_PROTOCOL;
+
+
+class EFIEthernetInterface : public EthernetInterface {
+public:
+	EFIEthernetInterface();
+	virtual ~EFIEthernetInterface();
+
+	status_t Init();
+
+	virtual mac_addr_t MACAddress() const;
+
+	virtual	void *AllocateSendReceiveBuffer(size_t size);
+	virtual	void FreeSendReceiveBuffer(void *buffer);
+
+	virtual ssize_t Send(const void *buffer, size_t size);
+	virtual ssize_t Receive(void *buffer, size_t size);
+
+private:
+	EFI_SIMPLE_NETWORK	*fNetwork;
+	mac_addr_t	fMACAddress;
+};
+
+
+EFIEthernetInterface::EFIEthernetInterface()
+	:
+	EthernetInterface(),
+	fNetwork(NULL),
+	fMACAddress(kNoMACAddress)
+{
+}
+
+
+EFIEthernetInterface::~EFIEthernetInterface()
+{
+	if (fNetwork != NULL) {
+		fNetwork->Shutdown(fNetwork);
+		fNetwork->Stop(fNetwork);
+		fNetwork = NULL;
+	}
+}
+
+
+status_t
+EFIEthernetInterface::Init()
+{
+	EFI_STATUS status = kBootServices->LocateProtocol(&sSimpleNetworkGuid,
+		NULL, (void **)&fNetwork);
+
+	if (status != EFI_SUCCESS || fNetwork == NULL)
+		return B_ERROR;
+
+	if (fNetwork->Start(fNetwork) != EFI_SUCCESS)
+		return B_ERROR;
+	if (fNetwork->Initialize(fNetwork, 0, 0) != EFI_SUCCESS)
+		return B_ERROR;
+
+	// get MAC address
+	EFI_MAC_ADDRESS macAddress = fNetwork->Mode->CurrentAddress;
+	//ASSERT(fNetwork->Mode->HwAddressSize == ETH_ALEN);
+	fMACAddress = macAddress.Addr;
+
+	return B_OK;
+}
+
+
+mac_addr_t
+EFIEthernetInterface::MACAddress() const
+{
+	return fMACAddress;
+}
+
+
+void *
+EFIEthernetInterface::AllocateSendReceiveBuffer(size_t size)
+{
+	return malloc(size);
+}
+
+
+void
+EFIEthernetInterface::FreeSendReceiveBuffer(void *buffer)
+{
+	if (buffer != NULL)
+		free(buffer);
+}
+
+
+ssize_t
+EFIEthernetInterface::Send(const void *buffer, size_t size)
+{
+	EFI_STATUS status = fNetwork->Transmit(fNetwork, 0, size, (void *)buffer, NULL, NULL, NULL);
+
+	if (status == EFI_SUCCESS) {
+		// Need to wait for packet to be transmitted so we can recyle the transmit buffer
+		void *txBuffer;
+		do {
+			if (fNetwork->GetStatus(fNetwork, NULL, &txBuffer) != EFI_SUCCESS)
+				return B_ERROR;
+
+			struct timespec ts;
+			ts.tv_sec = 0;
+			ts.tv_nsec = 50 * 1000;
+			nanosleep(&ts, NULL);
+		} while (txBuffer != buffer);
+	}
+
+	return size;
+}
+
+
+ssize_t
+EFIEthernetInterface::Receive(void *buffer, size_t size)
+{
+	EFI_STATUS status = fNetwork->Receive(fNetwork, NULL, &size, buffer, NULL, NULL, NULL);
+
+	if (status == EFI_NOT_READY)
+		return 0;
+
+	if (status != EFI_SUCCESS)
+		return B_ERROR;
+
+	return size;
+}
+
+
+status_t
+platform_net_stack_init()
+{
+	EFIEthernetInterface *interface = new(std::nothrow) EFIEthernetInterface;
+	if (!interface)
+		return B_NO_MEMORY;
+
+	status_t error = interface->Init();
+	if (error != B_OK) {
+		delete interface;
+		return error;
+	}
+
+	error = NetStack::Default()->AddEthernetInterface(interface);
+	if (error != B_OK) {
+		delete interface;
+		return error;
+	}
+
+	return B_OK;
+}

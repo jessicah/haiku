@@ -13,6 +13,7 @@
 #include <boot/platform.h>
 #include <boot/heap.h>
 #include <boot/stage2.h>
+#include <boot/net/NetStack.h>
 
 //#include "acpi.h"
 //#include "apm.h"
@@ -106,6 +107,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systemTable)
 
 	serial_init();
 	serial_enable();
+	net_stack_init();
 //	interrupts_init();
 	console_init();
 //	cpu_init();

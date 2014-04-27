@@ -20,6 +20,7 @@ local efi_glue_src =
 BootMergeObject boot_platform_efi.o :
 	console.cpp
 	debug.cpp
+	netstack.cpp
 	devices.cpp
 	start.cpp
 	video.cpp
