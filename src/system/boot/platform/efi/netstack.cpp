@@ -14,6 +14,11 @@
 
 #include <time.h>
 
+
+#define MSG(format, args...) \
+	dprintf("%s:%d: " format "\n", __FILE__, __LINE__ , ## args)
+
+
 static EFI_GUID sSimpleNetworkGuid = EFI_SIMPLE_NETWORK_PROTOCOL;
 
 
@@ -63,19 +68,29 @@ EFIEthernetInterface::Init()
 	EFI_STATUS status = kBootServices->LocateProtocol(&sSimpleNetworkGuid,
 		NULL, (void **)&fNetwork);
 
-	if (status != EFI_SUCCESS || fNetwork == NULL)
+	if (status != EFI_SUCCESS || fNetwork == NULL) {
+		MSG("locate protocol failed: %x (%p)", status, fNetwork);
 		return B_ERROR;
+	}
 
-	if (fNetwork->Start(fNetwork) != EFI_SUCCESS)
+	status = fNetwork->Start(fNetwork);
+	if (status != EFI_SUCCESS && status != EFI_ALREADY_STARTED) {
+		MSG("failed to start simple network protocol: %x", status);
 		return B_ERROR;
-	if (fNetwork->Initialize(fNetwork, 0, 0) != EFI_SUCCESS)
+	}
+	status = fNetwork->Initialize(fNetwork, 0x1000, 0x1000);
+	if (status != EFI_SUCCESS) {
+		MSG("failed to initialize simple network protocol: %x", status);
 		return B_ERROR;
+	}
 
 	// get MAC address
 	EFI_MAC_ADDRESS macAddress = fNetwork->Mode->CurrentAddress;
 	//ASSERT(fNetwork->Mode->HwAddressSize == ETH_ALEN);
+	#define AT(i) fMACAddress[i]
 	fMACAddress = macAddress.Addr;
-
+	MSG("mac address: %2x:%2x:%2x:%2x:%2x:%2x", AT(0), AT(1), AT(2), AT(3), AT(4), AT(5));
+	#undef AT
 	return B_OK;
 }
 
@@ -138,9 +153,6 @@ EFIEthernetInterface::Receive(void *buffer, size_t size)
 
 	return size;
 }
-
-#define MSG(format, args...) \
-	dprintf("%s:%d: " format "\n", __FILE__, __LINE__ , ## args)
 
 status_t
 platform_net_stack_init()
