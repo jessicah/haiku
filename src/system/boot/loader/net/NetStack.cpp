@@ -164,7 +164,8 @@ net_stack_init()
 	}
 	MSG("created");
 
-	return platform_net_stack_init();
+	//return platform_net_stack_init();
+		// don't do this here for now
 }
 
 

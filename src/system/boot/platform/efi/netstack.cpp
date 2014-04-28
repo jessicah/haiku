@@ -10,6 +10,8 @@
 #include <boot/net/NetStack.h>
 #include <boot/net/Ethernet.h>
 
+#include <KernelExport.h>
+
 #include <time.h>
 
 static EFI_GUID sSimpleNetworkGuid = EFI_SIMPLE_NETWORK_PROTOCOL;
@@ -137,28 +139,38 @@ EFIEthernetInterface::Receive(void *buffer, size_t size)
 	return size;
 }
 
+#define MSG(format, args...) \
+	dprintf("%s:%d: " format "\n", __FILE__, __LINE__ , ## args)
 
 status_t
 platform_net_stack_init()
 {
-	if (NetStack::Default() == NULL)
+	MSG("enter");
+	if (NetStack::Default() == NULL) {
+		MSG("no memory for default netstack");
 		return B_NO_MEMORY;
+	}
 
 	EFIEthernetInterface *interface = new(std::nothrow) EFIEthernetInterface;
-	if (!interface)
+	if (!interface) {
+		MSG("no memory for efi driver");
 		return B_NO_MEMORY;
+	}
 
 	status_t error = interface->Init();
 	if (error != B_OK) {
+		MSG("init efi driver failed");
 		delete interface;
 		return error;
 	}
 
 	error = NetStack::Default()->AddEthernetInterface(interface);
 	if (error != B_OK) {
+		MSG("add efi driver to netstack failed");
 		delete interface;
 		return error;
 	}
 
+	MSG("exit");
 	return B_OK;
 }

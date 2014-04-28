@@ -44,6 +44,8 @@ main(stage2_args *args)
 		// used as a boolean indicator until initialized for the kernel
 #endif
 
+	platform_net_stack_init();
+
 	add_stage2_driver_settings(args);
 
 	platform_init_video();
