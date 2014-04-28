@@ -115,6 +115,12 @@ NetStack::Default()
 	return sNetStack;
 }
 
+status_t
+NetStack::InitCheck()
+{
+	return created == true ? B_OK : B_NO_INIT;
+}
+
 
 status_t
 NetStack::ShutDown()

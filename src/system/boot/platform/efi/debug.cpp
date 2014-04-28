@@ -11,8 +11,12 @@
 #include <boot/platform.h>
 #include <boot/stage2.h>
 #include <boot/stdio.h>
+#include <boot/net/NetStack.h>
+#include <boot/net/UDP.h>
 #include <kernel.h>
 #include <util/ring_buffer.h>
+
+#include <algorithm>
 
 #include "keyboard.h"
 #include "serial.h"
@@ -20,6 +24,8 @@
 
 //#define PRINT_TIME_STAMPS
 	// Define to print a TSC timestamp before each line of output.
+#define ENABLE_SYSLOG_NG
+	// Define to print syslog messages over UDP.
 
 
 static const char* const kDebugSyslogSignature = "Haiku syslog";
@@ -33,6 +39,49 @@ static bool sPostCleanup = false;
 
 #ifdef PRINT_TIME_STAMPS
 extern "C" uint64 rdtsc();
+#endif
+
+
+#ifdef ENABLE_SYSLOG_NG
+static UDPSocket *sSyslogSocket = NULL;
+
+static void
+syslog_ng_write(const char *message, size_t length)
+{
+	if (NetStack::InitCheck() == B_NO_INIT)
+		return;
+#if 0
+	if (sSyslogSocket == NULL) {
+		// Check if the network stack has been initialized yet
+		if (NetStack::Default() != NULL) {
+			sSyslogSocket = new(std::nothrow) UDPSocket;
+			if (sSyslogSocket == NULL)
+				return;
+			sSyslogSocket->Bind(INADDR_ANY, 60514);
+		}
+	}
+
+	// Strip trailing newlines
+	while (length > 0) {
+		if (message[length - 1] != '\n'
+			&& message[length - 1] != '\r') {
+			break;
+		}
+		length--;
+	}
+	if (length <= 0)
+		return;
+
+	char buffer[1500];
+	const int facility = 0; // kernel
+	int severity = 7; // debug
+	int offset = snprintf(buffer, sizeof(buffer), "<%d>1 - - Haiku - - - \xEF\xBB\xBF",
+		facility * 8 + severity);
+	length = std::min(length, sizeof(buffer) - offset);
+	memcpy(buffer + offset, message, length);
+	sSyslogSocket->Send(INADDR_BROADCAST, 514, buffer, offset + length);
+#endif
+}
 #endif
 
 
@@ -74,6 +123,9 @@ dprintf_args(const char *format, va_list args)
 
 	syslog_write(buffer, length);
 	serial_puts(buffer, length);
+#ifdef ENABLE_SYSLOG_NG
+	syslog_ng_write(buffer, length);
+#endif
 
 	if (platform_boot_options() & BOOT_OPTION_DEBUG_OUTPUT)
 		fprintf(stderr, "%s", buffer);

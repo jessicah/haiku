@@ -27,7 +27,7 @@ public:
 	static status_t CreateDefault();
 	static NetStack *Default();
 	static status_t ShutDown();
-
+	static status_t InitCheck();
 	status_t AddEthernetInterface(EthernetInterface *interface);
 
 	EthernetInterface *GetEthernetInterface() const
