@@ -5,10 +5,6 @@
 
 #include <boot/net/NetStack.h>
 
-#include <new>
-
-#include <stdio.h>
-
 #include <boot/net/ARP.h>
 #include <boot/net/Ethernet.h>
 #include <boot/net/IP.h>
@@ -23,6 +19,8 @@
 
 // sNetStack
 NetStack *NetStack::sNetStack = NULL;
+
+static NetStack sStaticNetStack;
 
 // constructor
 NetStack::NetStack()
@@ -94,25 +92,12 @@ NetStack::Init()
 	return B_OK;
 }
 
+static bool created = false;
+
 // CreateDefault
 status_t
 NetStack::CreateDefault()
 {
-	if (sNetStack)
-		return B_OK;
-
-	NetStack *netStack = new(nothrow) NetStack;
-	MSG("netStack = %p", netStack);
-	if (!netStack)
-		return B_NO_MEMORY;
-
-	status_t error = netStack->Init();
-	if (error != B_OK) {
-		delete netStack;
-		return error;
-	}
-
-	sNetStack = netStack;
 	return B_OK;
 }
 
@@ -120,6 +105,13 @@ NetStack::CreateDefault()
 NetStack *
 NetStack::Default()
 {
+	if (created == false) {
+		if (sStaticNetStack.Init() != B_OK) {
+			return NULL;
+		}
+		sNetStack = &sStaticNetStack;
+		created = true;
+	}
 	return sNetStack;
 }
 
@@ -167,7 +159,7 @@ net_stack_init()
 	MSG("enter");
 	status_t error = NetStack::CreateDefault();
 	if (error != B_OK) {
-		MSG("create default: %lx", error);
+		MSG("create default: %x", error);
 		return error;
 	}
 	MSG("created");

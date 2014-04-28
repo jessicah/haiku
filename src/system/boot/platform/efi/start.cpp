@@ -109,9 +109,9 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systemTable)
 	serial_enable();
 //	interrupts_init();
 	console_init();
-//	net_stack_init();
+	net_stack_init();
 //		we can't actually init the network stack here... as we can't allocate
-//		objects yet...
+//		objects yet... can we? we can initialise static objects...
 //	cpu_init();
 //	mmu_init();
 	debug_init_post_mmu();

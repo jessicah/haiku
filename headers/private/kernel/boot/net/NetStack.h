@@ -17,7 +17,7 @@ class TCPService;
 
 
 class NetStack {
-private:
+public:
 	NetStack();
 	~NetStack();
 

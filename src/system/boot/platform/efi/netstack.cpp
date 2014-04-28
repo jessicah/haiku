@@ -141,6 +141,9 @@ EFIEthernetInterface::Receive(void *buffer, size_t size)
 status_t
 platform_net_stack_init()
 {
+	if (NetStack::Default() == NULL)
+		return B_NO_MEMORY;
+
 	EFIEthernetInterface *interface = new(std::nothrow) EFIEthernetInterface;
 	if (!interface)
 		return B_NO_MEMORY;
