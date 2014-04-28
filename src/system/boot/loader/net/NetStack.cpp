@@ -102,6 +102,7 @@ NetStack::CreateDefault()
 		return B_OK;
 
 	NetStack *netStack = new(nothrow) NetStack;
+	MSG("netStack = %p", netStack);
 	if (!netStack)
 		return B_NO_MEMORY;
 
@@ -165,8 +166,11 @@ net_stack_init()
 {
 	MSG("enter");
 	status_t error = NetStack::CreateDefault();
-	if (error != B_OK)
+	if (error != B_OK) {
+		MSG("create default: %lx", error);
 		return error;
+	}
+	MSG("created");
 
 	return platform_net_stack_init();
 }
