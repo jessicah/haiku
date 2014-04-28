@@ -73,6 +73,9 @@ EFIEthernetInterface::Init()
 		return B_ERROR;
 	}
 
+	status = fNetwork->Shutdown(fNetwork);
+	MSG("shutting down first, so can start from scratch... %x", status);
+
 	status = fNetwork->Start(fNetwork);
 	if (status != EFI_SUCCESS && status != EFI_ALREADY_STARTED) {
 		MSG("failed to start simple network protocol: %x", status);
