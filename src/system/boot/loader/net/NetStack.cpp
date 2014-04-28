@@ -15,6 +15,11 @@
 #include <boot/net/UDP.h>
 #include <boot/net/TCP.h>
 
+#include <KernelExport.h>
+
+
+#define MSG(format, args...) \
+	dprintf("%s:%d: " format "\n", __FILE__, __LINE__ , ## args)
 
 // sNetStack
 NetStack *NetStack::sNetStack = NULL;
@@ -158,6 +163,7 @@ NetStack::AddEthernetInterface(EthernetInterface *interface)
 status_t
 net_stack_init()
 {
+	MSG("enter");
 	status_t error = NetStack::CreateDefault();
 	if (error != B_OK)
 		return error;
