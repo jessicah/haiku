@@ -45,20 +45,38 @@ extern "C" uint64 rdtsc();
 #ifdef ENABLE_SYSLOG_NG
 static UDPSocket *sSyslogSocket = NULL;
 
+static bool in_write = false;
+
+void syslog_write(const char *, size_t);
+
 static void
 syslog_ng_write(const char *message, size_t length)
 {
-	if (NetStack::InitCheck() == B_NO_INIT)
+	if (in_write == true) return;
+	in_write = true;
+	if (NetStack::InitCheck() == B_NO_INIT) {
+		in_write = false;
 		return;
-#if 0
+	}
+
 	if (sSyslogSocket == NULL) {
 		// Check if the network stack has been initialized yet
 		if (NetStack::Default() != NULL) {
 			sSyslogSocket = new(std::nothrow) UDPSocket;
-			if (sSyslogSocket == NULL)
+			if (sSyslogSocket == NULL) {
+				in_write = false;
 				return;
+			}
 			sSyslogSocket->Bind(INADDR_ANY, 60514);
+		} else {
+			in_write = false;
+			return;
 		}
+	}
+
+	if (sSyslogSocket == NULL) {
+		in_write = false;
+		return;
 	}
 
 	// Strip trailing newlines
@@ -69,8 +87,10 @@ syslog_ng_write(const char *message, size_t length)
 		}
 		length--;
 	}
-	if (length <= 0)
+	if (length <= 0) {
+		in_write = false;
 		return;
+	}
 
 	char buffer[1500];
 	const int facility = 0; // kernel
@@ -79,13 +99,14 @@ syslog_ng_write(const char *message, size_t length)
 		facility * 8 + severity);
 	length = std::min(length, sizeof(buffer) - offset);
 	memcpy(buffer + offset, message, length);
+
 	sSyslogSocket->Send(INADDR_BROADCAST, 514, buffer, offset + length);
-#endif
+	in_write = false;
 }
 #endif
 
 
-static void
+void
 syslog_write(const char* buffer, size_t length)
 {
 	if (sPostCleanup && sDebugSyslogBuffer != NULL) {

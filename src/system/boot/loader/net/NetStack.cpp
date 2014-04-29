@@ -118,7 +118,9 @@ NetStack::Default()
 status_t
 NetStack::InitCheck()
 {
-	return created == true ? B_OK : B_NO_INIT;
+	bool ready = Default() != NULL;
+	bool ready3 = ready && (Default()->fEthernetInterface != NULL) && (created == true);
+	return ready3 ? B_OK : B_NO_INIT;
 }
 
 
@@ -162,13 +164,9 @@ NetStack::AddEthernetInterface(EthernetInterface *interface)
 status_t
 net_stack_init()
 {
-	MSG("enter");
 	status_t error = NetStack::CreateDefault();
-	if (error != B_OK) {
-		MSG("create default: %x", error);
+	if (error != B_OK)
 		return error;
-	}
-	MSG("created");
 
 	//return platform_net_stack_init();
 		// don't do this here for now

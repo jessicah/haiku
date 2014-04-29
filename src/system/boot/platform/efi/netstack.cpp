@@ -68,24 +68,18 @@ EFIEthernetInterface::Init()
 	EFI_STATUS status = kBootServices->LocateProtocol(&sSimpleNetworkGuid,
 		NULL, (void **)&fNetwork);
 
-	if (status != EFI_SUCCESS || fNetwork == NULL) {
-		MSG("locate protocol failed: %x (%p)", status, fNetwork);
+	if (status != EFI_SUCCESS || fNetwork == NULL)
 		return B_ERROR;
-	}
 
 	status = fNetwork->Shutdown(fNetwork);
-	MSG("shutting down first, so can start from scratch... %x", status);
 
 	status = fNetwork->Start(fNetwork);
-	if (status != EFI_SUCCESS && status != EFI_ALREADY_STARTED) {
-		MSG("failed to start simple network protocol: %x", status);
+	if (status != EFI_SUCCESS && status != EFI_ALREADY_STARTED)
 		return B_ERROR;
-	}
-	status = fNetwork->Initialize(fNetwork, 0x1000, 0x1000);
-	if (status != EFI_SUCCESS) {
-		MSG("failed to initialize simple network protocol: %x", status);
+
+	status = fNetwork->Initialize(fNetwork, 0, 0);
+	if (status != EFI_SUCCESS)
 		return B_ERROR;
-	}
 
 	// get MAC address
 	EFI_MAC_ADDRESS macAddress = fNetwork->Mode->CurrentAddress;
@@ -128,6 +122,7 @@ EFIEthernetInterface::Send(const void *buffer, size_t size)
 	if (status == EFI_SUCCESS) {
 		// Need to wait for packet to be transmitted so we can recyle the transmit buffer
 		void *txBuffer;
+		int limit = 10;
 		do {
 			if (fNetwork->GetStatus(fNetwork, NULL, &txBuffer) != EFI_SUCCESS)
 				return B_ERROR;
@@ -135,8 +130,11 @@ EFIEthernetInterface::Send(const void *buffer, size_t size)
 			struct timespec ts;
 			ts.tv_sec = 0;
 			ts.tv_nsec = 50 * 1000;
-			nanosleep(&ts, NULL);
-		} while (txBuffer != buffer);
+			//nanosleep(&ts, NULL);
+		} while (txBuffer != buffer && --limit > 0);
+
+		if (limit == 0)
+			return -1;
 	}
 
 	return size;
@@ -148,10 +146,7 @@ EFIEthernetInterface::Receive(void *buffer, size_t size)
 {
 	EFI_STATUS status = fNetwork->Receive(fNetwork, NULL, &size, buffer, NULL, NULL, NULL);
 
-	if (status == EFI_NOT_READY)
-		return 0;
-
-	if (status != EFI_SUCCESS)
+	if (status == EFI_NOT_READY || status != EFI_SUCCESS)
 		return B_ERROR;
 
 	return size;
@@ -160,32 +155,24 @@ EFIEthernetInterface::Receive(void *buffer, size_t size)
 status_t
 platform_net_stack_init()
 {
-	MSG("enter");
-	if (NetStack::Default() == NULL) {
-		MSG("no memory for default netstack");
+	if (NetStack::Default() == NULL)
 		return B_NO_MEMORY;
-	}
 
 	EFIEthernetInterface *interface = new(std::nothrow) EFIEthernetInterface;
-	if (!interface) {
-		MSG("no memory for efi driver");
+	if (!interface)
 		return B_NO_MEMORY;
-	}
 
 	status_t error = interface->Init();
 	if (error != B_OK) {
-		MSG("init efi driver failed");
 		delete interface;
 		return error;
 	}
 
 	error = NetStack::Default()->AddEthernetInterface(interface);
 	if (error != B_OK) {
-		MSG("add efi driver to netstack failed");
 		delete interface;
 		return error;
 	}
 
-	MSG("exit");
 	return B_OK;
 }
