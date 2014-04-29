@@ -1311,6 +1311,7 @@ add_debug_menu()
 		item->SetType(MENU_ITEM_NO_CHOICE);
 		item->SetHelpText(
 			"Displays the debug info the boot loader has logged.");
+		item->SetShortcut('l');
 	}
 
 	if (hasPreviousSyslog) {
@@ -1416,14 +1417,17 @@ user_menu(BootVolume& _bootVolume, PathBlacklist& _pathBlacklist)
 	// Add boot volume
 	menu->AddItem(item = new(std::nothrow) MenuItem("Select boot volume",
 		add_boot_volume_menu(_bootVolume.RootDirectory())));
+	item->SetShortcut('v');
 
 	// Add safe mode
 	menu->AddItem(item = new(std::nothrow) MenuItem("Select safe mode options",
 		safeModeMenu = add_safe_mode_menu()));
+	item->SetShortcut('s');
 
 	// add debug menu
 	menu->AddItem(item = new(std::nothrow) MenuItem("Select debug options",
 		debugMenu = add_debug_menu()));
+	item->SetShortcut('d');
 
 	// Add platform dependent menus
 	platform_add_menus(menu);
