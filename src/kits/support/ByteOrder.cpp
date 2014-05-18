@@ -39,7 +39,7 @@ swap_data(type_code type, void *_data, size_t length, swap_action action)
 			uint16 *end = (uint16 *)((addr_t)_data + length);
 
 			while (data < end) {
-				*data = __swap_int16(*data);
+				*data = __builtin_bswap16(*data);
 				data++;
 			}
 			break;
@@ -62,7 +62,7 @@ swap_data(type_code type, void *_data, size_t length, swap_action action)
 			uint32 *end = (uint32 *)((addr_t)_data + length);
 
 			while (data < end) {
-				*data = __swap_int32(*data);
+				*data = __builtin_bswap32(*data);
 				data++;
 			}
 			break;
@@ -83,7 +83,7 @@ swap_data(type_code type, void *_data, size_t length, swap_action action)
 			uint64 *end = (uint64 *)((addr_t)_data + length);
 
 			while (data < end) {
-				*data = __swap_int64(*data);
+				*data = __builtin_bswap64(*data);
 				data++;
 			}
 			break;
@@ -99,9 +99,9 @@ swap_data(type_code type, void *_data, size_t length, swap_action action)
 				BMessenger::Private messengerPrivate(messenger);
 				// ToDo: if the additional fields change, this function has to be updated!
 				messengerPrivate.SetTo(
-					__swap_int32(messengerPrivate.Team()),
-					__swap_int32(messengerPrivate.Port()),
-					__swap_int32(messengerPrivate.Token()));
+					__builtin_bswap32(messengerPrivate.Team()),
+					__builtin_bswap32(messengerPrivate.Port()),
+					__builtin_bswap32(messengerPrivate.Token()));
 				messenger++;
 			}
 			break;

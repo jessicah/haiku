@@ -118,7 +118,7 @@ syslog_write(const char* buffer, size_t length)
 }
 
 
-static void
+void
 dprintf_args(const char *format, va_list args)
 {
 	char buffer[512];

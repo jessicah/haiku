@@ -22,6 +22,7 @@ public:
 	~NetStack();
 
 	status_t Init();
+	void Destroy();
 
 public:
 	static status_t CreateDefault();

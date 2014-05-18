@@ -42,4 +42,4 @@ SEARCH on [ FGristFiles $(kernelLibArchSpecificSources) ]
 }
 
 SEARCH on [ FGristFiles $(librootOsArchSources) ]
-    = [ FDirName $(HAIKU_TOP) src system libroot os arch x86 ] ;
+    = [ FDirName $(HAIKU_TOP) src system libroot os arch $(TARGET_ARCH) ] ;

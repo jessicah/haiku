@@ -132,7 +132,7 @@ template<>
 inline void
 byte_swap(int64 &data)
 {
-	data = __swap_int64(data);
+	data = __builtin_bswap64(data);
 }
 
 
@@ -140,7 +140,7 @@ template<>
 inline void
 byte_swap(uint64 &data)
 {
-	data = __swap_int64(data);
+	data = __builtin_bswap64(data);
 }
 
 
@@ -148,7 +148,7 @@ template<>
 inline void
 byte_swap(int32 &data)
 {
-	data = __swap_int32(data);
+	data = __builtin_bswap32(data);
 }
 
 
@@ -156,7 +156,7 @@ template<>
 inline void
 byte_swap(uint32 &data)
 {
-	data = __swap_int32(data);
+	data = __builtin_bswap32(data);
 }
 
 
@@ -164,7 +164,7 @@ template<>
 inline void
 byte_swap(int16 &data)
 {
-	data = __swap_int16(data);
+	data = __builtin_bswap16(data);
 }
 
 
@@ -172,7 +172,7 @@ template<>
 inline void
 byte_swap(uint16 &data)
 {
-	data = __swap_int16(data);
+	data = __builtin_bswap16(data);
 }
 
 

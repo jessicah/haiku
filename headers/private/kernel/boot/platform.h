@@ -19,6 +19,7 @@ extern "C" {
 /* debug functions */
 extern void panic(const char *format, ...);
 extern void dprintf(const char *format, ...);
+extern void dprintf_args(const char *format, va_list args);
 
 /* heap functions */
 extern void platform_release_heap(struct stage2_args *args, void *base);

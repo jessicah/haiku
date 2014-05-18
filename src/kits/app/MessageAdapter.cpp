@@ -190,7 +190,7 @@ MessageAdapter::Unflatten(uint32 format, BMessage *into, const char *buffer)
 			{
 				r5_message_header *header = (r5_message_header *)buffer;
 				BMemoryIO stream(buffer + sizeof(uint32),
-					__swap_int32(header->flattened_size) - sizeof(uint32));
+					__builtin_bswap32(header->flattened_size) - sizeof(uint32));
 				return _UnflattenR5Message(format, into, &stream);
 			}
 
@@ -200,7 +200,7 @@ MessageAdapter::Unflatten(uint32 format, BMessage *into, const char *buffer)
 				dano_section_header *header = (dano_section_header *)buffer;
 				ssize_t size = header->size;
 				if (header->code == MESSAGE_FORMAT_DANO_SWAPPED)
-					size = __swap_int32(size);
+					size = __builtin_bswap32(size);
 
 				BMemoryIO stream(buffer + sizeof(uint32), size - sizeof(uint32));
 				return _UnflattenDanoMessage(format, into, &stream);
@@ -622,7 +622,7 @@ MessageAdapter::_UnflattenR5Message(uint32 format, BMessage *into,
 		} else {
 			for (int32 i = 0; i < itemCount; i++) {
 				if (!fixedSize) {
-					itemSize = __swap_int32(*(int32 *)pointer);
+					itemSize = __builtin_bswap32(*(int32 *)pointer);
 					pointer += sizeof(int32);
 				}
 

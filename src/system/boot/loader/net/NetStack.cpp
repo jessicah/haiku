@@ -36,6 +36,11 @@ NetStack::NetStack()
 // destructor
 NetStack::~NetStack()
 {
+}
+
+void
+NetStack::Destroy()
+{
 	delete fTCPService;
 	delete fUDPService;
 	delete fIPService;
@@ -128,7 +133,8 @@ status_t
 NetStack::ShutDown()
 {
 	if (sNetStack != NULL) {
-		delete sNetStack;
+		created = false;
+		sNetStack->Destroy();
 		sNetStack = NULL;
 	}
 
