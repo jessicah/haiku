@@ -34,6 +34,7 @@ enum TranslatorGroups {
 	B_TRANSLATOR_TEXT		= 'TEXT',
 	B_TRANSLATOR_MIDI		= 'midi',
 	B_TRANSLATOR_MEDIA		= 'mhi!',
+	B_TRANSLATOR_CONTACT	= 'ppl!',
 	B_TRANSLATOR_NONE		= 'none',
 	B_TRANSLATOR_ANY_TYPE	= 0
 };

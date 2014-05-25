@@ -9,11 +9,18 @@ SubDirHdrs [ FDirName $(SUBDIR) $(DOTDOT) shared ] ;
 
 AddResources PersonTranslator : PersonTranslator.rdef ;
 
-Translator PersonTranslator :
-	PersonMain.cpp
-	PersonTranslator.cpp
-	PersonView.cpp
-	: be translation libcontact.so libtranslatorsutils.a libshared.a
-	$(TARGET_LIBSUPC++) $(HAIKU_LOCALE_LIBS)
-	: true
-;
+local architectureObject ;
+for architectureObject in [ MultiArchSubDirSetup ] {
+	on $(architectureObject) {
+		Translator [ MultiArchDefaultGristFiles PersonTranslator ] :
+			PersonMain.cpp
+			PersonTranslator.cpp
+			PersonView.cpp
+			: be translation
+			[ MultiArchDefaultGristFiles libcontact.so ]
+			[ MultiArchDefaultGristFiles libtranslatorsutils.a ]
+			libshared.a	$(TARGET_LIBSUPC++) localestub
+		: true
+		;
+	}
+}

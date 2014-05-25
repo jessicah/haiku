@@ -72,6 +72,7 @@ rule HaikuImageGetSystemLibs
 			libpackage.so
 			libscreensaver.so
 			libtextencoding.so libtracker.so libtranslation.so
+			libcontact.so
 			libtiff.so
 		] ]
 		;
@@ -122,6 +123,7 @@ SYSTEM_ADD_ONS_TRANSLATORS +=
 	SGITranslator
 	TGATranslator TIFFTranslator
 	WebPTranslator WonderBrushTranslator
+	PersonTranslator
 ;
 
 SYSTEM_ADD_ONS_MEDIA += [ FFilterByBuildFeatures
