@@ -123,7 +123,7 @@ SYSTEM_ADD_ONS_TRANSLATORS +=
 	SGITranslator
 	TGATranslator TIFFTranslator
 	WebPTranslator WonderBrushTranslator
-	PersonTranslator
+	PersonTranslator VCardTranslator
 ;
 
 SYSTEM_ADD_ONS_MEDIA += [ FFilterByBuildFeatures

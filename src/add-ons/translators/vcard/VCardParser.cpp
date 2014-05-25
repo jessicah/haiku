@@ -107,7 +107,7 @@ VCardParser::PropertyAt(int32 i)
 	return fList.ItemAt(i);
 }
 
-	
+
 BContactFieldList*
 VCardParser::Properties()
 {
@@ -132,7 +132,7 @@ VCardParser::PropHandler(const CARD_Char* propName, const CARD_Char** params)
 		fEnd = true;
 		return;
 	}
-	
+
 	if (!fCheck)
 		return;
 
@@ -144,7 +144,7 @@ VCardParser::PropHandler(const CARD_Char* propName, const CARD_Char** params)
 	fLatestProp.SetTo(propName);
 
 	fLatestParams.MakeEmpty();
-	for (int i = 0; params[i] != NULL; i++) {	
+	for (int i = 0; params[i] != NULL; i++) {
 		fLatestParams.AddItem(new BString(params[i]));
 		if (params[i+1] == NULL)
 			i++;
@@ -205,8 +205,8 @@ VCardParser::_TranslateUsage(BContactField* field) {
 	int count = fLatestParams.CountItems();
 	for (int i = 0; i < count; i++) {
 		BString param = fLatestParams.ItemAt(i)->String();
-		field_usage usage = fUsagesMap.Get(HashString(param));
+		field_usage usage = fUsagesMap.Get(HashString(param.String(),
+			param.Length()));
 		field->AddUsage(usage);
-		//printf("----Param : %s\n", fLatestParams.ItemAt(i)->String());
 	}
 }

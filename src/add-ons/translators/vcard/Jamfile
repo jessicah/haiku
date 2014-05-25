@@ -9,13 +9,21 @@ SubDirHdrs [ FDirName $(SUBDIR) $(DOTDOT) shared ] ;
 
 AddResources VCardTranslator : VCardTranslator.rdef ;
 
-Translator VCardTranslator :
-	VCardMain.cpp
-	VCardParser.cpp
-	VCardTranslator.cpp
-	VCardView.cpp
-	cardparser.c
-	: be translation libcontact.so libtranslatorsutils.a libshared.a
-	$(TARGET_LIBSUPC++) $(HAIKU_LOCALE_LIBS)
-	: true
-;
+local architectureObject ;
+for architectureObject in [ MultiArchSubDirSetup ] {
+	on $(architectureObject) {
+		Translator [ MultiArchDefaultGristFiles VCardTranslator ] :
+			VCardMain.cpp
+			VCardParser.cpp
+			VCardTranslator.cpp
+			VCardView.cpp
+			cardparser.c
+			: be translation
+			[ MultiArchDefaultGristFiles libcontact.so ]
+			[ MultiArchDefaultGristFiles libtranslatorsutils.a ]
+			[ MultiArchDefaultGristFiles libshared.a	]
+			$(TARGET_LIBSUPC++) localestub
+			: true
+		;
+	}
+}
