@@ -1,25 +1,2 @@
-1	ukrainian	x-vnd.haiku-screenshot	889794495
-seconds	ScreenshotWindow		секунд
-Desktop	ScreenshotWindow		Робочий стіл
-Include window border	ScreenshotWindow		Включаючи межу вікна
-Screenshot	System name		Знімок екрану
-Select	ScreenshotWindow		Вибрати
-Capture active window	ScreenshotWindow		Захопити активне вікно
-Cancel	ScreenshotWindow		Відмінити
-Name:	ScreenshotWindow		Ім'я:
-Choose folder	ScreenshotWindow		Виберіть папку
-Save	ScreenshotWindow		Зберегти
-Choose folder...	ScreenshotWindow		Виберіть папку...
-Please select	ScreenshotWindow		Будь-ласка виберіть
-Save as:	ScreenshotWindow		Зберегти як:
-Copy to clipboard	ScreenshotWindow		Копіювати до буфера обміну
-Save in:	ScreenshotWindow		Зберегти в:
-screenshot	Screenshot	Base filename of screenshot files	знімок екрана
-New screenshot	ScreenshotWindow		Новий знімок
-Artwork folder	ScreenshotWindow		Папка Artwork
-Home folder	ScreenshotWindow		Папка Home
-Settings…	ScreenshotWindow		Настройки…
-overwrite	ScreenshotWindow		переписати
-Delay:	ScreenshotWindow		Затримка:
-Include mouse pointer	ScreenshotWindow		Включаючи курсор
-Translator Settings	ScreenshotWindow		Настройки транслятора
+1	ukrainian	x-vnd.haiku-screenshot-cli	721864121
+screenshot	Screenshot	Base filename of screenshot files	screenshot

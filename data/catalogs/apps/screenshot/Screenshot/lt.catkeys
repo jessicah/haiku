@@ -1,26 +1,2 @@
-1	lithuanian	x-vnd.haiku-screenshot	913664967
-seconds	ScreenshotWindow		sek.
-Desktop	ScreenshotWindow		Darbalaukis
-Include window border	ScreenshotWindow		Įtraukti lango rėmelį
-Screenshot	System name		Nuotrauka
-Select	ScreenshotWindow		Rinktis
-Capture active window	ScreenshotWindow		Fotografuoti tik aktyvų langą
-Cancel	ScreenshotWindow		Atsisakyti
-Name:	ScreenshotWindow		Failo vardas:
-Choose folder	ScreenshotWindow		Parinkite aplanką
-Save	ScreenshotWindow		Įrašyti
-Overwrite	ScreenshotWindow		Perrašyti
-Choose folder...	ScreenshotWindow		Rinktis aplanką…
-Please select	ScreenshotWindow		Pasirinkite
-Save as:	ScreenshotWindow		Failo formatas:
-Copy to clipboard	ScreenshotWindow		Kopijuoti į iškarpinę
-Save in:	ScreenshotWindow		Įrašyti į:
+1	lithuanian	x-vnd.haiku-screenshot-cli	721864121
 screenshot	Screenshot	Base filename of screenshot files	nuotrauka
-New screenshot	ScreenshotWindow		Nauja nuotrauka
-Artwork folder	ScreenshotWindow		Paveikslų aplankas
-Home folder	ScreenshotWindow		Namų aplankas
-Settings…	ScreenshotWindow		Nuostatos…
-overwrite	ScreenshotWindow		Perrašyti
-Delay:	ScreenshotWindow		Uždelsti:
-Include mouse pointer	ScreenshotWindow		Įtraukti pelės žymeklį
-Translator Settings	ScreenshotWindow		Keitiklio nuostatos

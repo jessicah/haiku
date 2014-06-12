@@ -1,26 +1,2 @@
-1	polish	x-vnd.haiku-screenshot	913664967
-seconds	ScreenshotWindow		sekund
-Desktop	ScreenshotWindow		Pulpit
-Include window border	ScreenshotWindow		Dołącz obramowanie okna
-Screenshot	System name		Zrzut ekranu
-Select	ScreenshotWindow		Wybierz
-Capture active window	ScreenshotWindow		Przechwyć aktywne okno
-Cancel	ScreenshotWindow		Anuluj
-Name:	ScreenshotWindow		Nazwa:
-Choose folder	ScreenshotWindow		Wybierz folder
-Save	ScreenshotWindow		Zapisz
-Overwrite	ScreenshotWindow		Nadpisz
-Choose folder...	ScreenshotWindow		Wybierz folder...
-Please select	ScreenshotWindow		Proszę wybrać
-Save as:	ScreenshotWindow		Zapisz jako:
-Copy to clipboard	ScreenshotWindow		Kopiuj do schowka
-Save in:	ScreenshotWindow		Zapisz w:
+1	polish	x-vnd.haiku-screenshot-cli	721864121
 screenshot	Screenshot	Base filename of screenshot files	screenshot
-New screenshot	ScreenshotWindow		Nowy zrzut ekranu
-Artwork folder	ScreenshotWindow		Folder na obrazki
-Home folder	ScreenshotWindow		Folder domowy
-Settings…	ScreenshotWindow		Ustawienia…
-overwrite	ScreenshotWindow		nadpisz
-Delay:	ScreenshotWindow		Opóźnienie:
-Include mouse pointer	ScreenshotWindow		Pokaż wskaźnik myszy
-Translator Settings	ScreenshotWindow		Ustawienia Translatora
