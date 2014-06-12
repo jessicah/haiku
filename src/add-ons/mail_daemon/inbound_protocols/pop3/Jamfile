@@ -12,16 +12,15 @@ SubDirHdrs [ FDirName $(HAIKU_TOP) headers os add-ons mail_daemon ] ;
 local sources =
 	ConfigView.cpp
 	MessageIO.cpp
-	pop3.cpp
+	POP3.cpp
 	md5c.c
 ;
 
 # use OpenSSL, if enabled
-if [ FIsBuildFeatureEnabled openssl ] {
+if $(HAIKU_BUILD_FEATURE_OPENSSL_ENABLED) {
 	SubDirC++Flags -DUSE_SSL ;
-	UseBuildFeatureHeaders openssl ;
-	Includes [ FGristFiles $(sources) ]
-		: [ BuildFeatureAttribute openssl : headers ] ;
+	SubDirSysHdrs $(HAIKU_OPENSSL_HEADERS) ;
+	Includes [ FGristFiles $(sources) ] : $(HAIKU_OPENSSL_HEADERS_DEPENDENCY) ;
 		# Dependency needed to trigger downloading/unzipping the package before
 		# compiling the files.
 	SetupFeatureObjectsDir ssl ;
@@ -33,14 +32,18 @@ AddResources POP3 : POP3.rdef ;
 
 Addon POP3
 	: $(sources)
-	: be libbnetapi.so libmail.so localestub
-		[ BuildFeatureAttribute openssl : libraries ] $(TARGET_LIBSUPC++)
-		$(TARGET_NETWORK_LIBS)
+	: be libbnetapi.so libmail.so $(HAIKU_LOCALE_LIBS)
+		$(HAIKU_OPENSSL_LIBS) $(TARGET_LIBSUPC++) $(TARGET_NETWORK_LIBS)
+;
+
+Package haiku-maildaemon-cvs :
+	POP3 :
+	boot home config add-ons mail_daemon inbound_protocols
 ;
 
 DoCatalogs POP3 :
 	x-vnd.Haiku-POP3
 	:
 	ConfigView.cpp
-	pop3.cpp
+	POP3.cpp
 ;

@@ -1,14 +1,21 @@
-#include "IMAPFolders.h"
-#include "IMAPMailbox.h"
-#include "IMAPStorage.h"
+/*
+ * Copyright 2011-2013, Axel Dörfler, axeld@pinc-software.de.
+ * Distributed under the terms of the MIT License.
+ */
+
+
+#include <stdlib.h>
+
+#include "Protocol.h"
+#include "Response.h"
 
 #include "argv.h"
 
 
 struct cmd_entry {
-	char*	name;
-	void	(*func)(int argc, char **argv);
-	char*	help;
+	const char*	name;
+	void		(*func)(int argc, char **argv);
+	const char*	help;
 };
 
 
@@ -18,8 +25,7 @@ static void do_help(int argc, char** argv);
 extern const char* __progname;
 static const char* kProgramName = __progname;
 
-static IMAPStorage sStorage;
-static IMAPMailbox sMailbox(sStorage);
+static IMAP::Protocol sProtocol;
 
 
 static void
@@ -47,8 +53,12 @@ do_select(int argc, char** argv)
 	if (argc > 1)
 		folder = argv[1];
 
-	status_t status = sMailbox.SelectMailbox(folder);
-	if (status != B_OK)
+	IMAP::SelectCommand command(folder);
+	status_t status = sProtocol.ProcessCommand(command);
+	if (status == B_OK) {
+		printf("Next UID: %" B_PRIu32 ", UID validity: %" B_PRIu32 "\n",
+			command.NextUID(), command.UIDValidity());
+	} else
 		error("select", status);
 }
 
@@ -56,16 +66,137 @@ do_select(int argc, char** argv)
 static void
 do_folders(int argc, char** argv)
 {
-	IMAPFolders folder(sMailbox);
-	FolderList folders;
-	status_t status = folder.GetFolders(folders);
-	if (status != B_OK)
+	IMAP::FolderList folders;
+	BString separator;
+
+	status_t status = sProtocol.GetFolders(folders, separator);
+	if (status != B_OK) {
 		error("folders", status);
+		return;
+	}
 
 	for (size_t i = 0; i < folders.size(); i++) {
 		printf(" %s %s\n", folders[i].subscribed ? "*" : " ",
 			folders[i].folder.String());
 	}
+}
+
+
+static void
+do_fetch(int argc, char** argv)
+{
+	uint32 from = 1;
+	uint32 to;
+	uint32 flags = IMAP::kFetchAll;
+	if (argc < 2) {
+		printf("usage: %s [<from>] [<to>] [header|body]\n", argv[0]);
+		return;
+	}
+	if (argc > 2) {
+		if (!strcasecmp(argv[argc - 1], "header")) {
+			flags = IMAP::kFetchHeader;
+			argc--;
+		} else if (!strcasecmp(argv[argc - 1], "body")) {
+			flags = IMAP::kFetchBody;
+			argc--;
+		}
+	}
+	if (argc > 2) {
+		from = atoul(argv[1]);
+		to = atoul(argv[2]);
+	} else
+		from = to = atoul(argv[1]);
+
+	IMAP::FetchCommand command(from, to, flags | IMAP::kFetchFlags);
+
+	// A fetch listener that dumps everything to stdout
+	class Listener : public IMAP::FetchListener {
+	public:
+		virtual ~Listener()
+		{
+		}
+
+		virtual	bool FetchData(uint32 fetchFlags, BDataIO& stream,
+			size_t& length)
+		{
+			fBuffer.SetSize(0);
+
+			char buffer[65535];
+			while (length > 0) {
+				ssize_t bytesRead = stream.Read(buffer,
+					min_c(sizeof(buffer), length));
+				if (bytesRead <= 0)
+					break;
+
+				fBuffer.Write(buffer, bytesRead);
+				length -= bytesRead;
+			}
+
+			// Null terminate the buffer
+			char null = '\0';
+			fBuffer.Write(&null, 1);
+
+			return true;
+		}
+
+		virtual	void FetchedData(uint32 fetchFlags, uint32 uid, uint32 flags)
+		{
+			printf("================= UID %ld, flags %lx =================\n",
+				uid, flags);
+			puts((const char*)fBuffer.Buffer());
+		}
+
+	private:
+		BMallocIO	fBuffer;
+	} listener;
+
+	command.SetListener(&listener);
+
+	status_t status = sProtocol.ProcessCommand(command);
+	if (status != B_OK) {
+		error("fetch", status);
+		return;
+	}
+}
+
+
+static void
+do_flags(int argc, char** argv)
+{
+	uint32 from = 1;
+	uint32 to;
+	if (argc < 2) {
+		printf("usage: %s [<from>] [<to>]\n", argv[0]);
+		return;
+	}
+	if (argc > 2) {
+		from = atoul(argv[1]);
+		to = atoul(argv[2]);
+	} else
+		to = atoul(argv[1]);
+
+	IMAP::MessageEntryList entries;
+	IMAP::FetchMessageEntriesCommand command(entries, from, to, true);
+	status_t status = sProtocol.ProcessCommand(command);
+	if (status != B_OK) {
+		error("flags", status);
+		return;
+	}
+
+	for (size_t i = 0; i < entries.size(); i++) {
+		printf("%10lu %8lu bytes, flags: %#lx\n", entries[i].uid,
+			entries[i].size, entries[i].flags);
+	}
+}
+
+
+static void
+do_noop(int argc, char** argv)
+{
+	IMAP::RawCommand command("NOOP");
+	status_t status = sProtocol.ProcessCommand(command);
+	if (status != B_OK)
+		error("noop", status);
 }
 
 
@@ -82,7 +213,7 @@ do_raw(int argc, char** argv)
 		strlcat(command, argv[i], sizeof(command));
 	}
 
-	class RawCommand : public IMAPCommand {
+	class RawCommand : public IMAP::Command, public IMAP::Handler {
 	public:
 		RawCommand(const char* command)
 			:
@@ -90,13 +221,18 @@ do_raw(int argc, char** argv)
 		{
 		}
 
-		BString Command()
+		BString CommandString()
 		{
 			return fCommand;
 		}
 
-		bool Handle(const BString& response)
+		bool HandleUntagged(IMAP::Response& response)
 		{
+			if (response.IsCommand(fCommand)) {
+				printf("-> %s\n", response.ToString().String());
+				return true;
+			}
+
 			return false;
 		}
 
@@ -104,7 +240,7 @@ do_raw(int argc, char** argv)
 		const char* fCommand;
 	};
 	RawCommand rawCommand(command);
-	status_t status = sMailbox.ProcessCommand(&rawCommand, 60 * 1000);
+	status_t status = sProtocol.ProcessCommand(rawCommand);
 	if (status != B_OK)
 		error("raw", status);
 }
@@ -113,6 +249,11 @@ do_raw(int argc, char** argv)
 static cmd_entry sBuiltinCommands[] = {
 	{"select", do_select, "Selects a mailbox, defaults to INBOX"},
 	{"folders", do_folders, "List of existing folders"},
+	{"flags", do_flags,
+		"List of all mail UIDs in the mailbox with their flags"},
+	{"fetch", do_fetch,
+		"Fetch mails via UIDs"},
+	{"noop", do_noop, "Issue a NOOP command (will report new messages)"},
 	{"raw", do_raw, "Issue a raw command to the server"},
 	{"help", do_help, "prints this help text"},
 	{"quit", NULL, "exits the application"},
@@ -145,11 +286,13 @@ main(int argc, char** argv)
 	const char* user = argv[2];
 	const char* password = argv[3];
 	bool useSSL = argc > 4;
-	uint16 port = useSSL ? 995 : 143;
+	uint16 port = useSSL ? 993 : 143;
 
-	printf("Connecting to \"%s\" as %s\n", server, user);
+	BNetworkAddress address(AF_INET, server, port);
+	printf("Connecting to \"%s\" as %s%s, port %u\n", server, user,
+		useSSL ? " with SSL" : "", address.Port());
 
-	status_t status = sMailbox.Connect(server, user, password, useSSL, port);
+	status_t status = sProtocol.Connect(address, user, password, useSSL);
 	if (status != B_OK) {
 		error("connect", status);
 		return 1;

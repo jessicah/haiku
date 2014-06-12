@@ -19,7 +19,7 @@
 #endif
 
 
-static int32 gID = 1;
+static vint32 gID = 1;
 
 
 BRawNetBuffer::BRawNetBuffer()
@@ -165,7 +165,7 @@ DNSTools::GetDNSServers(BObjectList<BString>* serverList)
 	 line[sizeof(name) - 1] == '\t'))
 
 	BPath path;
-	if (find_directory(B_SYSTEM_SETTINGS_DIRECTORY, &path) != B_OK)
+	if (find_directory(B_COMMON_SETTINGS_DIRECTORY, &path) != B_OK)
 		return B_ENTRY_NOT_FOUND;
 
 	path.Append("network/resolv.conf");

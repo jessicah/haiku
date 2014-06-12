@@ -1,8 +1,13 @@
-/* C-mail API - compatibility function (stubs) for the old mail kit
-**
-** Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
-** Copyright 2011 Clemens Zeidler. All rights reserved.
-*/
+/*
+ * Copyright 2004-2012, Haiku, Inc. All rights reserved.
+ * Copyright 2001, Dr. Zoidberg Enterprises. All rights reserved.
+ * Copyright 2011, Clemens Zeidler. All rights reserved.
+ *
+ * Distributed under the terms of the MIT License.
+ */
+
+
+//!	C-mail API - compatibility function (stubs) for the old mail kit
 
 
 #include <stdlib.h>
@@ -22,15 +27,15 @@
 
 
 _EXPORT status_t
-check_for_mail(int32 * incoming_count)
+check_for_mail(int32* _incomingCount)
 {
-	status_t err = BMailDaemon::CheckMail(true);
-	if (err < B_OK)
-		return err;
-		
-	if (incoming_count != NULL)
-		*incoming_count = BMailDaemon::CountNewMessages(true);
-		
+	status_t status = BMailDaemon().CheckMail();
+	if (status != B_OK)
+		return status;
+
+	if (_incomingCount != NULL)
+		*_incomingCount = BMailDaemon().CountNewMessages(true);
+
 	return B_OK;
 }
 
@@ -38,7 +43,7 @@ check_for_mail(int32 * incoming_count)
 _EXPORT status_t
 send_queued_mail(void)
 {
-	return BMailDaemon::SendQueuedMail();
+	return BMailDaemon().SendQueuedMail();
 }
 
 
@@ -74,20 +79,19 @@ get_pop_account(mail_pop_account* account, int32 index)
 	if (accountSettings == NULL)
 		return B_BAD_INDEX;
 
-	const BMessage& settings = accountSettings->InboundSettings().Settings();
+	const BMessage& settings = accountSettings->InboundSettings();
 	strcpy(account->pop_name, settings.FindString("username"));
 	strcpy(account->pop_host, settings.FindString("server"));
 	strcpy(account->real_name, accountSettings->RealName());
 	strcpy(account->reply_to, accountSettings->ReturnAddress());
 
-	const char *password, *passwd;
-	password = settings.FindString("password");
-	passwd = get_passwd(&settings, "cpasswd");
-	if (passwd)
-		password = passwd;
+	const char* encryptedPassword = get_passwd(&settings, "cpasswd");
+	const char* password = encryptedPassword;
+	if (password == NULL)
+		password = settings.FindString("password");
 	strcpy(account->pop_password, password);
 
-	free((char *)passwd);
+	delete[] encryptedPassword;
 	return B_OK;
 }
 
@@ -107,14 +111,13 @@ get_smtp_host(char* buffer)
 		BMailSettings().DefaultOutboundAccount());
 	if (account == NULL)
 		return B_ERROR;
-		
-	const BMessage& settings = account->OutboundSettings().Settings();
-	
-	if (settings.HasString("server"))
-		strcpy(buffer,settings.FindString("server"));
-	else
+
+	const BMessage& settings = account->OutboundSettings();
+
+	if (!settings.HasString("server"))
 		return B_NAME_NOT_FOUND;
-		
+
+	strcpy(buffer, settings.FindString("server"));
 	return B_OK;
 }
 
@@ -136,6 +139,6 @@ forward_mail(entry_ref *ref, const char *recipients, bool now)
 
 	BEmailMessage mail(&file);
 	mail.SetTo(recipients);
-	
+
 	return mail.Send(now);
 }

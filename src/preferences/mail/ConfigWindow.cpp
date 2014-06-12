@@ -1,12 +1,12 @@
 /*
- * Copyright 2007-2014, Haiku, Inc. All rights reserved.
+ * Copyright 2007-2012, Haiku, Inc. All rights reserved.
  * Copyright 2001-2003 Dr. Zoidberg Enterprises. All rights reserved.
  *
  * Distributed under the terms of the MIT License.
  */
 
 
-//! main E-Mail config window
+//! Main E-Mail config window
 
 
 #include "ConfigWindow.h"
@@ -15,42 +15,41 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <Application.h>
-#include <Catalog.h>
-#include <ListView.h>
-#include <ScrollView.h>
-#include <StringView.h>
-#include <Button.h>
-#include <CheckBox.h>
-#include <MenuField.h>
-#include <TextControl.h>
-#include <TextView.h>
-#include <MenuItem.h>
-#include <Screen.h>
-#include <PopUpMenu.h>
-#include <MenuBar.h>
-#include <TabView.h>
-#include <Box.h>
 #include <Alert.h>
-#include <Bitmap.h>
-#include <Roster.h>
-#include <Resources.h>
-#include <Region.h>
-
 #include <AppFileInfo.h>
-#include <Entry.h>
-#include <Directory.h>
-#include <FindDirectory.h>
-#include <Path.h>
-
+#include <Application.h>
+#include <Bitmap.h>
+#include <Box.h>
+#include <Button.h>
 #include <Catalog.h>
+#include <CheckBox.h>
+#include <ControlLook.h>
+#include <Directory.h>
+#include <Entry.h>
+#include <FindDirectory.h>
+#include <LayoutBuilder.h>
+#include <ListView.h>
 #include <Locale.h>
-
 #include <MailDaemon.h>
 #include <MailSettings.h>
+#include <MenuBar.h>
+#include <MenuField.h>
+#include <MenuItem.h>
+#include <Path.h>
+#include <PopUpMenu.h>
+#include <Region.h>
+#include <Resources.h>
+#include <Roster.h>
+#include <Screen.h>
+#include <ScrollView.h>
+#include <StringView.h>
+#include <TabView.h>
+#include <TextControl.h>
+#include <TextView.h>
+
+#include <MailPrivate.h>
 
 #include "AutoConfigWindow.h"
-#include "CenterContainer.h"
 
 
 #undef B_TRANSLATION_CONTEXT
@@ -85,8 +84,7 @@ AccountItem::AccountItem(const char* label, BMailAccountSettings* account,
 	:
 	BStringItem(label),
 	fAccount(account),
-	fType(type),
-	fConfigPanel(NULL)
+	fType(type)
 {
 }
 
@@ -97,7 +95,7 @@ AccountItem::Update(BView* owner, const BFont* font)
 	if (fType == ACCOUNT_ITEM)
 		font = be_bold_font;
 
-	BStringItem::Update(owner,font);
+	BStringItem::Update(owner, font);
 }
 
 
@@ -113,28 +111,14 @@ AccountItem::DrawItem(BView* owner, BRect rect, bool complete)
 }
 
 
-void
-AccountItem::SetConfigPanel(BView* panel)
-{
-	fConfigPanel = panel;
-}
-
-
-BView*
-AccountItem::ConfigPanel()
-{
-	return fConfigPanel;
-}
-
-
 //	#pragma mark -
 
 
 class AccountsListView : public BListView {
 public:
-	AccountsListView(BRect rect, BHandler* target)
+	AccountsListView(BHandler* target)
 		:
-		BListView(rect, NULL, B_SINGLE_SELECTION_LIST, B_FOLLOW_ALL),
+		BListView(NULL, B_SINGLE_SELECTION_LIST),
 		fTarget(target)
 	{
 	}
@@ -183,12 +167,13 @@ class BitmapView : public BView {
 	public:
 		BitmapView(BBitmap *bitmap)
 			:
-			BView(bitmap->Bounds(), NULL, B_FOLLOW_NONE, B_WILL_DRAW)
+			BView(NULL, B_WILL_DRAW)
 		{
 			fBitmap = bitmap;
 
 			SetDrawingMode(B_OP_ALPHA);
 			SetBlendingMode(B_PIXEL_ALPHA, B_ALPHA_OVERLAY);
+			SetExplicitSize(bitmap->Bounds().Size());
 		}
 
 		~BitmapView()
@@ -199,9 +184,6 @@ class BitmapView : public BView {
 		virtual void AttachedToWindow()
 		{
 			SetViewColor(Parent()->ViewColor());
-
-			MoveTo((Parent()->Bounds().Width() - Bounds().Width()) / 2,
-				Frame().top);
 		}
 
 		virtual void Draw(BRect updateRect)
@@ -221,161 +203,77 @@ ConfigWindow::ConfigWindow()
 	:
 	BWindow(BRect(100, 100, 600, 540), B_TRANSLATE_SYSTEM_NAME("E-mail"),
 		B_TITLED_WINDOW,
-		B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE | B_NOT_RESIZABLE),
+		B_ASYNCHRONOUS_CONTROLS | B_NOT_ZOOMABLE | B_AUTO_UPDATE_SIZE_LIMITS),
 	fLastSelectedAccount(NULL),
 	fSaveSettings(false)
 {
-	// create controls
-	BRect rect(Bounds());
-	BView *top = new BView(rect, NULL, B_FOLLOW_ALL, 0);
-	top->SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
-	AddChild(top);
-
-	// determine font height
-	font_height fontHeight;
-	top->GetFontHeight(&fontHeight);
-	int32 height = (int32)(fontHeight.ascent + fontHeight.descent
-		+ fontHeight.leading) + 5;
-
-	rect.InsetBy(10, 10);
-	rect.bottom -= 18 + height;
-	BTabView *tabView = new BTabView(rect, NULL);
-
-	BView *view;
-	rect = tabView->Bounds();
-	rect.bottom -= tabView->TabHeight() + 4;
-	tabView->AddTab(view = new BView(rect, NULL, B_FOLLOW_ALL, 0));
-	tabView->TabAt(0)->SetLabel(B_TRANSLATE("Accounts"));
-	view->SetViewColor(top->ViewColor());
+	BTabView* tabView = new BTabView("tab");
 
 	// accounts listview
 
-	rect = view->Bounds().InsetByCopy(10, 10);
-	rect.right = 190 - B_V_SCROLL_BAR_WIDTH;
-	rect.bottom -= height + 18;
-	fAccountsListView = new AccountsListView(rect, this);
-	view->AddChild(new BScrollView(NULL, fAccountsListView, B_FOLLOW_ALL, 0,
-		false, true));
-	rect.right += B_V_SCROLL_BAR_WIDTH;
+	BView* view = new BView("accounts", 0);
+	tabView->AddTab(view);
+	tabView->TabAt(0)->SetLabel(B_TRANSLATE("Accounts"));
 
-	rect.left -= 2;
-	rect.top = rect.bottom + 10;
-	rect.bottom = rect.top + height;
-	BRect sizeRect = rect;
-	sizeRect.right = sizeRect.left + 30 + view->StringWidth(
-		B_TRANSLATE("Add"));
-	view->AddChild(new BButton(sizeRect, NULL, B_TRANSLATE("Add"),
-		new BMessage(kMsgAddAccount), B_FOLLOW_BOTTOM));
+	fAccountsListView = new AccountsListView(this);
 
-	sizeRect.left = sizeRect.right + 5;
-	sizeRect.right = sizeRect.left + 30 + view->StringWidth(
-		B_TRANSLATE("Remove"));
-	view->AddChild(fRemoveButton = new BButton(
-		sizeRect, NULL, B_TRANSLATE("Remove"),
-		new BMessage(kMsgRemoveAccount), B_FOLLOW_BOTTOM));
+	BButton* addButton = new BButton(NULL, B_TRANSLATE("Add"),
+		new BMessage(kMsgAddAccount));
+	fRemoveButton = new BButton(NULL, B_TRANSLATE("Remove"),
+		new BMessage(kMsgRemoveAccount));
 
-	// accounts config view
-	rect = view->Bounds();
-	rect.left = fAccountsListView->Frame().right + B_V_SCROLL_BAR_WIDTH + 16;
-	rect.right -= 10;
-	fConfigView = new CenterContainer(rect);
-	view->AddChild(fConfigView);
+	fConfigView = new BView(NULL, 0);
+	fConfigView->SetLayout(new BGroupLayout(B_VERTICAL));
+	fConfigView->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED, B_SIZE_UNLIMITED));
+	fConfigView->SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
 
-	_MakeHowToView();
+	BScrollView* scroller = new BScrollView(NULL, fAccountsListView, 0,
+		false, true);
+
+	BLayoutBuilder::Group<>(view, B_HORIZONTAL)
+		.SetInsets(B_USE_DEFAULT_SPACING)
+		.AddGroup(B_VERTICAL)
+			.Add(scroller)
+			.AddGroup(B_HORIZONTAL)
+				.Add(addButton)
+				.Add(fRemoveButton)
+			.End()
+		.End()
+		.Add(fConfigView, 2.0f);
+
+	_ReplaceConfigView(_BuildHowToView());
 
 	// general settings
 
-	rect = tabView->ContainerView()->Bounds();
-	tabView->AddTab(view = new CenterContainer(rect));
+	view = new BView("general", 0);
+	view->SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED, B_SIZE_UNLIMITED));
+	tabView->AddTab(view);
 	tabView->TabAt(1)->SetLabel(B_TRANSLATE("Settings"));
 
-	rect = view->Bounds().InsetByCopy(10, 10);
-	rect.bottom = rect.top + height * 5 + 15;
-	BBox *box = new BBox(rect);
-	box->SetLabel(B_TRANSLATE("Mail checking"));
-	view->AddChild(box);
-
-	rect = box->Bounds().InsetByCopy(10, 10);
-	rect.top += 7;
-	rect.bottom = rect.top + height;
-	BRect tile = rect.OffsetByCopy(0, 1);
-	int32 labelWidth = (int32)view->StringWidth(B_TRANSLATE("Check every")) + 6;
-	tile.right = 80 + labelWidth;
-	fIntervalControl = new BTextControl(tile, "time",
-		B_TRANSLATE("Check every"), NULL, NULL);
-	fIntervalControl->SetDivider(labelWidth);
-	box->AddChild(fIntervalControl);
-
-	BPopUpMenu* frequencyPopUp = new BPopUpMenu(B_EMPTY_STRING);
-	const char* frequencyStrings[] = {
-		B_TRANSLATE_COMMENT("never", "mail checking frequency"),
-		B_TRANSLATE("minutes"),
-		B_TRANSLATE("hours"),
-		B_TRANSLATE("days")};
-
-	for (int32 i = 0; i < 4; i++) {
-		BMenuItem* item = new BMenuItem(frequencyStrings[i],
-			new BMessage(kMsgIntervalUnitChanged));
-		frequencyPopUp->AddItem(item);
-	}
-	tile.left = tile.right + 5;
-	tile.right = rect.right;
-	tile.OffsetBy(0,-1);
-	fIntervalUnitField = new BMenuField(tile, "frequency", B_EMPTY_STRING,
-		frequencyPopUp);
-	fIntervalUnitField->SetDivider(0.0);
-	box->AddChild(fIntervalUnitField);
-
-	rect.OffsetBy(0,height + 9);
-	rect.bottom -= 2;
-	fPPPActiveCheckBox = new BCheckBox(rect, "ppp active",
-		B_TRANSLATE("Only when dial-up is connected"), NULL);
-	box->AddChild(fPPPActiveCheckBox);
-
-	rect.OffsetBy(0,height + 9);
-	rect.bottom -= 2;
-	fPPPActiveSendCheckBox = new BCheckBox(rect, "ppp activesend",
-		B_TRANSLATE("Schedule outgoing mail when dial-up is disconnected"),
+	fCheckMailCheckBox = new BCheckBox("check", B_TRANSLATE("Check every"),
 		NULL);
-	box->AddChild(fPPPActiveSendCheckBox);
+	fIntervalControl = new BTextControl("time", B_TRANSLATE("minutes"), NULL,
+		NULL);
 
-	// Miscellaneous settings box
-
-	rect = box->Frame();  rect.bottom = rect.top + 3 * height + 33;
-	box = new BBox(rect);
-	box->SetLabel(B_TRANSLATE("Miscellaneous"));
-	view->AddChild(box);
-
-	BPopUpMenu *statusPopUp = new BPopUpMenu(B_EMPTY_STRING);
-	const char *statusModes[] = {
+	BPopUpMenu* statusPopUp = new BPopUpMenu(B_EMPTY_STRING);
+	const char* statusModes[] = {
 		B_TRANSLATE_COMMENT("Never", "show status window"),
 		B_TRANSLATE("While sending"),
-		B_TRANSLATE("While sending and receiving"),
-		B_TRANSLATE("Always")};
-	for (int32 i = 0; i < 4; i++) {
+		B_TRANSLATE("While sending and receiving")};
+	for (size_t i = 0; i < sizeof(statusModes) / sizeof(statusModes[0]); i++) {
 		BMessage* msg = new BMessage(kMsgShowStatusWindowChanged);
 		BMenuItem* item = new BMenuItem(statusModes[i], msg);
 		statusPopUp->AddItem(item);
 		msg->AddInt32("ShowStatusWindow", i);
 	}
-	rect = box->Bounds().InsetByCopy(10, 10);
-	rect.top += 7;
-	rect.bottom = rect.top + height + 5;
-	labelWidth = (int32)view->StringWidth(
-		B_TRANSLATE("Show connection status window:"))	+ 8;
-	fStatusModeField = new BMenuField(rect, "show status",
-		B_TRANSLATE("Show connection status window:"), statusPopUp);
-	fStatusModeField->SetDivider(labelWidth);
-	box->AddChild(fStatusModeField);
 
-	rect = fStatusModeField->Frame();;
-	rect.OffsetBy(0, rect.Height() + 10);
+	fStatusModeField = new BMenuField("show status",
+		B_TRANSLATE("Show notifications:"), statusPopUp);
+
 	BMessage* msg = new BMessage(B_REFS_RECEIVED);
-	BButton *button = new BButton(rect, B_EMPTY_STRING,
+	BButton* editMenuButton = new BButton(B_EMPTY_STRING,
 		B_TRANSLATE("Edit mailbox menu…"), msg);
-	button->ResizeToPreferred();
-	box->AddChild(button);
-	button->SetTarget(BMessenger("application/x-vnd.Be-TRAK"));
+	editMenuButton->SetTarget(BMessenger("application/x-vnd.Be-TRAK"));
 
 	BPath path;
 	find_directory(B_USER_SETTINGS_DIRECTORY, &path);
@@ -385,38 +283,43 @@ ConfigWindow::ConfigWindow()
 		entry_ref ref;
 		entry.GetRef(&ref);
 		msg->AddRef("refs", &ref);
-	}
-	else
-		button->SetEnabled(false);
+	} else
+		editMenuButton->SetEnabled(false);
 
-	rect = button->Frame();
-	rect.OffsetBy(rect.Width() + 30,0);
-	fAutoStartCheckBox = new BCheckBox(rect, "start daemon",
-		B_TRANSLATE("Start mail services on startup"), NULL);
-	fAutoStartCheckBox->ResizeToPreferred();
-	box->AddChild(fAutoStartCheckBox);
+	BLayoutBuilder::Group<>(view, B_VERTICAL)
+		.SetInsets(B_USE_DEFAULT_SPACING)
+		.AddGlue()
+		.AddGroup(B_HORIZONTAL, 0.f)
+			.AddGlue()
+			.Add(fCheckMailCheckBox)
+			.Add(fIntervalControl->CreateTextViewLayoutItem())
+			.AddStrut(be_control_look->DefaultLabelSpacing())
+			.Add(fIntervalControl->CreateLabelLayoutItem())
+			.AddGlue()
+		.End()
+		.AddGroup(B_HORIZONTAL, 0.f)
+			.AddGlue()
+			.Add(fStatusModeField->CreateLabelLayoutItem())
+			.Add(fStatusModeField->CreateMenuBarLayoutItem())
+			.AddGlue()
+		.End()
+		.Add(editMenuButton)
+		.AddGlue();
 
 	// save/revert buttons
 
-	top->AddChild(tabView);
-
-	rect = tabView->Frame();
-	rect.top = rect.bottom + 10;
-	rect.bottom = rect.top + height + 5;
-	BButton *saveButton = new BButton(rect, "apply", B_TRANSLATE("Apply"),
+	BButton* applyButton = new BButton("apply", B_TRANSLATE("Apply"),
 		new BMessage(kMsgSaveSettings));
-	float w,h;
-	saveButton->GetPreferredSize(&w, &h);
-	saveButton->ResizeTo(w, h);
-	saveButton->MoveTo(rect.right - w, rect.top);
-	top->AddChild(saveButton);
-
-	BButton *revertButton = new BButton(rect, "revert", B_TRANSLATE("Revert"),
+	BButton* revertButton = new BButton("revert", B_TRANSLATE("Revert"),
 		new BMessage(kMsgRevertSettings));
-	revertButton->GetPreferredSize(&w, &h);
-	revertButton->ResizeTo(w, h);
-	revertButton->MoveTo(rect.left, rect.top);
-	top->AddChild(revertButton);
+
+	BLayoutBuilder::Group<>(this, B_VERTICAL)
+		.SetInsets(B_USE_DEFAULT_SPACING)
+		.Add(tabView)
+		.AddGroup(B_HORIZONTAL)
+			.AddGlue()
+			.Add(revertButton)
+			.Add(applyButton);
 
 	_LoadSettings();
 		// this will also move our window to the stored position
@@ -435,42 +338,46 @@ ConfigWindow::~ConfigWindow()
 }
 
 
-void
-ConfigWindow::_MakeHowToView()
+BView*
+ConfigWindow::_BuildHowToView()
 {
+	BView* groupView = new BView("howTo", 0);
+
+	BitmapView* bitmapView = NULL;
 	app_info info;
 	if (be_app->GetAppInfo(&info) == B_OK) {
 		BFile appFile(&info.ref, B_READ_ONLY);
 		BAppFileInfo appFileInfo(&appFile);
 		if (appFileInfo.InitCheck() == B_OK) {
-			BBitmap *bitmap = new (nothrow) BBitmap(BRect(0, 0, 63, 63),
+			BBitmap* bitmap = new (std::nothrow) BBitmap(BRect(0, 0, 63, 63),
 				B_RGBA32);
-			if (appFileInfo.GetIcon(bitmap, B_LARGE_ICON) == B_OK) {
-				fConfigView->AddChild(new BitmapView(bitmap));
-			} else
+			if (appFileInfo.GetIcon(bitmap, B_LARGE_ICON) == B_OK)
+				bitmapView = new BitmapView(bitmap);
+			else
 				delete bitmap;
 		}
 	}
 
-	BRect rect = fConfigView->Bounds();
-	BTextView *text = new BTextView(rect, NULL, rect, B_FOLLOW_NONE,
-		B_WILL_DRAW);
-	text->SetViewColor(fConfigView->Parent()->ViewColor());
+	BTextView* text = new BTextView(NULL, B_WILL_DRAW);
 	text->SetAlignment(B_ALIGN_CENTER);
 	text->SetText(B_TRANSLATE(
-		"\n\nCreate a new account with the Add button.\n\n"
+		"Create a new account with the Add button.\n\n"
 		"Remove an account with the Remove button on the selected item.\n\n"
 		"Select an item in the list to change its settings."));
-	rect = text->Bounds();
-	text->ResizeTo(rect.Width(), text->TextHeight(0, 42));
-	text->SetTextRect(rect);
-
 	text->MakeEditable(false);
 	text->MakeSelectable(false);
 
-	fConfigView->AddChild(text);
+	BLayoutBuilder::Group<>(groupView, B_VERTICAL)
+		.AddGlue()
+		.Add(text)
+		.AddGlue();
 
-	fConfigView->Layout();
+	if (bitmapView != NULL)
+		groupView->GetLayout()->AddView(1, bitmapView);
+
+	text->SetViewColor(groupView->ViewColor());
+
+	return groupView;
 }
 
 
@@ -487,25 +394,12 @@ ConfigWindow::_LoadSettings()
 	// load in general settings
 	BMailSettings settings;
 	status_t status = _SetToGeneralSettings(&settings);
-	if (status == B_OK) {
-		// move own window
-		MoveTo(settings.ConfigWindowFrame().LeftTop());
-	} else {
+	if (status != B_OK) {
 		fprintf(stderr, B_TRANSLATE("Error retrieving general settings: %s\n"),
 			strerror(status));
 	}
 
-	BScreen screen(this);
-	BRect screenFrame(screen.Frame().InsetByCopy(0, 5));
-	if (!screenFrame.Contains(Frame().LeftTop())
-		|| !screenFrame.Contains(Frame().RightBottom()))
-		status = B_ERROR;
-
-	if (status != B_OK) {
-		// center window on screen
-		MoveTo((screenFrame.Width() - Frame().Width()) / 2,
-			(screenFrame.Height() - Frame().Height()) / 2);
-	}
+	CenterOnScreen();
 }
 
 
@@ -526,11 +420,8 @@ ConfigWindow::_LoadAccounts()
 void
 ConfigWindow::_SaveSettings()
 {
-	// remove config views (trigger view archive)
-	fConfigView->DeleteChildren();
-
 	// collect changed accounts
-	BMessage changedAccounts(kMsgAccountsChanged);
+	BMessage changedAccounts(BPrivate::kMsgAccountsChanged);
 	for (int32 i = 0; i < fAccounts.CountItems(); i++) {
 		BMailAccountSettings* account = fAccounts.ItemAt(i);
 		if (account && account->HasBeenModified())
@@ -550,71 +441,45 @@ ConfigWindow::_SaveSettings()
 	}
 	fToDeleteAccounts.MakeEmpty();
 
-	/*** save general settings ***/
+	// Apply and save general settings
 
-	// figure out time interval
-	float interval;
-	sscanf(fIntervalControl->Text(),"%f",&interval);
-	float multiplier = 0;
-	switch (fIntervalUnitField->Menu()->IndexOf(
-			fIntervalUnitField->Menu()->FindMarked())) {
-		case 1:		// minutes
-			multiplier = 60;
-			break;
-		case 2:		// hours
-			multiplier = 60 * 60;
-			break;
-		case 3:		// days
-			multiplier = 24 * 60 * 60;
-			break;
-	}
-	time_t time = (time_t)(multiplier * interval);
-
-	// apply and save general settings
 	BMailSettings settings;
 	if (fSaveSettings) {
-		settings.SetAutoCheckInterval(time * 1e6);
-		settings.SetCheckOnlyIfPPPUp(fPPPActiveCheckBox->Value()
-			== B_CONTROL_ON);
-		settings.SetSendOnlyIfPPPUp(fPPPActiveSendCheckBox->Value()
-			== B_CONTROL_ON);
-		settings.SetDaemonAutoStarts(fAutoStartCheckBox->Value()
-			== B_CONTROL_ON);
+		// figure out time interval
+		float floatInterval;
+		sscanf(fIntervalControl->Text(), "%f", &floatInterval);
+		bigtime_t interval = bigtime_t(60000000L * floatInterval);
+
+		settings.SetAutoCheckInterval(interval);
+		settings.SetDaemonAutoStarts(!fAccounts.IsEmpty());
 
 		// status mode (alway, fetching/retrieving, ...)
 		int32 index = fStatusModeField->Menu()->IndexOf(
 			fStatusModeField->Menu()->FindMarked());
 		settings.SetShowStatusWindow(index);
 
-	} else {
-		// restore status window look
-		settings.SetStatusWindowLook(settings.StatusWindowLook());
+		settings.Save();
 	}
 
-	settings.SetConfigWindowFrame(Frame());
-	settings.Save();
-
-	/*** save accounts ***/
+	// Save accounts
 
 	if (fSaveSettings) {
 		for (int i = 0; i < fAccounts.CountItems(); i++)
 			fAccounts.ItemAt(i)->Save();
 	}
 
-	BMessenger messenger("application/x-vnd.Be-POST");
+	BMessenger messenger(B_MAIL_DAEMON_SIGNATURE);
 	if (messenger.IsValid()) {
 		// server should reload general settings
-		messenger.SendMessage(kMsgSettingsUpdated);
+		messenger.SendMessage(BPrivate::kMsgSettingsUpdated);
 		// notify server about changed accounts
 		messenger.SendMessage(&changedAccounts);
 	}
 
-	// start the mail_daemon if auto start was selected
-	if (fSaveSettings && fAutoStartCheckBox->Value() == B_CONTROL_ON
-		&& !be_roster->IsRunning("application/x-vnd.Be-POST"))
-	{
-		be_roster->Launch("application/x-vnd.Be-POST");
-	}
+	// Start the mail_daemon if auto start was selected
+	BMailDaemon daemon;
+	if (fSaveSettings && settings.DaemonAutoStarts() && !daemon.IsRunning())
+		daemon.Launch();
 }
 
 
@@ -643,7 +508,7 @@ ConfigWindow::MessageReceived(BMessage *msg)
 			int32 index = msg->FindInt32("index");
 			AccountItem* clickedItem = dynamic_cast<AccountItem*>(
 				fAccountsListView->ItemAt(index));
-			if (clickedItem == NULL || clickedItem->GetType() != ACCOUNT_ITEM)
+			if (clickedItem == NULL || clickedItem->Type() != ACCOUNT_ITEM)
 				break;
 
 			BPopUpMenu rightClickMenu("accounts", false, false);
@@ -655,7 +520,7 @@ ConfigWindow::MessageReceived(BMessage *msg)
 			rightClickMenu.AddItem(inMenuItem);
 			rightClickMenu.AddItem(outMenuItem);
 
-			BMailAccountSettings* settings = clickedItem->GetAccount();
+			BMailAccountSettings* settings = clickedItem->Account();
 			if (settings->IsInboundEnabled())
 				inMenuItem->SetMarked(true);
 			if (settings->IsOutboundEnabled())
@@ -696,12 +561,11 @@ ConfigWindow::MessageReceived(BMessage *msg)
 			int32 index;
 			if (msg->FindInt32("index", &index) != B_OK || index < 0) {
 				// deselect current item
-				fConfigView->DeleteChildren();
-				_MakeHowToView();
+				_ReplaceConfigView(_BuildHowToView());
 				break;
 			}
-			AccountItem *item = (AccountItem *)fAccountsListView->ItemAt(index);
-			if (item)
+			AccountItem* item = (AccountItem*)fAccountsListView->ItemAt(index);
+			if (item != NULL)
 				_AccountSelected(item);
 			break;
 		}
@@ -724,8 +588,8 @@ ConfigWindow::MessageReceived(BMessage *msg)
 				AccountItem *item = (AccountItem *)fAccountsListView->ItemAt(
 					index);
 				if (item != NULL) {
-					_RemoveAccount(item->GetAccount());
-					_MakeHowToView();
+					_RemoveAccount(item->Account());
+					_ReplaceConfigView(_BuildHowToView());
 				}
 			}
 			break;
@@ -756,7 +620,7 @@ ConfigWindow::MessageReceived(BMessage *msg)
 			fSaveSettings = true;
 			_SaveSettings();
 			AccountUpdated(fLastSelectedAccount);
-			_MakeHowToView();
+			_ReplaceConfigView(_BuildHowToView());
 			fAccountsListView->DeselectAll();
 			break;
 
@@ -787,8 +651,8 @@ ConfigWindow::AccountUpdated(BMailAccountSettings* account)
 
 	for (int i = 0; i < fAccountsListView->CountItems(); i++) {
 		AccountItem* item = (AccountItem*)fAccountsListView->ItemAt(i);
-		if (item->GetAccount() == account) {
-			if (item->GetType() == ACCOUNT_ITEM) {
+		if (item->Account() == account) {
+			if (item->Type() == ACCOUNT_ITEM) {
 				item->SetText(account->Name());
 				fAccountsListView->Invalidate();
 			}
@@ -798,9 +662,9 @@ ConfigWindow::AccountUpdated(BMailAccountSettings* account)
 
 
 status_t
-ConfigWindow::_SetToGeneralSettings(BMailSettings *settings)
+ConfigWindow::_SetToGeneralSettings(BMailSettings* settings)
 {
-	if (!settings)
+	if (settings == NULL)
 		return B_BAD_VALUE;
 
 	status_t status = settings->InitCheck();
@@ -808,37 +672,18 @@ ConfigWindow::_SetToGeneralSettings(BMailSettings *settings)
 		return status;
 
 	// retrieval frequency
+	uint32 interval = uint32(settings->AutoCheckInterval() / 60000000L);
+	fCheckMailCheckBox->SetValue(interval != 0 ? B_CONTROL_ON : B_CONTROL_OFF);
 
-	time_t interval = time_t(settings->AutoCheckInterval() / 1e6L);
-	char text[25];
-	text[0] = 0;
-	int timeIndex = 0;
-	if (interval >= 60) {
-		timeIndex = 1;
-		sprintf(text, "%" B_PRIdTIME, interval / (60));
-	}
-	if (interval >= (60*60)) {
-		timeIndex = 2;
-		sprintf(text, "%" B_PRIdTIME, interval / (60*60));
-	}
-	if (interval >= (60*60*24)) {
-		timeIndex = 3;
-		sprintf(text, "%" B_PRIdTIME, interval / (60*60*24));
-	}
-	fIntervalControl->SetText(text);
-
-	if (BMenuItem *item = fIntervalUnitField->Menu()->ItemAt(timeIndex))
-		item->SetMarked(true);
-	fIntervalControl->SetEnabled(timeIndex != 0);
-
-	fPPPActiveCheckBox->SetValue(settings->CheckOnlyIfPPPUp());
-	fPPPActiveSendCheckBox->SetValue(settings->SendOnlyIfPPPUp());
-
-	fAutoStartCheckBox->SetValue(settings->DaemonAutoStarts());
+	if (interval == 0)
+		interval = 5;
+	BString intervalText;
+	intervalText.SetToFormat("%" B_PRIu32, interval);
+	fIntervalControl->SetText(intervalText.String());
 
 	int32 showStatusIndex = settings->ShowStatusWindow();
-	BMenuItem *item = fStatusModeField->Menu()->ItemAt(showStatusIndex);
-	if (item) {
+	BMenuItem* item = fStatusModeField->Menu()->ItemAt(showStatusIndex);
+	if (item != NULL) {
 		item->SetMarked(true);
 		// send live update to the server by simulating a menu click
 		BMessage msg(kMsgShowStatusWindowChanged);
@@ -856,9 +701,6 @@ ConfigWindow::_RevertToLastSettings()
 	// revert general settings
 	BMailSettings settings;
 
-	// restore status window look
-	settings.SetStatusWindowLook(settings.StatusWindowLook());
-
 	status_t status = _SetToGeneralSettings(&settings);
 	if (status != B_OK) {
 		char text[256];
@@ -875,18 +717,16 @@ ConfigWindow::_RevertToLastSettings()
 	// revert account data
 
 	if (fAccountsListView->CurrentSelection() != -1)
-		fConfigView->DeleteChildren();
+		_ReplaceConfigView(_BuildHowToView());
 
 	for (int32 i = 0; i < fAccounts.CountItems(); i++) {
 		BMailAccountSettings* account = fAccounts.ItemAt(i);
 		_RemoveAccountFromListView(account);
 		delete account;
 	}
+
 	fAccounts.MakeEmpty();
 	_LoadAccounts();
-
-	if (fConfigView->CountChildren() == 0)
-		_MakeHowToView();
 }
 
 
@@ -929,13 +769,16 @@ ConfigWindow::_RemoveAccount(BMailAccountSettings* account)
 void
 ConfigWindow::_RemoveAccountFromListView(BMailAccountSettings* account)
 {
-	for (int i = 0; i < fAccountsListView->CountItems(); i++) {
+	if (fLastSelectedAccount == account) {
+		_ReplaceConfigView(_BuildHowToView());
+		fLastSelectedAccount = NULL;
+	}
+
+	for (int i = fAccountsListView->CountItems(); i-- > 0;) {
 		AccountItem* item = (AccountItem*)fAccountsListView->ItemAt(i);
-		if (item->GetAccount() == account) {
+		if (item->Account() == account) {
 			fAccountsListView->RemoveItem(i);
-			fConfigView->RemoveChild(item->ConfigPanel());
 			delete item;
-			i--;
 		}
 	}
 }
@@ -946,41 +789,42 @@ ConfigWindow::_AccountSelected(AccountItem* item)
 {
 	AccountUpdated(fLastSelectedAccount);
 
-	BMailAccountSettings* account = item->GetAccount();
+	BMailAccountSettings* account = item->Account();
 	fLastSelectedAccount = account;
 
-	fConfigView->Hide();
-	fConfigView->DeleteChildren();
-
 	BView* view = NULL;
-	switch (item->GetType()) {
+	switch (item->Type()) {
 		case ACCOUNT_ITEM:
-			view = new AccountConfigView(fConfigView->Bounds(), account);
+			view = new AccountConfigView(account);
 			break;
 
 		case INBOUND_ITEM:
-		{
-			view = new InProtocolsConfigView(account);
+			view = new ProtocolSettingsView(account->InboundAddOnRef(),
+				*account, account->InboundSettings());
 			break;
-		}
 
 		case OUTBOUND_ITEM:
-		{
-			view = new OutProtocolsConfigView(account);
+			view = new ProtocolSettingsView(account->OutboundAddOnRef(),
+				*account, account->OutboundSettings());
 			break;
-		}
 
 		case FILTER_ITEM:
-		{
-			view = new FiltersConfigView(fConfigView->Bounds(), *account);
+			view = new FiltersConfigView(*account);
 			break;
-		}
-	}
-	if (view) {
-		item->SetConfigPanel(view);
-		fConfigView->AddChild(view);
 	}
 
-	fConfigView->Layout();
-	fConfigView->Show();
+	_ReplaceConfigView(view);
+}
+
+
+void
+ConfigWindow::_ReplaceConfigView(BView* view)
+{
+	while (BView* child = fConfigView->ChildAt(0)) {
+		fConfigView->RemoveChild(child);
+		delete child;
+	}
+
+	if (view != NULL)
+		fConfigView->AddChild(view);
 }

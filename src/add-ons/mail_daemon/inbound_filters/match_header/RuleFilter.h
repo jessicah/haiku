@@ -1,40 +1,38 @@
-#ifndef ZOIDBERG_RULE_FILTER_H
-#define ZOIDBERG_RULE_FILTER_H
-/* RuleFilter - performs action depending on matching a header value
-**
-** Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
-*/
+/*
+ * Copyright 2004-2013, Haiku, Inc. All rights reserved.
+ * Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
+ *
+ * Distributed under the terms of the MIT License.
+ */
+#ifndef RULE_FILTER_H
+#define RULE_FILTER_H
 
 
 #include <Message.h>
 #include <List.h>
-#include <MailAddon.h>
+#include <MailFilter.h>
 
+#include "MatchHeaderSettings.h"
 #include "StringMatcher.h"
 
 
-typedef enum {
-	Z_MOVE_TO,
-	Z_FLAG,
-	Z_TRASH,
-	Z_SET_REPLY,
-	Z_SET_READ
-} z_mail_action_flags;
-
-
-class RuleFilter : public MailFilter {
+class RuleFilter : public BMailFilter {
 public:
-								RuleFilter(MailProtocol& protocol,
-									AddonSettings* settings);
-			void				HeaderFetched(const entry_ref& ref,
-									BFile* file);
+								RuleFilter(BMailProtocol& protocol,
+									const BMailAddOnSettings& settings);
+
+	virtual	BMailFilterAction	HeaderFetched(entry_ref& ref, BFile& file,
+									BMessage& attributes);
 
 private:
-			StringMatcher		fMatcher;
 			BString				fAttribute;
-			BString				fArg;
+			BString				fExpression;
+			StringMatcher		fMatcher;
+			BString				fMoveTarget;
+			BString				fSetFlags;
 			int32				fReplyAccount;
-			z_mail_action_flags	fDoWhat;
+			rule_action			fAction;
 };
 
-#endif	/* ZOIDBERG_RULE_FILTER_H */
+
+#endif	// RULE_FILTER_H

@@ -1,22 +1,30 @@
-#ifndef CONFIG_VIEW
-#define CONFIG_VIEW
-/* ConfigView - the configuration view for the Folder filter
-**
-** Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
-*/
+/*
+ * Copyright 2004-2012, Haiku, Inc. All rights reserved.
+ * Copyright 2001, Dr. Zoidberg Enterprises. All rights reserved.
+ *
+ * Distributed under the terms of the MIT License.
+ */
+#ifndef CONFIG_VIEW_H
+#define CONFIG_VIEW_H
 
 
-#include <View.h>
+#include <MailSettingsView.h>
+
+#include <FileConfigView.h>
 
 
-class ConfigView : public BView
-{
-	public:
-		ConfigView();
-		void SetTo(const BMessage *archive);
+class ConfigView : public BMailSettingsView {
+public:
+								ConfigView();
 
-		virtual	status_t Archive(BMessage *into, bool deep = true) const;
-		virtual	void GetPreferredSize(float *width, float *height);
+			void				SetTo(const BMailAddOnSettings& settings);
+
+	virtual status_t			SaveInto(BMailAddOnSettings& settings) const;
+
+private:
+			BPrivate::MailFileConfigView* fFileView;
+			BTextControl*		fTagControl;
 };
 
-#endif	/* CONFIG_VIEW */
+
+#endif	// CONFIG_VIEW_H

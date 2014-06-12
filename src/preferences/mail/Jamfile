@@ -1,6 +1,5 @@
 SubDir HAIKU_TOP src preferences mail ;
 
-
 UsePublicHeaders [ FDirName add-ons mail_daemon ] ;
 UsePrivateHeaders mail ;
 
@@ -14,10 +13,9 @@ local sources =
 	AutoConfig.cpp
 	AutoConfigView.cpp
 	AutoConfigWindow.cpp
-	CenterContainer.cpp
 	ConfigViews.cpp
 	ConfigWindow.cpp
-	FilterAddonList.cpp
+	FilterList.cpp
 	DNSQuery.cpp
 	FilterConfigView.cpp
 	main.cpp
@@ -30,7 +28,7 @@ Preference E-mail
 	$(sources)
 	:
 	be libmail.so $(HAIKU_NETWORK_LIBS) $(TARGET_NETAPI_LIB) $(TARGET_LIBSTDC++)
-	$(TARGET_LIBSUPC++) localestub
+	$(TARGET_LIBSUPC++) $(HAIKU_LOCALE_LIBS)
 ;
 
 DoCatalogs E-mail

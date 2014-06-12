@@ -1,13 +1,194 @@
 /*
- * Copyright 2011, Axel Dörfler, axeld@pinc-software.de.
+ * Copyright 2011-2013, Axel Dörfler, axeld@pinc-software.de.
  * Distributed under the terms of the MIT License.
  */
 
 
 #include "Response.h"
 
+#include <algorithm>
+#include <stdlib.h>
+
+#include <UnicodeChar.h>
+
+
+#define TRACE_IMAP
+#ifdef TRACE_IMAP
+#	define TRACE(...) printf(__VA_ARGS__)
+#else
+#	define TRACE(...) ;
+#endif
+
 
 namespace IMAP {
+
+
+// Note, the following alphabet is a modified base64; the '/' is replaced by
+// a ',' here.
+static const char kBase64Alphabet[64] = {
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+  'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+  'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  '+', ','
+};
+static char kInverseBase64Alphabet[128];
+static bool kInverseBase64Initialized = false;
+
+
+RFC3501Encoding::RFC3501Encoding()
+{
+	if (!kInverseBase64Initialized) {
+		// This is not thread safe, but it's not harmful
+		for (size_t i = 0; i < sizeof(kBase64Alphabet); i++)
+			kInverseBase64Alphabet[(int)kBase64Alphabet[i]] = i + 1;
+		kInverseBase64Initialized = true;
+	}
+}
+
+
+RFC3501Encoding::~RFC3501Encoding()
+{
+}
+
+
+BString
+RFC3501Encoding::Encode(const BString& clearText) const
+{
+	const char* clear = clearText.String();
+	bool shifted = false;
+	int32 bitsToWrite = 0;
+	int32 sextet = 0;
+	BString buffer;
+
+	while (true) {
+		uint32 c = BUnicodeChar::FromUTF8(&clear);
+		if (c == 0)
+			break;
+
+		if (!shifted && c == '&')
+			buffer += "&-";
+		else if (c >= 0x20 && c <= 0x7e) {
+			_Unshift(buffer, bitsToWrite, sextet, shifted);
+			buffer += c;
+		} else {
+			// Enter shifted mode, encode in base64
+			if (!shifted) {
+				buffer += '&';
+				shifted = true;
+			}
+
+			bitsToWrite += 16;
+			while (bitsToWrite >= 6) {
+				bitsToWrite -= 6;
+				buffer += kBase64Alphabet[(sextet + (c >> bitsToWrite)) & 0x3f];
+				sextet = 0;
+			}
+			sextet = (c << (6 - bitsToWrite)) & 0x3f;
+		}
+	}
+
+	_Unshift(buffer, bitsToWrite, sextet, shifted);
+	return buffer;
+}
+
+
+BString
+RFC3501Encoding::Decode(const BString& encodedText) const
+{
+	int32 end = encodedText.Length();
+	BString buffer;
+	for (int32 i = 0; i < end; i++) {
+		uint8 c = (uint8)encodedText.ByteAt(i);
+		if (c == '&') {
+			if (i < end - 1 && encodedText.ByteAt(i + 1) == '-') {
+				// just add an ampersand
+				buffer += '&';
+				i++;
+			} else {
+				// base64 encoded chunk
+				uint32 value = 0;
+				int32 bitsRead = 0;
+				while (true) {
+					if (++i >= end)
+						throw ParseException("Malformed base64!");
+
+					c = encodedText.ByteAt(i);
+					if (c == '-') {
+						if (value != 0 || bitsRead >= 6)
+							throw ParseException("Base64 encoding ends early!");
+						break;
+					}
+					if (c >= 128)
+						throw ParseException("Malformed base64!");
+					int32 sextet = kInverseBase64Alphabet[c] - 1;
+					if (sextet >= 0) {
+						bitsRead += 6;
+						if (bitsRead < 16) {
+							value += sextet << (16 - bitsRead);
+						} else {
+							bitsRead -= 16;
+							value += sextet >> bitsRead;
+							_ToUTF8(buffer, value);
+
+							// Move on to next character
+							value = (sextet << (16 - bitsRead)) & 0xffff;
+						}
+					} else {
+						buffer += c;
+						if (value != 0 || bitsRead >= 6)
+							throw ParseException("Malformed base64!");
+						break;
+					}
+				}
+			}
+		} else
+			buffer += c;
+	}
+	return buffer;
+}
+
+
+void
+RFC3501Encoding::_ToUTF8(BString& string, uint32 c) const
+{
+	if (c < 0x80)
+		string += (char)c;
+	else if (c < 0x800) {
+		string += 0xc0 | (c >> 6);
+		string += 0x80 | (c & 0x3f);
+	} else if (c < 0x10000) {
+		string += 0xe0 | (c >> 12);
+		string += 0x80 | ((c >> 6) & 0x3f);
+		string += 0x80 | (c & 0x3f);
+	} else if (c <= 0x10ffff) {
+		string += 0xf0 | (c >> 18);
+		string += 0x80 | ((c >> 12) & 0x3f);
+		string += 0x80 | ((c >> 6) & 0x3f);
+		string += 0x80 | (c & 0x3f);
+	}
+}
+
+
+//!	Exit base64, or "shifted" mode.
+void
+RFC3501Encoding::_Unshift(BString& buffer, int32& bitsToWrite, int32& sextet,
+	bool& shifted) const
+{
+	if (!shifted)
+		return;
+
+	if (bitsToWrite != 0)
+		buffer += kBase64Alphabet[sextet];
+	buffer += '-';
+	sextet = 0;
+	bitsToWrite = 0;
+	shifted = false;
+}
+
+
+// #pragma mark -
 
 
 ArgumentList::ArgumentList()
@@ -82,11 +263,8 @@ ArgumentList::ListAt(int32 index) const
 bool
 ArgumentList::IsListAt(int32 index) const
 {
-	if (index >= 0 && index < CountItems()) {
-		if (ListArgument* argument = dynamic_cast<ListArgument*>(ItemAt(index)))
-			return true;
-	}
-	return false;
+	return index >= 0 && index < CountItems()
+		&& dynamic_cast<ListArgument*>(ItemAt(index)) != NULL;
 }
 
 
@@ -101,15 +279,15 @@ ArgumentList::IsListAt(int32 index, char kind) const
 }
 
 
-int32
-ArgumentList::IntegerAt(int32 index) const
+uint32
+ArgumentList::NumberAt(int32 index) const
 {
-	return atoi(StringAt(index).String());
+	return atoul(StringAt(index).String());
 }
 
 
 bool
-ArgumentList::IsIntegerAt(int32 index) const
+ArgumentList::IsNumberAt(int32 index) const
 {
 	BString string = StringAt(index);
 	for (int32 i = 0; i < string.Length(); i++) {
@@ -196,20 +374,26 @@ StringArgument::ToString() const
 
 
 ParseException::ParseException()
-	:
-	fMessage(NULL)
 {
+	fBuffer[0] = '\0';
 }
 
 
-ParseException::ParseException(const char* message)
-	:
-	fMessage(message)
+ParseException::ParseException(const char* format, ...)
 {
+	va_list args;
+	va_start(args, format);
+	vsnprintf(fBuffer, sizeof(fBuffer), format, args);
+	va_end(args);
 }
 
 
-ParseException::~ParseException()
+// #pragma mark -
+
+
+StreamException::StreamException(status_t status)
+	:
+	ParseException("Error from stream: %s", status)
 {
 }
 
@@ -219,9 +403,32 @@ ParseException::~ParseException()
 
 ExpectedParseException::ExpectedParseException(char expected, char instead)
 {
-	snprintf(fBuffer, sizeof(fBuffer), "Expected \"%c\", but got \"%c\"!",
-		expected, instead);
-	fMessage = fBuffer;
+	char bufferA[8];
+	char bufferB[8];
+	snprintf(fBuffer, sizeof(fBuffer), "Expected %s, but got %s instead!",
+		CharToString(bufferA, sizeof(bufferA), expected),
+		CharToString(bufferB, sizeof(bufferB), instead));
+}
+
+
+const char*
+ExpectedParseException::CharToString(char* buffer, size_t size, char c)
+{
+	snprintf(buffer, size, isprint(c) ? "\"%c\"" : "(%x)", c);
+	return buffer;
+}
+
+
+// #pragma mark -
+
+
+LiteralHandler::LiteralHandler()
+{
+}
+
+
+LiteralHandler::~LiteralHandler()
+{
 }
 
 
@@ -231,7 +438,8 @@ ExpectedParseException::ExpectedParseException(char expected, char instead)
 Response::Response()
 	:
 	fTag(0),
-	fContinuation(false)
+	fContinuation(false),
+	fHasNextChar(false)
 {
 }
 
@@ -242,30 +450,29 @@ Response::~Response()
 
 
 void
-Response::SetTo(const char* line) throw(ParseException)
+Response::Parse(BDataIO& stream, LiteralHandler* handler) throw(ParseException)
 {
 	MakeEmpty();
+	fLiteralHandler = handler;
 	fTag = 0;
 	fContinuation = false;
+	fHasNextChar = false;
 
-	if (line[0] == '*') {
+	char begin = Next(stream);
+	if (begin == '*') {
 		// Untagged response
-		Consume(line, '*');
-		Consume(line, ' ');
-	} else if (line[0] == '+') {
+		Consume(stream, ' ');
+	} else if (begin == '+') {
 		// Continuation
-		Consume(line, '+');
 		fContinuation = true;
-	} else {
+	} else if (begin == 'A') {
 		// Tagged response
-		Consume(line, 'A');
-		fTag = strtoul(line, (char**)&line, 10);
-		if (line == NULL)
-			ParseException("Invalid tag!");
-		Consume(line, ' ');
-	}
+		fTag = ExtractNumber(stream);
+		Consume(stream, ' ');
+	} else
+		throw ParseException("Unexpected response begin");
 
-	char c = ParseLine(*this, line);
+	char c = ParseLine(*this, stream);
 	if (c != '\0')
 		throw ExpectedParseException('\0', c);
 }
@@ -279,44 +486,47 @@ Response::IsCommand(const char* command) const
 
 
 char
-Response::ParseLine(ArgumentList& arguments, const char*& line)
+Response::ParseLine(ArgumentList& arguments, BDataIO& stream)
 {
-	while (line[0] != '\0') {
-		char c = line[0];
+	while (true) {
+		char c = Peek(stream);
+		if (c == '\0')
+			break;
+
 		switch (c) {
 			case '(':
-				ParseList(arguments, line, '(', ')');
+				ParseList(arguments, stream, '(', ')');
 				break;
 			case '[':
-				ParseList(arguments, line, '[', ']');
+				ParseList(arguments, stream, '[', ']');
 				break;
 			case ')':
 			case ']':
-				Consume(line, c);
+				Consume(stream, c);
 				return c;
 			case '"':
-				ParseQuoted(arguments, line);
+				ParseQuoted(arguments, stream);
 				break;
 			case '{':
-				ParseLiteral(arguments, line);
+				ParseLiteral(arguments, stream);
 				break;
 
 			case ' ':
 			case '\t':
 				// whitespace
-				Consume(line, c);
+				Consume(stream, c);
 				break;
 
 			case '\r':
-				Consume(line, '\r');
-				Consume(line, '\n');
+				Consume(stream, '\r');
+				Consume(stream, '\n');
 				return '\0';
 			case '\n':
-				Consume(line, '\n');
+				Consume(stream, '\n');
 				return '\0';
 
 			default:
-				ParseString(arguments, line);
+				ParseString(arguments, stream);
 				break;
 		}
 	}
@@ -326,55 +536,38 @@ Response::ParseLine(ArgumentList& arguments, const char*& line)
 
 
 void
-Response::Consume(const char*& line, char c)
-{
-	if (line[0] != c)
-		throw ExpectedParseException(c, line[0]);
-
-	line++;
-}
-
-
-void
-Response::ParseList(ArgumentList& arguments, const char*& line, char start,
+Response::ParseList(ArgumentList& arguments, BDataIO& stream, char start,
 	char end)
 {
-	Consume(line, start);
+	Consume(stream, start);
 
 	ListArgument* argument = new ListArgument(start);
 	arguments.AddItem(argument);
 
-	char c = ParseLine(argument->List(), line);
+	char c = ParseLine(argument->List(), stream);
 	if (c != end)
 		throw ExpectedParseException(end, c);
 }
 
 
 void
-Response::ParseQuoted(ArgumentList& arguments, const char*& line)
+Response::ParseQuoted(ArgumentList& arguments, BDataIO& stream)
 {
-	Consume(line, '"');
+	Consume(stream, '"');
 
 	BString string;
-	char* output = string.LockBuffer(strlen(line));
-	int32 index = 0;
-
-	while (line[0] != '\0') {
-		char c = line[0];
+	while (true) {
+		char c = Next(stream);
 		if (c == '\\') {
-			line++;
-			if (line[0] == '\0')
-				break;
+			c = Next(stream);
 		} else if (c == '"') {
-			line++;
-			output[index] = '\0';
-			string.UnlockBuffer(index);
 			arguments.AddItem(new StringArgument(string));
 			return;
 		}
+		if (c == '\0')
+			break;
 
-		output[index++] = c;
-		line++;
+		string += c;
 	}
 
 	throw ParseException("Unexpected end of qouted string!");
@@ -382,34 +575,197 @@ Response::ParseQuoted(ArgumentList& arguments, const char*& line)
 
 
 void
-Response::ParseLiteral(ArgumentList& arguments, const char*& line)
+Response::ParseLiteral(ArgumentList& arguments, BDataIO& stream)
 {
-	// TODO!
-	throw ParseException("Literals are not yet supported!");
+	Consume(stream, '{');
+	size_t size = ExtractNumber(stream);
+	Consume(stream, '}');
+	Consume(stream, '\r');
+	Consume(stream, '\n');
+
+	bool handled = false;
+	if (fLiteralHandler != NULL) {
+		handled = fLiteralHandler->HandleLiteral(*this, arguments, stream,
+			size);
+	}
+
+	if (!handled && size <= 65536) {
+		// The default implementation just adds the data as a string
+		TRACE("Trying to read literal with %" B_PRIuSIZE " bytes.\n", size);
+		BString string;
+		char* buffer = string.LockBuffer(size);
+		if (buffer == NULL) {
+			throw ParseException("Not enough memory for literal of %"
+				B_PRIuSIZE " bytes.", size);
+		}
+
+		size_t totalRead = 0;
+		while (totalRead < size) {
+			ssize_t bytesRead = stream.Read(buffer + totalRead,
+				size - totalRead);
+			if (bytesRead == 0)
+				throw ParseException("Unexpected end of literal");
+			if (bytesRead < 0)
+				throw StreamException(bytesRead);
+
+			totalRead += bytesRead;
+		}
+
+		string.UnlockBuffer(size);
+		arguments.AddItem(new StringArgument(string));
+	} else {
+		// Skip any bytes left in the literal stream
+		_SkipLiteral(stream, size);
+	}
 }
 
 
 void
-Response::ParseString(ArgumentList& arguments, const char*& line)
+Response::ParseString(ArgumentList& arguments, BDataIO& stream)
 {
-	arguments.AddItem(new StringArgument(ExtractString(line)));
+	arguments.AddItem(new StringArgument(ExtractString(stream)));
 }
 
 
 BString
-Response::ExtractString(const char*& line)
+Response::ExtractString(BDataIO& stream)
 {
-	const char* start = line;
+	BString string;
 
-	while (line[0] != '\0') {
-		char c = line[0];
+	// TODO: parse modified UTF-7 as described in RFC 3501, 5.1.3
+	while (true) {
+		char c = Peek(stream);
+		if (c == '\0')
+			break;
 		if (c <= ' ' || strchr("()[]{}\"", c) != NULL)
-			return BString(start, line - start);
+			return string;
 
-		line++;
+		string += Next(stream);
 	}
 
 	throw ParseException("Unexpected end of string");
+}
+
+
+size_t
+Response::ExtractNumber(BDataIO& stream)
+{
+	BString string = ExtractString(stream);
+
+	const char* end;
+	size_t number = strtoul(string.String(), (char**)&end, 10);
+	if (end == NULL || end[0] != '\0')
+		ParseException("Invalid number!");
+
+	return number;
+}
+
+
+void
+Response::Consume(BDataIO& stream, char expected)
+{
+	char c = Next(stream);
+	if (c != expected)
+		throw ExpectedParseException(expected, c);
+}
+
+
+char
+Response::Next(BDataIO& stream)
+{
+	if (fHasNextChar) {
+		fHasNextChar = false;
+		return fNextChar;
+	}
+
+	return Read(stream);
+}
+
+
+char
+Response::Peek(BDataIO& stream)
+{
+	if (fHasNextChar)
+		return fNextChar;
+
+	fNextChar = Read(stream);
+	fHasNextChar = true;
+
+	return fNextChar;
+}
+
+
+char
+Response::Read(BDataIO& stream)
+{
+	char c;
+	ssize_t bytesRead = stream.Read(&c, 1);
+	if (bytesRead == 1) {
+		printf("%c", c);
+		return c;
+	}
+
+	if (bytesRead == 0)
+		throw ParseException("Unexpected end of string");
+
+	throw StreamException(bytesRead);
+}
+
+
+void
+Response::_SkipLiteral(BDataIO& stream, size_t size)
+{
+	char buffer[4096];
+	size_t totalRead = 0;
+	while (totalRead < size) {
+		size_t toRead = std::min(sizeof(buffer), size - totalRead);
+		ssize_t bytesRead = stream.Read(buffer, toRead);
+		if (bytesRead == 0)
+			throw ParseException("Unexpected end of literal");
+		if (bytesRead < 0)
+			throw StreamException(bytesRead);
+
+		totalRead += bytesRead;
+	}
+}
+
+
+// #pragma mark -
+
+
+ResponseParser::ResponseParser(BDataIO& stream)
+	:
+	fLiteralHandler(NULL)
+{
+	SetTo(stream);
+}
+
+
+ResponseParser::~ResponseParser()
+{
+}
+
+
+void
+ResponseParser::SetTo(BDataIO& stream)
+{
+	fStream = &stream;
+}
+
+
+void
+ResponseParser::SetLiteralHandler(LiteralHandler* handler)
+{
+	fLiteralHandler = handler;
+}
+
+
+status_t
+ResponseParser::NextResponse(Response& response, bigtime_t timeout)
+	throw(ParseException)
+{
+	response.Parse(*fStream, fLiteralHandler);
+	return B_OK;
 }
 
 

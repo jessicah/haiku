@@ -33,7 +33,7 @@ Application Mail :
 	WIndex.cpp
 	Words.cpp
 	KUndoBuffer.cpp
-	: be tracker $(TARGET_LIBSTDC++) $(TARGET_LIBSUPC++) localestub
+	: be tracker $(TARGET_LIBSTDC++) $(TARGET_LIBSUPC++) $(HAIKU_LOCALE_LIBS)
 		libmail.so libtextencoding.so
 	: Mail.rdef
 ;

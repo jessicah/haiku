@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2011, Haiku, Inc. All rights reserved.
+ * Copyright 2007-2012, Haiku, Inc. All rights reserved.
  * Copyright 2001-2002 Dr. Zoidberg Enterprises. All rights reserved.
  * Copyright 2011, Clemens Zeidler <haiku@clemens-zeidler.de>
  *
@@ -8,8 +8,10 @@
 
 
 #include <Catalog.h>
+#include <GridLayout.h>
+#include <MailFilter.h>
+
 #include <FileConfigView.h>
-#include <MailAddon.h>
 #include <MailPrivate.h>
 #include <ProtocolConfigView.h>
 
@@ -18,21 +20,24 @@
 #define B_TRANSLATION_CONTEXT "ConfigView"
 
 
-class POP3ConfigView : public BMailProtocolConfigView {
+using namespace BPrivate;
+
+
+class POP3ConfigView : public MailProtocolConfigView {
 public:
-								POP3ConfigView(MailAddonSettings& settings,
-									BMailAccountSettings& accountSettings);
-			status_t			Archive(BMessage *into, bool deep = true) const;
-			void				GetPreferredSize(float *width, float *height);
+								POP3ConfigView(
+									const BMailProtocolSettings& settings);
+
+	virtual status_t			SaveInto(BMailAddOnSettings& settings) const;
+
 private:
-			BMailFileConfigView*	fFileView;
+			MailFileConfigView*	fFileView;
 };
 
 
-POP3ConfigView::POP3ConfigView(MailAddonSettings& settings,
-	BMailAccountSettings& accountSettings)
+POP3ConfigView::POP3ConfigView(const BMailProtocolSettings& settings)
 	:
-	BMailProtocolConfigView(B_MAIL_PROTOCOL_HAS_USERNAME
+	MailProtocolConfigView(B_MAIL_PROTOCOL_HAS_USERNAME
 		| B_MAIL_PROTOCOL_HAS_AUTH_METHODS | B_MAIL_PROTOCOL_HAS_PASSWORD
 		| B_MAIL_PROTOCOL_HAS_HOSTNAME
 		| B_MAIL_PROTOCOL_CAN_LEAVE_MAIL_ON_SERVER
@@ -52,38 +57,32 @@ POP3ConfigView::POP3ConfigView(MailAddonSettings& settings,
 
 	SetTo(settings);
 
-	fFileView =  new BMailFileConfigView(B_TRANSLATE("Destination:"),
+	fFileView = new MailFileConfigView(B_TRANSLATE("Destination:"),
 		"destination", false, BPrivate::default_mail_in_directory().Path());
-	fFileView->SetTo(&settings.Settings(), NULL);
-	AddChild(fFileView);
-	float w, h;
-	BMailProtocolConfigView::GetPreferredSize(&w, &h);
-	fFileView->MoveBy(0, h - 10);
-	GetPreferredSize(&w, &h);
-	ResizeTo(w, h);
+	fFileView->SetTo(&settings, NULL);
+
+	Layout()->AddView(fFileView, 0, Layout()->CountRows(),
+		Layout()->CountColumns());
 }
 
 
 status_t
-POP3ConfigView::Archive(BMessage *into, bool deep) const
+POP3ConfigView::SaveInto(BMailAddOnSettings& settings) const
 {
-	fFileView->Archive(into, deep);
-	return BMailProtocolConfigView::Archive(into, deep);
+	status_t status = fFileView->SaveInto(settings);
+	if (status != B_OK)
+		return status;
+
+	return MailProtocolConfigView::SaveInto(settings);
 }
 
 
-void
-POP3ConfigView::GetPreferredSize(float* width, float* height)
+// #pragma mark -
+
+
+BMailSettingsView*
+instantiate_protocol_settings_view(const BMailAccountSettings& accountSettings,
+	const BMailProtocolSettings& settings)
 {
-	BMailProtocolConfigView::GetPreferredSize(width, height);
-	*height += 20;
+	return new POP3ConfigView(settings);
 }
-
-
-BView*
-instantiate_config_panel(MailAddonSettings& settings,
-	BMailAccountSettings& accountSettings)
-{
-	return new POP3ConfigView(settings, accountSettings);
-}
-

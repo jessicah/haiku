@@ -1,5 +1,5 @@
 /*
- * Copyright 2011, Axel Dörfler, axeld@pinc-software.de.
+ * Copyright 2011-2013, Axel Dörfler, axeld@pinc-software.de.
  * Distributed under the terms of the MIT License.
  */
 #ifndef RESPONSE_H
@@ -8,6 +8,7 @@
 
 #include <stdexcept>
 
+#include <DataIO.h>
 #include <ObjectList.h>
 #include <String.h>
 
@@ -16,6 +17,22 @@ namespace IMAP {
 
 
 class Argument;
+class Response;
+
+
+class RFC3501Encoding {
+public:
+								RFC3501Encoding();
+								~RFC3501Encoding();
+
+			BString				Encode(const BString& clearText) const;
+			BString				Decode(const BString& encodedText) const;
+
+private:
+			void				_ToUTF8(BString& string, uint32 c) const;
+			void				_Unshift(BString& string, int32& bitsToWrite,
+									int32& sextet, bool& shifted) const;
+};
 
 
 class ArgumentList : public BObjectList<Argument> {
@@ -33,8 +50,8 @@ public:
 			bool				IsListAt(int32 index) const;
 			bool				IsListAt(int32 index, char kind) const;
 
-			int32				IntegerAt(int32 index) const;
-			bool				IsIntegerAt(int32 index) const;
+			uint32				NumberAt(int32 index) const;
+			bool				IsNumberAt(int32 index) const;
 
 			BString				ToString() const;
 };
@@ -81,23 +98,39 @@ private:
 class ParseException : public std::exception {
 public:
 								ParseException();
-								ParseException(const char* message);
-	virtual						~ParseException();
+								ParseException(const char* format, ...);
 
-			const char*			Message() const { return fMessage; }
+			const char*			Message() const { return fBuffer; }
 
 protected:
-			const char*			fMessage;
+			char				fBuffer[64];
 };
 
 
-class ExpectedParseException : ParseException {
+class StreamException : public ParseException {
+public:
+								StreamException(status_t status);
+};
+
+
+class ExpectedParseException : public ParseException {
 public:
 								ExpectedParseException(char expected,
 									char instead);
 
 protected:
-			char				fBuffer[64];
+			const char*			CharToString(char* buffer, size_t size, char c);
+};
+
+
+class LiteralHandler {
+public:
+								LiteralHandler();
+	virtual						~LiteralHandler();
+
+	virtual bool				HandleLiteral(Response& response,
+									ArgumentList& arguments, BDataIO& stream,
+									size_t& length) = 0;
 };
 
 
@@ -106,30 +139,64 @@ public:
 								Response();
 								~Response();
 
-			void				SetTo(const char* line) throw(ParseException);
+			void				Parse(BDataIO& stream, LiteralHandler* handler)
+									throw(ParseException);
 
 			bool				IsUntagged() const { return fTag == 0; }
-			int32				Tag() const { return fTag; }
+			uint32				Tag() const { return fTag; }
 			bool				IsCommand(const char* command) const;
 			bool				IsContinuation() const { return fContinuation; }
 
 protected:
 			char				ParseLine(ArgumentList& arguments,
-									const char*& line);
-			void				Consume(const char*& line, char c);
+									BDataIO& stream);
 			void				ParseList(ArgumentList& arguments,
-									const char*& line, char start, char end);
+									BDataIO& stream, char start, char end);
 			void				ParseQuoted(ArgumentList& arguments,
-									const char*& line);
+									BDataIO& stream);
 			void				ParseLiteral(ArgumentList& arguments,
-									const char*& line);
+									BDataIO& stream);
 			void				ParseString(ArgumentList& arguments,
-									const char*& line);
-			BString				ExtractString(const char*& line);
+									BDataIO& stream);
+
+			BString				ExtractString(BDataIO& stream);
+			size_t				ExtractNumber(BDataIO& stream);
+
+			void				Consume(BDataIO& stream, char c);
+
+			char				Next(BDataIO& stream);
+			char				Peek(BDataIO& stream);
+			char				Read(BDataIO& stream);
+
+private:
+			void				_SkipLiteral(BDataIO& stream, size_t size);
 
 protected:
-			int32				fTag;
+			LiteralHandler*		fLiteralHandler;
+			uint32				fTag;
 			bool				fContinuation;
+			bool				fHasNextChar;
+			char				fNextChar;
+};
+
+
+class ResponseParser {
+public:
+								ResponseParser(BDataIO& stream);
+								~ResponseParser();
+
+			void				SetTo(BDataIO& stream);
+			void				SetLiteralHandler(LiteralHandler* handler);
+
+			status_t			NextResponse(Response& response,
+									bigtime_t timeout) throw(ParseException);
+
+private:
+								ResponseParser(const ResponseParser& other);
+
+protected:
+			BDataIO*			fStream;
+			LiteralHandler*		fLiteralHandler;
 };
 
 

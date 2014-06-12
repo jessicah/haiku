@@ -208,9 +208,6 @@ class TTextView : public BTextView {
 
 		void ContentChanged(void);
 
-		int32 LineStart(int32 offset);
-		int32 PreviousByte(int32 offset) const;
-
 		class Reader;
 		friend class TTextView::Reader;
 

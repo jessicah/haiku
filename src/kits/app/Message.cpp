@@ -1,5 +1,5 @@
 /*
- * Copyright 2005-2012, Haiku Inc. All rights reserved.
+ * Copyright 2005-2013, Haiku Inc. All rights reserved.
  * Distributed under the terms of the MIT License.
  *
  * Authors:
@@ -28,7 +28,6 @@
 #include <Point.h>
 #include <Rect.h>
 #include <String.h>
-#include <StringList.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -188,8 +187,8 @@ BMessage::operator=(const BMessage &other)
 {
 	DEBUG_FUNCTION_ENTER;
 
-	if (this == &other)
-		return *this;
+    if (this == &other)
+        return *this;
 
 	_Clear();
 
@@ -2628,20 +2627,6 @@ BMessage::AddString(const char *name, const BString &string)
 
 
 status_t
-BMessage::AddStrings(const char *name, const BStringList &list)
-{
-	int32 count = list.CountStrings();
-	for (int32 i = 0; i < count; i++) {
-		status_t error = AddString(name, list.StringAt(i));
-		if (error != B_OK)
-			return error;
-	}
-
-	return B_OK;
-}
-
-
-status_t
 BMessage::AddPointer(const char *name, const void *pointer)
 {
 	return AddData(name, B_POINTER_TYPE, &pointer, sizeof(pointer), true);
@@ -2827,36 +2812,6 @@ BMessage::FindString(const char *name, int32 index, BString *string) const
 	// Find*() clobbers the object even on failure
 	string->SetTo(value);
 	return error;
-}
-
-
-status_t
-BMessage::FindStrings(const char *name, BStringList *list) const
-{
-	if (list == NULL)
-		return B_BAD_VALUE;
-
-	list->MakeEmpty();
-
-	// get the number of items
-	type_code type;
-	int32 count;
-	if (GetInfo(name, &type, &count) != B_OK)
-		return B_NAME_NOT_FOUND;
-
-	if (type != B_STRING_TYPE)
-		return B_BAD_DATA;
-
-	for (int32 i = 0; i < count; i++) {
-		BString string;
-		status_t error = FindString(name, i, &string);
-		if (error != B_OK)
-			return error;
-		if (!list->Add(string))
-			return B_NO_MEMORY;
-	}
-
-	return B_OK;
 }
 
 
@@ -3173,8 +3128,8 @@ BMessage::HasFlat(const char *name, const BFlattenable *object) const
 
 
 bool
-BMessage::HasFlat(const char *name, int32 index, const BFlattenable *object)
-	const
+BMessage::HasFlat(const char *name, int32 index,
+	const BFlattenable *object) const
 {
 	return HasData(name, object->TypeCode(), index);
 }
@@ -3202,20 +3157,21 @@ BMessage::GetString(const char *name, int32 index,
 status_t
 BMessage::SetString(const char *name, const BString& value)
 {
-	return SetData(name, B_STRING_TYPE, value.String(), value.Length() + 1);
+	return SetData(name, B_STRING_TYPE, value.String(), value.Length() + 1,
+		false);
 }
 
 
 status_t
 BMessage::SetString(const char *name, const char* value)
 {
-	return SetData(name, B_STRING_TYPE, value, strlen(value) + 1);
+	return SetData(name, B_STRING_TYPE, value, strlen(value) + 1, false);
 }
 
 
 status_t
 BMessage::SetData(const char* name, type_code type, const void* data,
-	ssize_t numBytes)
+	ssize_t numBytes, bool fixedSize, int count)
 {
 	if (numBytes <= 0 || data == NULL)
 		return B_BAD_VALUE;
@@ -3223,5 +3179,5 @@ BMessage::SetData(const char* name, type_code type, const void* data,
 	if (ReplaceData(name, type, data, numBytes) == B_OK)
 		return B_OK;
 
-	return AddData(name, type, data, numBytes);
+	return AddData(name, type, data, numBytes, fixedSize, count);
 }

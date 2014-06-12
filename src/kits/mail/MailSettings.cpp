@@ -1,6 +1,6 @@
 /*
+ * Copyright 2004-2012, Haiku Inc. All rights reserved.
  * Copyright 2001-2003 Dr. Zoidberg Enterprises. All rights reserved.
- * Copyright 2004-2011, Haiku Inc. All rights reserved.
  *
  * Distributed under the terms of the MIT License.
  */
@@ -51,30 +51,24 @@ BMailSettings::InitCheck() const
 
 
 status_t
-BMailSettings::Save(bigtime_t /*timeout*/)
+BMailSettings::Save()
 {
-	status_t ret;
-	//
-	// Find chain-saving directory
-	//
-
 	BPath path;
-	ret = find_directory(B_USER_SETTINGS_DIRECTORY, &path);
-	if (ret != B_OK) {
+	status_t status = find_directory(B_USER_SETTINGS_DIRECTORY, &path);
+	if (status != B_OK) {
 		fprintf(stderr, "Couldn't find user settings directory: %s\n",
-			strerror(ret));
-		return ret;
+			strerror(status));
+		return status;
 	}
 
 	path.Append("Mail");
 
-	status_t result = BPrivate::WriteMessageFile(fData, path,
-		"new_mail_daemon");
-	if (result < B_OK)
-		return result;
+	status = BPrivate::WriteMessageFile(fData, path, "new_mail_daemon");
+	if (status != B_OK)
+		return status;
 
-	BMessenger(B_MAIL_DAEMON_SIGNATURE).SendMessage('mrrs');
-
+	BMessenger(B_MAIL_DAEMON_SIGNATURE).SendMessage(
+		BPrivate::kMsgSettingsUpdated);
 	return B_OK;
 }
 
@@ -82,58 +76,43 @@ BMailSettings::Save(bigtime_t /*timeout*/)
 status_t
 BMailSettings::Reload()
 {
-	status_t ret;
+	// Try directories from most specific to least
+	directory_which which[] = {
+		B_USER_SETTINGS_DIRECTORY,
+		B_COMMON_SETTINGS_DIRECTORY};
+	status_t status = B_ENTRY_NOT_FOUND;
 
-	BPath path;
-	ret = find_directory(B_USER_SETTINGS_DIRECTORY, &path);
-	if (ret != B_OK) {
-		fprintf(stderr, "Couldn't find user settings directory: %s\n",
-			strerror(ret));
-		return ret;
+	for (size_t i = 0; i < sizeof(which) / sizeof(which[0]); i++) {
+		BPath path;
+		status = find_directory(which[i], &path);
+		if (status != B_OK)
+			continue;
+
+		path.Append("Mail/new_mail_daemon");
+		BFile file;
+		status = file.SetTo(path.Path(), B_READ_ONLY);
+		if (status != B_OK)
+			continue;
+
+		// read settings
+		BMessage settings;
+		status = settings.Unflatten(&file);
+		if (status != B_OK) {
+			fprintf(stderr, "Couldn't read settings from '%s': %s\n",
+				path.Path(), strerror(status));
+			continue;
+		}
+
+		// clobber old settings
+		fData = settings;
+		return B_OK;
 	}
 
-	path.Append("Mail/new_mail_daemon");
-
-	// open
-	BFile settings(path.Path(),B_READ_ONLY);
-	ret = settings.InitCheck();
-	if (ret != B_OK) {
-		fprintf(stderr, "Couldn't open settings file '%s': %s\n",
-			path.Path(), strerror(ret));
-		return ret;
-	}
-
-	// read settings
-	BMessage tmp;
-	ret = tmp.Unflatten(&settings);
-	if (ret != B_OK) {
-		fprintf(stderr, "Couldn't read settings from '%s': %s\n",
-			path.Path(), strerror(ret));
-		return ret;
-	}
-
-	// clobber old settings
-	fData = tmp;
-	return B_OK;
+	return status;
 }
 
 
 //	# pragma mark - Global settings
-
-
-int32
-BMailSettings::WindowFollowsCorner()
-{
-	return fData.FindInt32("WindowFollowsCorner");
-}
-
-
-void
-BMailSettings::SetWindowFollowsCorner(int32 whichCorner)
-{
-	if (fData.ReplaceInt32("WindowFollowsCorner", whichCorner) != B_OK)
-		fData.AddInt32("WindowFollowsCorner", whichCorner);
-}
 
 
 uint32
@@ -142,18 +121,17 @@ BMailSettings::ShowStatusWindow()
 	int32 showStatusWindow;
 	if (fData.FindInt32("ShowStatusWindow", &showStatusWindow) != B_OK) {
 		// show during send and receive
-		return 2;
+		return B_MAIL_SHOW_STATUS_WINDOW_WHEN_ACTIVE;
 	}
 
 	return showStatusWindow;
 }
 
 
-void
+status_t
 BMailSettings::SetShowStatusWindow(uint32 mode)
 {
-	if (fData.ReplaceInt32("ShowStatusWindow", mode) != B_OK)
-		fData.AddInt32("ShowStatusWindow", mode);
+	return fData.SetInt32("ShowStatusWindow", mode);
 }
 
 
@@ -164,87 +142,10 @@ BMailSettings::DaemonAutoStarts()
 }
 
 
-void
+status_t
 BMailSettings::SetDaemonAutoStarts(bool startIt)
 {
-	if (fData.ReplaceBool("DaemonAutoStarts", startIt) != B_OK)
-		fData.AddBool("DaemonAutoStarts", startIt);
-}
-
-
-BRect
-BMailSettings::ConfigWindowFrame()
-{
-	return fData.FindRect("ConfigWindowFrame");
-}
-
-
-void
-BMailSettings::SetConfigWindowFrame(BRect frame)
-{
-	if (fData.ReplaceRect("ConfigWindowFrame", frame) != B_OK)
-		fData.AddRect("ConfigWindowFrame", frame);
-}
-
-
-BRect
-BMailSettings::StatusWindowFrame()
-{
-	BRect frame;
-	if (fData.FindRect("StatusWindowFrame", &frame) != B_OK)
-		return BRect(100, 100, 200, 120);
-
-	return frame;
-}
-
-
-void
-BMailSettings::SetStatusWindowFrame(BRect frame)
-{
-	if (fData.ReplaceRect("StatusWindowFrame", frame) != B_OK)
-		fData.AddRect("StatusWindowFrame", frame);
-}
-
-
-int32
-BMailSettings::StatusWindowWorkspaces()
-{
-	uint32 workspaces;
-	if (fData.FindInt32("StatusWindowWorkSpace", (int32*)&workspaces) != B_OK)
-		return B_ALL_WORKSPACES;
-
-	return workspaces;
-}
-
-
-void
-BMailSettings::SetStatusWindowWorkspaces(int32 workspace)
-{
-	if (fData.ReplaceInt32("StatusWindowWorkSpace", workspace) != B_OK)
-		fData.AddInt32("StatusWindowWorkSpace", workspace);
-
-	BMessage msg('wsch');
-	msg.AddInt32("StatusWindowWorkSpace",workspace);
-	BMessenger(B_MAIL_DAEMON_SIGNATURE).SendMessage(&msg);
-}
-
-
-int32
-BMailSettings::StatusWindowLook()
-{
-	return fData.FindInt32("StatusWindowLook");
-}
-
-
-void
-BMailSettings::SetStatusWindowLook(int32 look)
-{
-	if (fData.ReplaceInt32("StatusWindowLook", look) != B_OK)
-		fData.AddInt32("StatusWindowLook", look);
-
-	BMessage msg('lkch');
-	msg.AddInt32("StatusWindowLook", look);
-	BMessenger(B_MAIL_DAEMON_SIGNATURE).SendMessage(&msg);
+	return fData.SetBool("DaemonAutoStarts", startIt);
 }
 
 
@@ -260,41 +161,10 @@ BMailSettings::AutoCheckInterval()
 }
 
 
-void
+status_t
 BMailSettings::SetAutoCheckInterval(bigtime_t interval)
 {
-	if (fData.ReplaceInt64("AutoCheckInterval", interval) != B_OK)
-		fData.AddInt64("AutoCheckInterval", interval);
-}
-
-
-bool
-BMailSettings::CheckOnlyIfPPPUp()
-{
-	return fData.FindBool("CheckOnlyIfPPPUp");
-}
-
-
-void
-BMailSettings::SetCheckOnlyIfPPPUp(bool yes)
-{
-	if (fData.ReplaceBool("CheckOnlyIfPPPUp", yes))
-		fData.AddBool("CheckOnlyIfPPPUp", yes);
-}
-
-
-bool
-BMailSettings::SendOnlyIfPPPUp()
-{
-	return fData.FindBool("SendOnlyIfPPPUp");
-}
-
-
-void
-BMailSettings::SetSendOnlyIfPPPUp(bool yes)
-{
-	if (fData.ReplaceBool("SendOnlyIfPPPUp", yes))
-		fData.AddBool("SendOnlyIfPPPUp", yes);
+	return fData.SetInt64("AutoCheckInterval", interval);
 }
 
 
@@ -305,11 +175,10 @@ BMailSettings::DefaultOutboundAccount()
 }
 
 
-void
+status_t
 BMailSettings::SetDefaultOutboundAccount(int32 to)
 {
-	if (fData.ReplaceInt32("DefaultOutboundAccount", to) != B_OK)
-		fData.AddInt32("DefaultOutboundAccount", to);
+	return fData.SetInt32("DefaultOutboundAccount", to);
 }
 
 
@@ -419,177 +288,233 @@ BMailAccounts::AccountByName(const char* name)
 // #pragma mark -
 
 
-AddonSettings::AddonSettings()
-	:
-	fModified(false)
+BMailAddOnSettings::BMailAddOnSettings()
 {
 }
 
 
-bool
-AddonSettings::Load(const BMessage& message)
+BMailAddOnSettings::~BMailAddOnSettings()
 {
-	const char* addonPath = NULL;
-	if (message.FindString("add-on path", &addonPath) != B_OK
-		|| get_ref_for_path(addonPath, &fAddonRef) != B_OK
-		|| message.FindMessage("settings", &fSettings) != B_OK)
-		return false;
-
-	fModified = false;
-	return true;
 }
 
 
-bool
-AddonSettings::Save(BMessage& message)
+status_t
+BMailAddOnSettings::Load(const BMessage& message)
 {
-	BPath path(&fAddonRef);
-	message.AddString("add-on path", path.Path());
-	message.AddMessage("settings", &fSettings);
-	fModified = false;
-	return true;
+	const char* pathString = NULL;
+	if (message.FindString("add-on path", &pathString) != B_OK)
+		return B_BAD_VALUE;
+
+	BPath path(pathString);
+	if (!path.IsAbsolute()) {
+		directory_which which[] = {
+			B_USER_ADDONS_DIRECTORY,
+			B_COMMON_ADDONS_DIRECTORY,
+			B_SYSTEM_ADDONS_DIRECTORY
+		};
+
+		for (size_t i = 0; i < sizeof(which) / sizeof(which[0]); i++) {
+			status_t status = find_directory(which[i], &path);
+			if (status != B_OK)
+				continue;
+
+			path.Append("mail_daemon");
+			path.Append(pathString);
+
+			if (BEntry(path.Path()).Exists())
+				break;
+		}
+	}
+
+	status_t status = get_ref_for_path(path.Path(), &fRef);
+	if (status != B_OK)
+		return status;
+
+	BMessage settings;
+	message.FindMessage("settings", &settings);
+
+	MakeEmpty();
+	Append(settings);
+
+	fOriginalSettings = *this;
+	fOriginalRef = fRef;
+	return B_OK;
+}
+
+
+status_t
+BMailAddOnSettings::Save(BMessage& message)
+{
+	BPath path(&fRef);
+	status_t status = message.AddString("add-on path", _RelativizePath(path));
+	if (status == B_OK)
+		status = message.AddMessage("settings", this);
+	if (status != B_OK)
+		return status;
+
+	fOriginalSettings = *this;
+	fOriginalRef = fRef;
+	return B_OK;
 }
 
 
 void
-AddonSettings::SetAddonRef(const entry_ref& ref)
+BMailAddOnSettings::SetAddOnRef(const entry_ref& ref)
 {
-	fAddonRef = ref;
+	fRef = ref;
 }
 
 
 const entry_ref&
-AddonSettings::AddonRef() const
+BMailAddOnSettings::AddOnRef() const
 {
-	return fAddonRef;
-}
-
-
-const BMessage&
-AddonSettings::Settings() const
-{
-	return fSettings;
-}
-
-
-BMessage&
-AddonSettings::EditSettings()
-{
-	fModified = true;
-	return fSettings;
+	return fRef;
 }
 
 
 bool
-AddonSettings::HasBeenModified()
+BMailAddOnSettings::HasBeenModified() const
 {
-	return fModified;
+	return fRef != fOriginalRef
+		|| !fOriginalSettings.HasSameData(*this, true, true);
+}
+
+
+/*!	Cuts off the ".../add-ons/mail_daemon" part of the provided \a path
+	in case it exists. Otherwise, the complete path will be returned.
+*/
+const char*
+BMailAddOnSettings::_RelativizePath(const BPath& path) const
+{
+	const char* string = path.Path();
+	const char* parentDirectory = "/mail_daemon/";
+	const char* at = strstr(string, parentDirectory);
+	if (at == NULL)
+		return string;
+
+	return at + strlen(parentDirectory);
 }
 
 
 // #pragma mark -
 
 
-bool
-MailAddonSettings::Load(const BMessage& message)
+BMailProtocolSettings::BMailProtocolSettings()
+	:
+	fFiltersSettings(5, true)
 {
-	if (!AddonSettings::Load(message))
-		return false;
+}
+
+
+BMailProtocolSettings::~BMailProtocolSettings()
+{
+}
+
+
+status_t
+BMailProtocolSettings::Load(const BMessage& message)
+{
+	status_t status = BMailAddOnSettings::Load(message);
+	if (status != B_OK)
+		return status;
 
 	type_code typeFound;
 	int32 countFound;
 	message.GetInfo("filters", &typeFound, &countFound);
 	if (typeFound != B_MESSAGE_TYPE)
-		return false;
+		return B_BAD_VALUE;
 
 	for (int i = 0; i < countFound; i++) {
 		int32 index = AddFilterSettings();
-		AddonSettings& filterSettings = fFiltersSettings[index];
+		if (index < 0)
+			return B_NO_MEMORY;
+
+		BMailAddOnSettings* filterSettings = fFiltersSettings.ItemAt(index);
+
 		BMessage filterMessage;
 		message.FindMessage("filters", i, &filterMessage);
-		if (!filterSettings.Load(filterMessage))
+		if (filterSettings->Load(filterMessage) != B_OK)
 			RemoveFilterSettings(index);
 	}
-	return true;
+	return B_OK;
 }
 
 
-bool
-MailAddonSettings::Save(BMessage& message)
+status_t
+BMailProtocolSettings::Save(BMessage& message)
 {
-	if (!AddonSettings::Save(message))
-		return false;
+	status_t status = BMailAddOnSettings::Save(message);
+	if (status != B_OK)
+		return status;
 
 	for (int i = 0; i < CountFilterSettings(); i++) {
 		BMessage filter;
-		AddonSettings& filterSettings = fFiltersSettings[i];
-		filterSettings.Save(filter);
+		BMailAddOnSettings* filterSettings = fFiltersSettings.ItemAt(i);
+		filterSettings->Save(filter);
 		message.AddMessage("filters", &filter);
 	}
-	return true;
+	return B_OK;
 }
 
 
 int32
-MailAddonSettings::CountFilterSettings()
+BMailProtocolSettings::CountFilterSettings() const
 {
-	return fFiltersSettings.size();
+	return fFiltersSettings.CountItems();
 }
 
 
 int32
-MailAddonSettings::AddFilterSettings(const entry_ref* ref)
+BMailProtocolSettings::AddFilterSettings(const entry_ref* ref)
 {
-	AddonSettings filterSettings;
+	BMailAddOnSettings* filterSettings = new BMailAddOnSettings();
 	if (ref != NULL)
-		filterSettings.SetAddonRef(*ref);
-	fFiltersSettings.push_back(filterSettings);
-	return fFiltersSettings.size() - 1;
+		filterSettings->SetAddOnRef(*ref);
+
+	if (fFiltersSettings.AddItem(filterSettings))
+		return fFiltersSettings.CountItems() - 1;
+
+	delete filterSettings;
+	return -1;
+}
+
+
+void
+BMailProtocolSettings::RemoveFilterSettings(int32 index)
+{
+	fFiltersSettings.RemoveItemAt(index);
 }
 
 
 bool
-MailAddonSettings::RemoveFilterSettings(int32 index)
+BMailProtocolSettings::MoveFilterSettings(int32 from, int32 to)
 {
-	fFiltersSettings.erase(fFiltersSettings.begin() + index);
-	return true;
-}
-
-
-bool
-MailAddonSettings::MoveFilterSettings(int32 from, int32 to)
-{
-	if (from < 0 || from >= (int32)fFiltersSettings.size() || to < 0
-		|| to >= (int32)fFiltersSettings.size())
+	if (from < 0 || from >= (int32)CountFilterSettings() || to < 0
+		|| to >= (int32)CountFilterSettings())
 		return false;
-	AddonSettings fromSettings = fFiltersSettings[from];
-	fFiltersSettings.erase(fFiltersSettings.begin() + from);
-	if (to == (int32)fFiltersSettings.size())
-		fFiltersSettings.push_back(fromSettings);
-	else {
-		std::vector<AddonSettings>::iterator it = fFiltersSettings.begin() + to;
-		fFiltersSettings.insert(it, fromSettings);
-	}
+	if (from == to)
+		return true;
+
+	BMailAddOnSettings* settings = fFiltersSettings.RemoveItemAt(from);
+	fFiltersSettings.AddItem(settings, to);
 	return true;
 }
 
 
-AddonSettings*
-MailAddonSettings::FilterSettingsAt(int32 index)
+BMailAddOnSettings*
+BMailProtocolSettings::FilterSettingsAt(int32 index) const
 {
-	if (index < 0 || index >= (int32)fFiltersSettings.size())
-		return NULL;
-	return &fFiltersSettings[index];
+	return fFiltersSettings.ItemAt(index);
 }
 
 
 bool
-MailAddonSettings::HasBeenModified()
+BMailProtocolSettings::HasBeenModified() const
 {
-	if (AddonSettings::HasBeenModified())
+	if (BMailAddOnSettings::HasBeenModified())
 		return true;
-	for (unsigned int i = 0; i < fFiltersSettings.size(); i++) {
-		if (fFiltersSettings[i].HasBeenModified())
+	for (int32 i = 0; i < CountFilterSettings(); i++) {
+		if (FilterSettingsAt(i)->HasBeenModified())
 			return true;
 	}
 	return false;
@@ -634,7 +559,7 @@ BMailAccountSettings::SetAccountID(int32 id)
 
 
 int32
-BMailAccountSettings::AccountID()
+BMailAccountSettings::AccountID() const
 {
 	return fAccountID;
 }
@@ -686,7 +611,7 @@ BMailAccountSettings::ReturnAddress() const
 
 
 bool
-BMailAccountSettings::SetInboundAddon(const char* name)
+BMailAccountSettings::SetInboundAddOn(const char* name)
 {
 	BPath path;
 	status_t status = find_directory(B_BEOS_ADDONS_DIRECTORY, &path);
@@ -697,15 +622,14 @@ BMailAccountSettings::SetInboundAddon(const char* name)
 	path.Append(name);
 	entry_ref ref;
 	get_ref_for_path(path.Path(), &ref);
-	fInboundSettings.SetAddonRef(ref);
+	fInboundSettings.SetAddOnRef(ref);
 
-	fModified = true;
 	return true;
 }
 
 
 bool
-BMailAccountSettings::SetOutboundAddon(const char* name)
+BMailAccountSettings::SetOutboundAddOn(const char* name)
 {
 	BPath path;
 	status_t status = find_directory(B_BEOS_ADDONS_DIRECTORY, &path);
@@ -716,36 +640,49 @@ BMailAccountSettings::SetOutboundAddon(const char* name)
 	path.Append(name);
 	entry_ref ref;
 	get_ref_for_path(path.Path(), &ref);
-	fOutboundSettings.SetAddonRef(ref);
+	fOutboundSettings.SetAddOnRef(ref);
 
-	fModified = true;
 	return true;
 }
 
 
 const entry_ref&
-BMailAccountSettings::InboundPath() const
+BMailAccountSettings::InboundAddOnRef() const
 {
-	return fInboundSettings.AddonRef();
+	return fInboundSettings.AddOnRef();
 }
 
 
 const entry_ref&
-BMailAccountSettings::OutboundPath() const
+BMailAccountSettings::OutboundAddOnRef() const
 {
-	return fOutboundSettings.AddonRef();
+	return fOutboundSettings.AddOnRef();
 }
 
 
-MailAddonSettings&
+BMailProtocolSettings&
 BMailAccountSettings::InboundSettings()
 {
 	return fInboundSettings;
 }
 
 
-MailAddonSettings&
+const BMailProtocolSettings&
+BMailAccountSettings::InboundSettings() const
+{
+	return fInboundSettings;
+}
+
+
+BMailProtocolSettings&
 BMailAccountSettings::OutboundSettings()
+{
+	return fOutboundSettings;
+}
+
+
+const BMailProtocolSettings&
+BMailAccountSettings::OutboundSettings() const
 {
 	return fOutboundSettings;
 }
@@ -754,14 +691,14 @@ BMailAccountSettings::OutboundSettings()
 bool
 BMailAccountSettings::HasInbound()
 {
-	return BEntry(&fInboundSettings.AddonRef()).Exists();
+	return BEntry(&fInboundSettings.AddOnRef()).Exists();
 }
 
 
 bool
 BMailAccountSettings::HasOutbound()
 {
-	return BEntry(&fOutboundSettings.AddonRef()).Exists();
+	return BEntry(&fOutboundSettings.AddOnRef()).Exists();
 }
 
 
@@ -870,18 +807,16 @@ BMailAccountSettings::Delete()
 
 
 bool
-BMailAccountSettings::HasBeenModified()
+BMailAccountSettings::HasBeenModified() const
 {
-	if (fInboundSettings.HasBeenModified())
-		return true;
-	if (fOutboundSettings.HasBeenModified())
-		return true;
-	return fModified;
+	return fModified
+		|| fInboundSettings.HasBeenModified()
+		|| fOutboundSettings.HasBeenModified();
 }
 
 
 const BEntry&
-BMailAccountSettings::AccountFile()
+BMailAccountSettings::AccountFile() const
 {
 	return fAccountFile;
 }

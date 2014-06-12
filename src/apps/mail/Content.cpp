@@ -1909,7 +1909,7 @@ TTextView::Open(hyper_text *enclosure)
 		case TYPE_BE_ENCLOSURE:
 			if (!enclosure->have_ref) {
 				BPath path;
-				if (find_directory(B_SYSTEM_TEMP_DIRECTORY, &path) == B_NO_ERROR) {
+				if (find_directory(B_COMMON_TEMP_DIRECTORY, &path) == B_NO_ERROR) {
 					BDirectory dir(path.Path());
 					if (dir.InitCheck() == B_NO_ERROR) {
 						char name[B_FILE_NAME_LENGTH];
@@ -3121,7 +3121,6 @@ TTextView::AddQuote(int32 start, int32 finish)
 	int32 lineStart;
 	GoToLine(CurrentLine());
 	GetSelection(&lineStart, &lineStart);
-	lineStart = LineStart(lineStart);
 
 	// make sure that we're changing the whole last line, too
 	int32 lineEnd = finish > lineStart ? finish - 1 : finish;
@@ -3199,7 +3198,6 @@ TTextView::RemoveQuote(int32 start, int32 finish)
 	GoToLine(CurrentLine());
 	int32 lineStart;
 	GetSelection(&lineStart, &lineStart);
-	lineStart = LineStart(lineStart);
 
 	// make sure that we're changing the whole last line, too
 	int32 lineEnd = finish > lineStart ? finish - 1 : finish;
@@ -3279,39 +3277,6 @@ TTextView::RemoveQuote(int32 start, int32 finish)
 
 	Select(start, finish);
 	ScrollTo(rect.LeftTop());
-}
-
-
-int32
-TTextView::LineStart(int32 offset)
-{
-	if (offset <= 0)
-		return 0;
-
-	while (offset > 0) {
-		offset = PreviousByte(offset);
-		if (ByteAt(offset) == B_ENTER)
-			return offset + 1;
-	}
-
-	return offset;
-}
-
-
-int32
-TTextView::PreviousByte(int32 offset) const
-{
-	if (offset <= 0)
-		return 0;
-
-	int32 count = 6;
-
-	for (--offset; offset > 0 && count; --offset, --count) {
-		if ((ByteAt(offset) & 0xC0) != 0x80)
-			break;
-	}
-
-	return count ? offset : 0;
 }
 
 
@@ -3409,3 +3374,4 @@ TTextView::Redo()
 		fUndoBuffer.On();
 	}
 }
+

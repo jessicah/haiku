@@ -1,199 +1,237 @@
-/* RuleFilter's config view - performs action depending on matching a header value
-**
-** Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
-*/
+/*
+ * Copyright 2004-2012, Haiku, Inc. All rights reserved.
+ * Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
+ *
+ * Distributed under the terms of the MIT License.
+ */
 
 
 #include <stdio.h>
 
 #include <Catalog.h>
-#include <MenuField.h>
-#include <PopUpMenu.h>
-#include <Message.h>
-#include <TextControl.h>
-#include <MenuItem.h>
-
-#include <MailAddon.h>
-#include <FileConfigView.h>
+#include <LayoutBuilder.h>
+#include <MailFilter.h>
 #include <MailSettings.h>
+#include <MailSettingsView.h>
+#include <MenuField.h>
+#include <MenuItem.h>
+#include <Message.h>
+#include <PopUpMenu.h>
+#include <TextControl.h>
+
+#include <FileConfigView.h>
+
+#include "MatchHeaderSettings.h"
 
 
 #undef B_TRANSLATION_CONTEXT
 #define B_TRANSLATION_CONTEXT "ConfigView"
 
 
-const uint32 kMsgActionMoveTo = 'argm';
-const uint32 kMsgActionDelete = 'argd';
-const uint32 kMsgActionSetTo = 'args';
-const uint32 kMsgActionReplyWith = 'argr';
-const uint32 kMsgActionSetRead = 'arge';
+using namespace BPrivate;
 
 
-class RuleFilterConfig : public BView {
-	public:
-		RuleFilterConfig(const BMessage *settings);
+static const uint32 kMsgActionChanged = 'actC';
 
-		virtual	void MessageReceived(BMessage *msg);
-		virtual	void AttachedToWindow();
-		virtual	status_t Archive(BMessage *into, bool deep = true) const;
-		virtual	void GetPreferredSize(float *width, float *height);
-	private:
-		BTextControl *attr, *regex;
-		BFileControl *arg;
-		BPopUpMenu *menu, *outbound;
-		BMenuField *outbound_field;
-		int staging;
-		int32 chain;
+
+class RuleFilterConfig : public BMailSettingsView {
+public:
+								RuleFilterConfig(
+									const BMailAddOnSettings& settings);
+
+	virtual status_t			SaveInto(BMailAddOnSettings& settings) const;
+
+	virtual	void				MessageReceived(BMessage* message);
+	virtual	void				AttachedToWindow();
+
+private:
+			void				_SetVisible(BView* view, bool visible);
+
+private:
+			BTextControl*		fAttributeControl;
+			BTextControl*		fRegexControl;
+			FileControl*		fFileControl;
+			BTextControl*		fFlagsControl;
+			BPopUpMenu*			fActionMenu;
+			BPopUpMenu*			fAccountMenu;
+			BMenuField*			fAccountField;
+			int					fAction;
+			int32				fAccountID;
 };
 
 
-RuleFilterConfig::RuleFilterConfig(const BMessage *settings)
+RuleFilterConfig::RuleFilterConfig(const BMailAddOnSettings& addOnSettings)
 	:
-	BView(BRect(0,0,260,85),"rulefilter_config", B_FOLLOW_LEFT | B_FOLLOW_TOP,
-		0), menu(NULL)
+	BMailSettingsView("rulefilter_config"),
+	fActionMenu(NULL)
 {
 	SetViewColor(ui_color(B_PANEL_BACKGROUND_COLOR));
-	attr = new BTextControl(BRect(5,5,100,20),"attr", B_TRANSLATE("If"),
-		B_TRANSLATE("header (e.g. Subject)"),NULL);
-	attr->SetDivider(be_plain_font->StringWidth(B_TRANSLATE("If"))+ 4);
-	if (settings->HasString("attribute"))
-		attr->SetText(settings->FindString("attribute"));
-	AddChild(attr);
 
-	regex = new BTextControl(BRect(104,5,255,20),"attr", B_TRANSLATE("has"),
-		B_TRANSLATE("value (use REGEX: in from of regular expressions like "
-		"*spam*)"), NULL);
-	regex->SetDivider(be_plain_font->StringWidth(B_TRANSLATE("has")) + 4);
-	if (settings->HasString("regex"))
-		regex->SetText(settings->FindString("regex"));
-	AddChild(regex);
+	MatchHeaderSettings settings(addOnSettings);
+	fAction = settings.Action();
 
-	arg = new BFileControl(BRect(5,55,255,80),"arg", NULL,
+	fAttributeControl = new BTextControl("attr", B_TRANSLATE("If"),
+		B_TRANSLATE("header (e.g. Subject)"), NULL);
+	fAttributeControl->SetText(settings.Attribute());
+
+	fRegexControl = new BTextControl("regex", B_TRANSLATE("has"),
+		B_TRANSLATE("value (use REGEX: in front of regular expressions like "
+			"*spam*)"), NULL);
+	fRegexControl->SetText(settings.Expression());
+
+	fFileControl = new FileControl("arg", NULL,
 		B_TRANSLATE("this field is based on the action"));
-	if (BControl *control = (BControl *)arg->FindView("select_file"))
+	if (BControl* control = (BControl*)fFileControl->FindView("select_file"))
 		control->SetEnabled(false);
-	if (settings->HasString("argument"))
-		arg->SetText(settings->FindString("argument"));
+	fFileControl->SetText(settings.MoveTarget());
 
-	outbound = new BPopUpMenu(B_TRANSLATE("<Choose account>"));
+	fFlagsControl = new BTextControl("flags", NULL, NULL);
+	fFlagsControl->SetText(settings.SetFlagsTo());
 
-	if (settings->HasInt32("do_what"))
-		staging = settings->FindInt32("do_what");
-	else
-		staging = -1;
-	if (staging == 3)
-		chain = settings->FindInt32("argument");
-	else
-		chain = -1;
-	printf("Chain: %" B_PRId32 "\n",chain);
+	// Populate account menu
+
+	fAccountMenu = new BPopUpMenu(B_TRANSLATE("<Choose account>"));
+	fAccountID = settings.ReplyAccount();
 
 	BMailAccounts accounts;
 	for (int32 i = 0; i < accounts.CountAccounts(); i++) {
 		BMailAccountSettings* account = accounts.AccountAt(i);
 		if (!account->HasOutbound())
 			continue;
-		BMenuItem *item = new BMenuItem(account->Name(),
-			new BMessage(account->AccountID()));
-		outbound->AddItem(item);
-		if (account->AccountID() == chain)
+
+		BMessage* message = new BMessage();
+		message->AddInt32("account id", account->AccountID());
+
+		BMenuItem* item = new BMenuItem(account->Name(), message);
+		fAccountMenu->AddItem(item);
+		if (account->AccountID() == fAccountID)
 			item->SetMarked(true);
 	}
-}
 
-
-void RuleFilterConfig::AttachedToWindow() {
-	if (menu != NULL)
-		return; // We switched back from another tab
-
-	menu = new BPopUpMenu(B_TRANSLATE("<Choose action>"));
-	menu->AddItem(new BMenuItem(B_TRANSLATE("Move to"),
-		new BMessage(kMsgActionMoveTo)));
-	menu->AddItem(new BMenuItem(B_TRANSLATE("Set flags to"),
-		new BMessage(kMsgActionSetTo)));
-	menu->AddItem(new BMenuItem(B_TRANSLATE("Delete message"),
-		new BMessage(kMsgActionDelete)));
-	menu->AddItem(new BMenuItem(B_TRANSLATE("Reply with"),
-		new BMessage(kMsgActionReplyWith)));
-	menu->AddItem(new BMenuItem(B_TRANSLATE("Set as read"),
-		new BMessage(kMsgActionSetRead)));
-	menu->SetTargetForItems(this);
-
-	BMenuField *field = new BMenuField(BRect(5,30,210,50),"do_what",
-		B_TRANSLATE("Then"), menu);
-	field->ResizeToPreferred();
-	field->SetDivider(be_plain_font->StringWidth(B_TRANSLATE("Then")) + 8);
-	AddChild(field);
-
-	outbound_field = new BMenuField(BRect(5,55,255,80),"reply","Foo",outbound);
-	outbound_field->ResizeToPreferred();
-	outbound_field->SetDivider(0);
-	if (staging >= 0) {
-		menu->ItemAt(staging)->SetMarked(true);
-		MessageReceived(menu->ItemAt(staging)->Message());
-	} else {
-		AddChild(arg);
+	fAccountField = new BMenuField("reply", "Foo", fAccountMenu);
+	if (fAction >= 0) {
+		BMenuItem* item = fActionMenu->ItemAt(fAction);
+		if (item != NULL) {
+			item->SetMarked(true);
+			MessageReceived(item->Message());
+		}
 	}
+
+	// Popuplate action menu
+
+	fActionMenu = new BPopUpMenu(B_TRANSLATE("<Choose action>"));
+
+	const struct {
+		rule_action	action;
+		const char*	label;
+	} kActions[] = {
+		{ACTION_MOVE_TO, B_TRANSLATE("Move to")},
+		{ACTION_SET_FLAGS_TO, B_TRANSLATE("Set flags to")},
+		{ACTION_DELETE_MESSAGE, B_TRANSLATE("Delete message")},
+		{ACTION_REPLY_WITH, B_TRANSLATE("Reply with")},
+		{ACTION_SET_AS_READ, B_TRANSLATE("Set as read")},
+	};
+	for (size_t i = 0; i < sizeof(kActions) / sizeof(kActions[0]); i++) {
+		BMessage* message = new BMessage(kMsgActionChanged);
+		message->AddInt32("action", (int32)kActions[i].action);
+
+		fActionMenu->AddItem(new BMenuItem(kActions[i].label, message));
+	}
+
+	BMenuField* actionField = new BMenuField("action", B_TRANSLATE("Then"),
+		fActionMenu);
+
+	// Build layout
+
+	BLayoutBuilder::Group<>(this, B_VERTICAL)
+		.AddGroup(B_HORIZONTAL)
+			.Add(fAttributeControl->CreateLabelLayoutItem())
+			.Add(fAttributeControl->CreateTextViewLayoutItem())
+			.Add(fRegexControl->CreateLabelLayoutItem())
+			.Add(fRegexControl->CreateTextViewLayoutItem())
+		.End()
+		.AddGroup(B_HORIZONTAL)
+			.Add(actionField->CreateLabelLayoutItem())
+			.Add(actionField->CreateMenuBarLayoutItem())
+		.End()
+		.Add(fFileControl)
+		.Add(fAccountField);
 }
 
-status_t RuleFilterConfig::Archive(BMessage *into, bool deep) const {
-	into->MakeEmpty();
-	into->AddInt32("do_what",menu->IndexOf(menu->FindMarked()));
-	into->AddString("attribute",attr->Text());
-	into->AddString("regex",regex->Text());
-	if (into->FindInt32("do_what") == 3)
-		into->AddInt32("argument", outbound->FindMarked()->Message()->what);
-	else
-		into->AddString("argument",arg->Text());
+
+status_t
+RuleFilterConfig::SaveInto(BMailAddOnSettings& settings) const
+{
+	int32 action = fActionMenu->IndexOf(fActionMenu->FindMarked());
+	settings.SetInt32("action", action);
+	settings.SetString("attribute", fAttributeControl->Text());
+	settings.SetString("regex", fRegexControl->Text());
+
+	switch (action) {
+		case ACTION_MOVE_TO:
+			settings.SetString("move target", fFileControl->Text());
+			break;
+
+		case ACTION_SET_FLAGS_TO:
+			settings.SetString("set flags", fFlagsControl->Text());
+			break;
+
+		case ACTION_REPLY_WITH:
+		{
+			BMenuItem* item = fAccountMenu->FindMarked();
+			if (item != NULL) {
+				settings.SetInt32("account",
+					item->Message()->FindInt32("account id"));
+			}
+			break;
+		}
+	}
 
 	return B_OK;
 }
 
-void RuleFilterConfig::MessageReceived(BMessage *msg) {
-	switch (msg->what)
-	{
-		case kMsgActionMoveTo:
-		case kMsgActionSetTo:
-			if (arg->FindView("file_path"))
-				arg->SetEnabled(true);
-			if (BControl *control = (BControl *)arg->FindView("select_file"))
-				control->SetEnabled(msg->what == kMsgActionMoveTo);
-			if (arg->Parent() == NULL) {
-				outbound_field->RemoveSelf();
-				AddChild(arg);
-			}
+
+void
+RuleFilterConfig::AttachedToWindow()
+{
+	fActionMenu->SetTargetForItems(this);
+}
+
+
+void
+RuleFilterConfig::MessageReceived(BMessage* message)
+{
+	switch (message->what) {
+		case kMsgActionChanged:
+			fAction = message->FindInt32("action");
+
+			_SetVisible(fFileControl, fAction == ACTION_MOVE_TO);
+			_SetVisible(fFlagsControl, fAction == ACTION_SET_FLAGS_TO);
+			_SetVisible(fAccountField, fAction == ACTION_REPLY_WITH);
 			break;
-		case kMsgActionDelete:
-			arg->SetEnabled(false);
-			if (arg->Parent() == NULL) {
-				outbound_field->RemoveSelf();
-				AddChild(arg);
-			}
-			break;
-		case kMsgActionReplyWith:
-			if (outbound->Parent() == NULL) {
-				arg->RemoveSelf();
-				AddChild(outbound_field);
-			}
-			break;
-		case kMsgActionSetRead:
-			arg->SetEnabled(false);
-			if (arg->Parent() == NULL) {
-				outbound_field->RemoveSelf();
-				AddChild(arg);
-			}
-			break;
+
 		default:
-			BView::MessageReceived(msg);
+			BView::MessageReceived(message);
 	}
 }
 
-void RuleFilterConfig::GetPreferredSize(float *width, float *height) {
-	*width = 260;
-	*height = 55;
+
+void
+RuleFilterConfig::_SetVisible(BView* view, bool visible)
+{
+	while (visible && view->IsHidden(view))
+		view->Show();
+	while (!visible && !view->IsHidden(view))
+		view->Hide();
 }
 
 
-BView* instantiate_filter_config_panel(AddonSettings& settings)
+// #pragma mark -
+
+
+BMailSettingsView*
+instantiate_filter_settings_view(const BMailAccountSettings& accountSettings,
+	const BMailAddOnSettings& settings)
 {
-	return new RuleFilterConfig(&settings.Settings());
+	return new RuleFilterConfig(settings);
 }

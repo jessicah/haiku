@@ -5,18 +5,18 @@ UsePublicHeaders [ FDirName add-ons mail_daemon ] ;
 
 SubDirHdrs [ FDirName $(HAIKU_TOP) headers os add-ons mail_daemon ] ;
 
-AddResources NewMailNotification : NewMailNotification.rdef ;
+AddResources NewMailNotification : NotifierFilter.rdef ;
 
 Addon NewMailNotification :
-	filter.cpp
-	ConfigView.cpp
+	NotifierFilter.cpp
+	NotifierConfigView.cpp
 	:
-	be libmail.so localestub $(TARGET_LIBSUPC++)
+	be libmail.so $(HAIKU_LOCALE_LIBS) $(TARGET_LIBSUPC++)
 	;
 
 DoCatalogs NewMailNotification :
 	x-vnd.Haiku-NewMailNotification
 	:
-	ConfigView.cpp
-	filter.cpp
+	NotifierFilter.cpp
+	NotifierConfigView.cpp
 ;

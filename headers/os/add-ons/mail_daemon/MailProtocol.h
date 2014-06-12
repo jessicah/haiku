@@ -1,16 +1,16 @@
-/* Protocol - the base class for protocol filters
- *
+/*
+ * Copyright 2004-2013, Haiku, Inc. All Rights Reserved.
  * Copyright 2001 Dr. Zoidberg Enterprises. All rights reserved.
  * Copyright 2011 Clemens Zeidler. All rights reserved.
-*/
-#ifndef MAIL_PROTOCOL_H
-#define MAIL_PROTOCOL_H
+ *
+ * Distributed under the terms of the MIT License.
+ */
+#ifndef _MAIL_PROTOCOL_H
+#define _MAIL_PROTOCOL_H
 
 
 #include <map>
-#include <vector>
 
-#include <Handler.h>
 #include <Looper.h>
 #include <OS.h>
 #include <ObjectList.h>
@@ -21,206 +21,152 @@
 #include <MailSettings.h>
 
 
-class MailNotifier {
-public:
-	virtual						~MailNotifier() {}
+class BMailFilter;
+class BMailSettingsView;
+class BView;
 
-	virtual MailNotifier*		Clone() = 0;
+
+class BMailNotifier {
+public:
+	virtual						~BMailNotifier() {}
+
+	virtual BMailNotifier*		Clone() = 0;
 
 	virtual	void				ShowError(const char* error) = 0;
 	virtual	void				ShowMessage(const char* message) = 0;
 
-	virtual void				SetTotalItems(int32 items) = 0;
-	virtual void				SetTotalItemsSize(int32 size) = 0;
-	virtual	void				ReportProgress(int bytes, int messages,
+	virtual void				SetTotalItems(uint32 items) = 0;
+	virtual void				SetTotalItemsSize(uint64 size) = 0;
+	virtual	void				ReportProgress(uint32 items, uint64 bytes,
 									const char* message = NULL) = 0;
 	virtual void				ResetProgress(const char* message = NULL) = 0;
 };
 
 
-class MailProtocol;
+typedef status_t BMailFilterAction;
+
+#define B_NO_MAIL_ACTION		0
+#define B_MOVE_MAIL_ACTION		1
+#define B_DELETE_MAIL_ACTION	2
 
 
-class MailFilter {
+class BMailProtocol : public BLooper {
 public:
-								MailFilter(MailProtocol& protocol,
-									AddonSettings* settings);
-	virtual						~MailFilter();
+								BMailProtocol(
+									const BMailAccountSettings& settings);
+	virtual						~BMailProtocol();
 
-	//! Message hooks if filter is installed to a inbound protocol
-	virtual	void				HeaderFetched(const entry_ref& ref,
-									BFile* file);
-	virtual	void				BodyFetched(const entry_ref& ref, BFile* file);
-	virtual void				MailboxSynced(status_t status);
+			const BMailAccountSettings& AccountSettings() const;
 
-	//! Message hooks if filter is installed to a outbound protocol
-	virtual	void				MessageReadyToSend(const entry_ref& ref,
-									BFile* file);
-	virtual	void				MessageSent(const entry_ref& ref,
-									BFile* file);
-protected:
-			MailProtocol&		fMailProtocol;
-			AddonSettings*		fAddonSettings;
-};
+			void				SetMailNotifier(BMailNotifier* mailNotifier);
+			BMailNotifier*		MailNotifier() const;
 
+			//! We take ownership of the filters
+			bool				AddFilter(BMailFilter* filter);
+			int32				CountFilter() const;
+			BMailFilter*		FilterAt(int32 index) const;
+			BMailFilter*		RemoveFilter(int32 index);
+			bool				RemoveFilter(BMailFilter* filter);
 
-class MailProtocolThread;
+	virtual void				MessageReceived(BMessage* message);
 
-
-class MailProtocol {
-public:
-								MailProtocol(BMailAccountSettings* settings);
-	virtual						~MailProtocol();
-
-	virtual	void				SetStopNow() {}
-
-			BMailAccountSettings&	AccountSettings();
-
-			void				SetProtocolThread(
-									MailProtocolThread* protocolThread);
-	virtual	void				AddedToLooper() {}
-			MailProtocolThread*	Looper();
-			/*! Add handler to the handler list. The handler is installed /
-			removed to the according BLooper automatically. */
-			bool				AddHandler(BHandler* handler);
-			//! Does not delete handler
-			bool				RemoveHandler(BHandler* handler);
-
-			void				SetMailNotifier(MailNotifier* mailNotifier);
-
-	virtual	void				ShowError(const char* error);
-	virtual	void				ShowMessage(const char* message);
-	virtual void				SetTotalItems(int32 items);
-	virtual void				SetTotalItemsSize(int32 size);
-	virtual void				ReportProgress(int bytes, int messages,
-									const char* message = NULL);
-	virtual void				ResetProgress(const char* message = NULL);
-
-			//! MailProtocol takes ownership of the filters
-			bool				AddFilter(MailFilter* filter);
-			int32				CountFilter();
-			MailFilter*			FilterAt(int32 index);
-			MailFilter*			RemoveFilter(int32 index);
-			bool				RemoveFilter(MailFilter* filter);
-
-			void				NotifyNewMessagesToFetch(int32 nMessages);
-			void				NotifyHeaderFetched(const entry_ref& ref,
-									BFile* mail);
-			void				NotifyBodyFetched(const entry_ref& ref,
-									BFile* mail);
-			void				NotifyMessageReadyToSend(const entry_ref& ref,
-									BFile* mail);
-			void				NotifyMessageSent(const entry_ref& ref,
-									BFile* mail);
-
-			//! mail storage operations
+			// Mail storage operations
 	virtual	status_t			MoveMessage(const entry_ref& ref,
 									BDirectory& dir);
 	virtual	status_t			DeleteMessage(const entry_ref& ref);
 
-	virtual	void				FileRenamed(const entry_ref& from,
-									const entry_ref& to);
-	virtual	void				FileDeleted(const node_ref& node);
+			// Convenience methods that call the BMailNotifier
+			void				ShowError(const char* error);
+			void				ShowMessage(const char* message);
+
+#if __GNUC__ > 2
+			// Unhide virtual base methods
+			using BHandler::AddFilter;
+			using BHandler::RemoveFilter;
+#endif
 
 protected:
-			void				LoadFilters(MailAddonSettings& settings);
+		 	void				SetTotalItems(uint32 items);
+			void				SetTotalItemsSize(uint64 size);
+			void				ReportProgress(uint32 items, uint64 bytes,
+									const char* message = NULL);
+			void				ResetProgress(const char* message = NULL);
+			void				NotifyNewMessagesToFetch(int32 nMessages);
 
-			BMailAccountSettings	fAccountSettings;
-			MailNotifier*		fMailNotifier;
+			// Filter notifications
+			BMailFilterAction	ProcessHeaderFetched(entry_ref& ref,
+									BFile& mail, BMessage& attributes);
+			void				NotifyBodyFetched(const entry_ref& ref,
+									BFile& mail, BMessage& attributes);
+			BMailFilterAction	ProcessMessageFetched(entry_ref& ref,
+									BFile& mail, BMessage& attributes);
+			void				NotifyMessageReadyToSend(const entry_ref& ref,
+									BFile& mail);
+			void				NotifyMessageSent(const entry_ref& ref,
+									BFile& mail);
+
+			void				LoadFilters(
+									const BMailProtocolSettings& settings);
 
 private:
-			MailFilter*			_LoadFilter(AddonSettings* filterSettings);
+			BMailFilter*		_LoadFilter(const BMailAddOnSettings& settings);
+			BMailFilterAction	_ProcessHeaderFetched(entry_ref& ref,
+									BFile& mail, BMessage& attributes);
+			void				_NotifyBodyFetched(const entry_ref& ref,
+									BFile& mail, BMessage& attributes);
 
-			MailProtocolThread*	fProtocolThread;
-			BObjectList<BHandler>	fHandlerList;
-			BObjectList<MailFilter>	fFilterList;
-			std::map<entry_ref, image_id>	fFilterImages;
+protected:
+			const BMailAccountSettings fAccountSettings;
+			BMailNotifier*		fMailNotifier;
+
+private:
+			BObjectList<BMailFilter> fFilterList;
+			std::map<entry_ref, image_id> fFilterImages;
 };
 
 
-class InboundProtocol : public MailProtocol {
+class BInboundMailProtocol : public BMailProtocol {
 public:
-								InboundProtocol(BMailAccountSettings* settings);
-	virtual						~InboundProtocol();
+								BInboundMailProtocol(
+									const BMailAccountSettings& settings);
+	virtual						~BInboundMailProtocol();
+
+	virtual void				MessageReceived(BMessage* message);
 
 	virtual	status_t			SyncMessages() = 0;
 	virtual status_t			FetchBody(const entry_ref& ref) = 0;
 	virtual	status_t			MarkMessageAsRead(const entry_ref& ref,
-									read_flags flag = B_READ);
+									read_flags flags = B_READ);
 	virtual	status_t			DeleteMessage(const entry_ref& ref) = 0;
 	virtual	status_t			AppendMessage(const entry_ref& ref);
+
+protected:
+			void				NotiyMailboxSynchronized(status_t status);
 };
 
 
-class OutboundProtocol : public MailProtocol {
+class BOutboundMailProtocol : public BMailProtocol {
 public:
-								OutboundProtocol(
-									BMailAccountSettings* settings);
-	virtual						~OutboundProtocol();
+								BOutboundMailProtocol(
+									const BMailAccountSettings& settings);
+	virtual						~BOutboundMailProtocol();
 
-	virtual	status_t			SendMessages(const std::vector<entry_ref>&
-									mails, size_t totalBytes) = 0;
+	virtual void				MessageReceived(BMessage* message);
+
+	virtual	status_t			SendMessages(const BMessage& message,
+									off_t totalBytes) = 0;
 };
 
 
-class MailProtocolThread : public BLooper {
-public:
-								MailProtocolThread(MailProtocol* protocol);
-	virtual	void				MessageReceived(BMessage* message);
+// Your protocol needs to export these hooks in order to be picked up
+extern "C" BInboundMailProtocol* instantiate_inbound_protocol(
+	const BMailAccountSettings& settings);
+extern "C" BOutboundMailProtocol* instantiate_outbound_protocol(
+	const BMailAccountSettings& settings);
 
-			MailProtocol*		Protocol() { return fMailProtocol; }
-
-			void				SetStopNow();
-			/*! These function post a message to the loop to trigger the action.
-			*/
-			void				TriggerFileMove(const entry_ref& ref,
-									BDirectory& dir);
-			void				TriggerFileDeletion(const entry_ref& ref);
-
-			void				TriggerFileRenamed(const entry_ref& from,
-									const entry_ref& to);
-			void				TriggerFileDeleted(const node_ref& node);
-private:
-			MailProtocol*		fMailProtocol;
-};
+extern "C" BMailSettingsView* instantiate_protocol_settings_view(
+	const BMailAccountSettings& accountSettings,
+	const BMailProtocolSettings& settings);
 
 
-class InboundProtocolThread : public MailProtocolThread {
-public:
-								InboundProtocolThread(
-									InboundProtocol* protocol);
-								~InboundProtocolThread();
-
-			void				MessageReceived(BMessage* message);
-
-			void				SyncMessages();
-			void				FetchBody(const entry_ref& ref,
-									BMessenger* listener = NULL);
-			void				MarkMessageAsRead(const entry_ref& ref,
-									read_flags flag = B_READ);
-			void				DeleteMessage(const entry_ref& ref);
-			void				AppendMessage(const entry_ref& ref);
-private:
-			void				_NotiyMailboxSynced(status_t status);
-
-			InboundProtocol*	fProtocol;
-};
-
-
-class OutboundProtocolThread : public MailProtocolThread {
-public:
-								OutboundProtocolThread(
-									OutboundProtocol* protocol);
-								~OutboundProtocolThread();
-
-			void				MessageReceived(BMessage* message);
-
-			void				SendMessages(const std::vector<entry_ref>&
-									mails, size_t totalBytes);
-
-private:
-			OutboundProtocol*	fProtocol;
-};
-
-
-#endif // MAIL_PROTOCOL_H
+#endif	// _MAIL_PROTOCOL_H

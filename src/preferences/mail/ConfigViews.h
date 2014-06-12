@@ -1,7 +1,8 @@
 /*
- * Copyright 2007-2011, Haiku, Inc. All rights reserved.
+ * Copyright 2007-2012, Haiku, Inc. All rights reserved.
  * Copyright 2001-2002 Dr. Zoidberg Enterprises. All rights reserved.
  * Copyright 2011, Clemens Zeidler <haiku@clemens-zeidler.de>
+ *
  * Distributed under the terms of the MIT License.
  */
 #ifndef CONFIG_VIEWS_H
@@ -11,8 +12,11 @@
 #include <Box.h>
 #include <image.h>
 
-#include "MailSettings.h"
+#include <MailSettingsView.h>
+#include <MailSettings.h>
+
 #include <ProtocolConfigView.h>
+
 #include "FilterConfigView.h"
 
 
@@ -23,21 +27,14 @@ class BButton;
 struct entry_ref;
 
 
-class ProtocolsConfigView;
-
-
-BView* CreateConfigView(entry_ref addon, MailAddonSettings& settings,
-	BMailAccountSettings& accountSettings, image_id* image);
-
-
 class AccountConfigView : public BBox {
 public:
-								AccountConfigView(BRect rect,
-									BMailAccountSettings *account);
+								AccountConfigView(
+									BMailAccountSettings* account);
 
 	virtual void				DetachedFromWindow();
 	virtual void				AttachedToWindow();
-	virtual void				MessageReceived(BMessage *msg);
+	virtual void				MessageReceived(BMessage* message);
 
 			void				UpdateViews();
 
@@ -45,32 +42,27 @@ private:
 			BTextControl*		fNameControl;
 			BTextControl*		fRealNameControl;
 			BTextControl*		fReturnAddressControl;
-			BMailAccountSettings	*fAccount;
+			BMailAccountSettings* fAccount;
 };
 
 
-class InProtocolsConfigView : public BBox {
+class ProtocolSettingsView : public BBox {
 public:
-								InProtocolsConfigView(
-									BMailAccountSettings* account);
+								ProtocolSettingsView(const entry_ref& ref,
+									const BMailAccountSettings& accountSettings,
+									BMailProtocolSettings& settings);
 
 			void 				DetachedFromWindow();
-private:
-			BMailAccountSettings*	fAccount;
-			BView*				fConfigView;
-			image_id			fImageID;
-};
 
-
-class OutProtocolsConfigView : public BBox {
-public:
-								OutProtocolsConfigView(
-									BMailAccountSettings* account);
-			void 				DetachedFromWindow();
 private:
-			BMailAccountSettings*	fAccount;
-			BView*				fConfigView;
-			image_id			fImageID;
+			status_t			_CreateSettingsView(const entry_ref& ref,
+									const BMailAccountSettings& accountSettings,
+									BMailProtocolSettings& settings);
+
+private:
+			BMailProtocolSettings& fSettings;
+			BMailSettingsView*	fSettingsView;
+			image_id			fImage;
 };
 
 
