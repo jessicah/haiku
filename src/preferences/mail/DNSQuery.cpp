@@ -7,7 +7,7 @@
 #include <FindDirectory.h>
 #include <NetAddress.h>
 #include <NetEndpoint.h>
-#include <Path.h> 
+#include <Path.h>
 
 // #define DEBUG 1
 
@@ -19,7 +19,7 @@
 #endif
 
 
-static vint32 gID = 1;
+static int32 gID = 1;
 
 
 BRawNetBuffer::BRawNetBuffer()
@@ -165,7 +165,7 @@ DNSTools::GetDNSServers(BObjectList<BString>* serverList)
 	 line[sizeof(name) - 1] == '\t'))
 
 	BPath path;
-	if (find_directory(B_COMMON_SETTINGS_DIRECTORY, &path) != B_OK)
+	if (find_directory(B_SYSTEM_SETTINGS_DIRECTORY, &path) != B_OK)
 		return B_ENTRY_NOT_FOUND;
 
 	path.Append("network/resolv.conf");
@@ -205,7 +205,7 @@ DNSTools::GetDNSServers(BObjectList<BString>* serverList)
 	}
 
 	fclose(fp);
-	
+
 	return B_OK;
 }
 
@@ -288,7 +288,7 @@ DNSQuery::ReadDNSServer(in_addr* add)
 	status_t status = DNSTools::GetDNSServers(&dnsServerList);
 	if (status != B_OK)
 		return status;
-		
+
 	BString* firstDNS = dnsServerList.ItemAt(0);
 	if (firstDNS == NULL || inet_aton(firstDNS->String(), add) != 1)
 		return B_ERROR;

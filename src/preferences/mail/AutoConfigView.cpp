@@ -204,7 +204,7 @@ AutoConfigView::_GetSMTPAddonRef(entry_ref *ref)
 {
 	directory_which which[] = {
 		B_USER_ADDONS_DIRECTORY,
-		B_COMMON_ADDONS_DIRECTORY,
+		/*B_COMMON_ADDONS_DIRECTORY,*/
 		B_BEOS_ADDONS_DIRECTORY
 	};
 

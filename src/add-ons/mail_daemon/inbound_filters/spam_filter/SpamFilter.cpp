@@ -169,7 +169,7 @@ SpamFilter::_CheckForSpamServer()
 
 	BPath path;
 	entry_ref ref;
-	const directory_which kPlaces[] = {B_COMMON_BIN_DIRECTORY,
+	const directory_which kPlaces[] = {B_SYSTEM_BIN_DIRECTORY,
 		B_BEOS_BIN_DIRECTORY};
 	for (size_t i = 0; i < sizeof(kPlaces) / sizeof(kPlaces[0]); i++) {
 		find_directory(kPlaces[i], &path);

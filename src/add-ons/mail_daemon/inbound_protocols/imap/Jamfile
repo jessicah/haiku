@@ -33,7 +33,7 @@ local sources =
 
 AddResources IMAP : IMAP.rdef ;
 
-if $(HAIKU_BUILD_FEATURE_OPENSSL_ENABLED) {
+if [ FIsBuildFeatureEnabled openssl ] {
 	SubDirC++Flags -DUSE_SSL ;
 	SetupFeatureObjectsDir ssl ;
 } else {
@@ -44,7 +44,7 @@ Addon IMAP
 	:
 	$(sources)
 	:
-	be libmail.so $(HAIKU_LOCALE_LIBS) $(TARGET_NETWORK_LIBS) libbnetapi.so
+	be libmail.so localestub $(TARGET_NETWORK_LIBS) libbnetapi.so
 	libshared.a $(TARGET_LIBSUPC++) $(TARGET_LIBSTDC++)
 ;
 

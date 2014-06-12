@@ -76,39 +76,35 @@ BMailSettings::Save()
 status_t
 BMailSettings::Reload()
 {
-	// Try directories from most specific to least
-	directory_which which[] = {
-		B_USER_SETTINGS_DIRECTORY,
-		B_COMMON_SETTINGS_DIRECTORY};
-	status_t status = B_ENTRY_NOT_FOUND;
-
-	for (size_t i = 0; i < sizeof(which) / sizeof(which[0]); i++) {
-		BPath path;
-		status = find_directory(which[i], &path);
-		if (status != B_OK)
-			continue;
-
-		path.Append("Mail/new_mail_daemon");
-		BFile file;
-		status = file.SetTo(path.Path(), B_READ_ONLY);
-		if (status != B_OK)
-			continue;
-
-		// read settings
-		BMessage settings;
-		status = settings.Unflatten(&file);
-		if (status != B_OK) {
-			fprintf(stderr, "Couldn't read settings from '%s': %s\n",
-				path.Path(), strerror(status));
-			continue;
-		}
-
-		// clobber old settings
-		fData = settings;
-		return B_OK;
+	BPath path;
+	status_t status = find_directory(B_USER_SETTINGS_DIRECTORY, &path);
+	if (status != B_OK) {
+		fprintf(stderr, "Couldn't read settings from '%s': %s\n",
+			path.Path(), strerror(status));
+		return status;
 	}
 
-	return status;
+	path.Append("Mail/new_mail_daemon");
+	BFile file(path.Path(), B_READ_ONLY);
+	status = file.InitCheck();
+	if (status != B_OK) {
+		fprintf(stderr, "Couldn't read settings from '%s': %s\n",
+			path.Path(), strerror(status));
+		return status;
+	}
+
+	// read settings
+	BMessage settings;
+	status = settings.Unflatten(&file);
+	if (status != B_OK) {
+		fprintf(stderr, "Couldn't read settings from '%s': %s\n",
+			path.Path(), strerror(status));
+		return status;
+	}
+
+	// clobber old settings
+	fData = settings;
+	return B_OK;
 }
 
 
@@ -309,7 +305,7 @@ BMailAddOnSettings::Load(const BMessage& message)
 	if (!path.IsAbsolute()) {
 		directory_which which[] = {
 			B_USER_ADDONS_DIRECTORY,
-			B_COMMON_ADDONS_DIRECTORY,
+			/*B_COMMON_ADDONS_DIRECTORY,*/
 			B_SYSTEM_ADDONS_DIRECTORY
 		};
 

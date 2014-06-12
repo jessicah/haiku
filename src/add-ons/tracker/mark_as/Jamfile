@@ -12,7 +12,7 @@ Addon Mark\ as… :
 	: be tracker $(TARGET_LIBSUPC++) libmail.so
 ;
 
-Addon Mark\ as\ Read-R :
+Addon Mark\ as\ Read :
 	MarkAsRead.cpp
 	: be tracker $(TARGET_LIBSUPC++) libmail.so
 ;

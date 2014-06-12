@@ -19,7 +19,7 @@ Server mail_daemon :
 	MailDaemonApplication.cpp
 	main.cpp
 	DefaultNotifier.cpp
-	: be libmail.so tracker $(HAIKU_LOCALE_LIBS) $(TARGET_LIBSTDC++)
+	: be libmail.so tracker localestub $(TARGET_LIBSTDC++)
 		$(TARGET_NETWORK_LIBS)
 ;
 
