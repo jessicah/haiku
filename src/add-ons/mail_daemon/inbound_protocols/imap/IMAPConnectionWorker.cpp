@@ -320,7 +320,7 @@ public:
 
 			status_t status = WorkerPrivate(worker).SelectMailbox(*fFolder);
 			if (status != B_OK)
-				return status;
+				return B_OK;
 
 			fLastIndex = WorkerPrivate(worker).MessagesExist();
 			fFirstIndex = fMailbox->CountMessages() + 1;

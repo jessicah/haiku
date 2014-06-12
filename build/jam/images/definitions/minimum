@@ -134,14 +134,15 @@ SYSTEM_NETWORK_DEVICES =
 SYSTEM_NETWORK_DATALINK_PROTOCOLS =
 	<module>arp
 	ethernet_frame
-	ipv6_datagram
+	#ipv6_datagram
 	loopback_frame
 ;
 
 #SYSTEM_NETWORK_PPP = ipcp modem pap pppoe ;
 
 SYSTEM_NETWORK_PROTOCOLS =
-	icmp icmp6 ipv4 ipv6
+	#icmp icmp6 ipv4 ipv6
+	icmp ipv4
 	tcp
 	udp unix
 ;
