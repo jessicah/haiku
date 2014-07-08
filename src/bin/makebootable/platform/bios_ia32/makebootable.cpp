@@ -517,11 +517,20 @@ main(int argc, const char *const *argv)
 						fprintf(stderr, "Error: Parsing partition table on "
 							"device \"%s\" failed: %s\n", baseDeviceName,
 							strerror(error));
-						exit(1);
+						fprintf(stderr, "Falling back to partition geometry\n");
+						int partFD = open(fileName, O_RDONLY);
+						if (partFD > 0 && ioctl(partFD, HDIO_GETGEO, &geometry) == 0) {
+							partitionOffset = geometry.start * 512;
+							close(partFD);
+						} else {
+							fprintf(stderr, "Error: partition geometry also failed: %s\n", strerror(errno));
+							exit(1);
+						}
 					}
 
 					close(baseFD);
 
+					if (partitionOffset  <= 0) {
 					// check the partition we are supposed to write at
 					Partition *partition = map.PartitionAt(partitionIndex - 1);
 					if (!partition || partition->IsEmpty()) {
@@ -538,7 +547,7 @@ main(int argc, const char *const *argv)
 						exit(1);
 					}
 
-					partitionOffset = partition->Offset();
+					partitionOffset = partition->Offset(); }
 				} else {
 					// The given device is the base device. We'll write at
 					// offset 0.
