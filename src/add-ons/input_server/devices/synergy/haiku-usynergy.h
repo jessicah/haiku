@@ -8,24 +8,16 @@
 #ifndef USYNERGY_H
 #define USYNERGY_H
 
-extern "C"
-{
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netdb.h>
-}
-
 #include <InputServerDevice.h>
 #include <InterfaceDefs.h>
 #include <Locker.h>
 
 #include <ObjectList.h>
 
+#include "Keymap.h"
 #include "uSynergy.h"
 
-extern "C"
-{
+
 uSynergyBool      uSynergyConnectHaiku(uSynergyCookie cookie);
 uSynergyBool      uSynergySendHaiku(uSynergyCookie cookie, const uint8_t *buffer, int length);
 uSynergyBool      uSynergyReceiveHaiku(uSynergyCookie cookie, uint8_t *buffer, int maxLength, int* outLength);
@@ -37,7 +29,6 @@ void              uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, 
 void              uSynergyKeyboardCallbackHaiku(uSynergyCookie cookie, uint16_t key, uint16_t modifiers, uSynergyBool down, uSynergyBool repeat);
 void              uSynergyJoystickCallbackHaiku(uSynergyCookie cookie, uint8_t joyNum, uint16_t buttons, int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY);
 void              uSynergyClipboardCallbackHaiku(uSynergyCookie cookie, enum uSynergyClipboardFormat format, const uint8_t *data, uint32_t size);
-}
 
 class uSynergyInputServerDevice : public BInputServerDevice {
 	public:
@@ -56,11 +47,22 @@ class uSynergyInputServerDevice : public BInputServerDevice {
 		uSynergyContext		*uSynergyHaikuContext;
 
 		BMessage*		_BuildMouseMessage(uint32 what, uint64 when, uint32 buttons, float x, float y) const;
+		void			_ProcessKeyboard(uint16_t keycode, uint16_t modifiers, bool isKeyDown, bool isKeyRepeat);
+		void			_UpdateSettings();
 	public:
 		struct sockaddr_in	 synergyServerData;
 		int			 synergyServerSocket;
 	private:
 		static status_t		 uSynergyThreadLoop(void* arg);
+
+		uint32		fModifiers;
+		uint32		fCommandKey;
+		uint32		fControlKey;
+
+	volatile bool	fUpdateSettings;
+
+		Keymap		fKeymap;
+		BLocker		fKeymapLock;
 
 	public:
 		/* callbacks for uSynergy */

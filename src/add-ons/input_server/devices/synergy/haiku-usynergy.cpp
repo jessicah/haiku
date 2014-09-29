@@ -1,3 +1,6 @@
+
+#include <Application.h>
+#include <Autolock.h>
 #include <Notification.h>
 #include <Screen.h>
 #include <OS.h>
@@ -5,6 +8,10 @@
 #include <strings.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include <keyboard_mouse_driver.h>
 
@@ -31,6 +38,9 @@
 const static uint32 kSynergyThreadPriority = B_FIRST_REAL_TIME_PRIORITY + 4;
 
 uSynergyInputServerDevice::uSynergyInputServerDevice()
+	:
+	fUpdateSettings(false),
+	fKeymapLock("synergy keymap lock")
 {
 	CALLED();
 	uSynergyHaikuContext = (uSynergyContext*)malloc(sizeof(uSynergyContext));
@@ -123,6 +133,9 @@ uSynergyInputServerDevice::Stop(const char* name, void* cookie)
 status_t
 uSynergyInputServerDevice::Control(const char* name, void* cookie, uint32 command, BMessage* message)
 {
+	if (command == B_KEY_MAP_CHANGED)
+		fUpdateSettings = true;
+
 	return B_OK;
 }
 
@@ -144,6 +157,16 @@ uSynergyInputServerDevice::_BuildMouseMessage(uint32 what, uint64 when, uint32 b
 	return message;
 }
 
+void
+uSynergyInputServerDevice::_UpdateSettings()
+{
+	BAutolock lock(fKeymapLock);
+	fKeymap.RetrieveCurrent();
+	fModifiers = fKeymap.Map().lock_settings;
+	fControlKey = fKeymap.KeyForModifier(B_LEFT_CONTROL_KEY);
+	fCommandKey = fKeymap.KeyForModifier(B_LEFT_COMMAND_KEY);
+}
+
 status_t
 uSynergyInputServerDevice::uSynergyThreadLoop(void* arg)
 {
@@ -152,13 +175,17 @@ uSynergyInputServerDevice::uSynergyThreadLoop(void* arg)
 
 	while (inputDevice->threadActive) {
 		uSynergyUpdate(uSynergyHaikuContext);
+
+		if (inputDevice->fUpdateSettings) {
+			inputDevice->_UpdateSettings();
+			inputDevice->fUpdateSettings = false;
+		}
 	}
 
 	return B_OK;
 }
 
 
-extern "C" {
 uSynergyBool
 uSynergyConnectHaiku(uSynergyCookie cookie)
 {
@@ -166,11 +193,11 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
 
 	struct sockaddr_in server;
-	
+
 	server.sin_family = AF_INET;
 	server.sin_port = htons(24800);
 	inet_aton("10.20.30.18", &server.sin_addr);
-	
+
 	inputDevice->synergyServerSocket = socket(PF_INET, SOCK_STREAM, 0);
 
 	if (inputDevice->synergyServerSocket < 0) {
@@ -248,9 +275,10 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 	static uint32_t			 oldButtons = 0;
 	uint32_t			 buttons = 0;
 	static uint16_t			 oldX = 0, oldY = 0;
-	static int16_t			 oldWheelX = 0, oldWheelY = 0;
 	float				 xVal = (float)x / (float)inputDevice->uSynergyHaikuContext->m_clientWidth;
 	float				 yVal = (float)y / (float)inputDevice->uSynergyHaikuContext->m_clientHeight;
+
+	int64 timestamp = system_time();
 
 	if (buttonLeft == USYNERGY_TRUE) {
 		buttons |= 1 << 0;
@@ -264,39 +292,227 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 
 	if (buttons != oldButtons) {
 		bool pressedButton = buttons > 0;
-		BMessage* message = inputDevice->_BuildMouseMessage(pressedButton ? B_MOUSE_DOWN : B_MOUSE_UP, system_time(), buttons, xVal, yVal);
+		BMessage* message = inputDevice->_BuildMouseMessage(pressedButton ? B_MOUSE_DOWN : B_MOUSE_UP, timestamp, buttons, xVal, yVal);
 		if (message != NULL)
 			inputDevice->EnqueueMessage(message);
 		oldButtons = buttons;
 	}
 
 	if ((x != oldX) || (y != oldY)) {
-		BMessage* message = inputDevice->_BuildMouseMessage(B_MOUSE_MOVED, system_time(), buttons, xVal, yVal);
+		BMessage* message = inputDevice->_BuildMouseMessage(B_MOUSE_MOVED, timestamp, buttons, xVal, yVal);
 		if (message != NULL)
 			inputDevice->EnqueueMessage(message);
 		oldX = x;
 		oldY = y;
 	}
 
-	if ((oldWheelX != wheelX) || (oldWheelY = wheelY)) {
+	if (wheelX != 0 && wheelY != 0) {
 		BMessage* message = new BMessage(B_MOUSE_WHEEL_CHANGED);
 		if (message != NULL) {
-			if (message->AddInt64("when", system_time()) == B_OK
+			if (message->AddInt64("when", timestamp) == B_OK
 			    && message->AddFloat("be:wheel_delta_x", wheelX) == B_OK
 			    && message->AddFloat("be:wheel_delta_y", wheelY) == B_OK)
 				inputDevice->EnqueueMessage(message);
 			else
 				delete message;
 		}
-		oldWheelX = wheelX;
-		oldWheelY = wheelY;
 	}
+}
+
+void
+uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifiers, bool isKeyDown, bool isKeyRepeat)
+{
+	static uint8 activeDeadKey = 0;
+	static uint32 lastKeyCode = 0;
+	static uint32 repeatCount = 1;
+	static uint8 states[16];
+
+	int64 timestamp = system_time();
+
+	TRACE("synergy: keycode = %04x, modifiers = %04x\n", keycode, _modifiers);
+
+	if (isKeyDown && keycode == 0x68) {
+		// MENU KEY for Tracker
+		bool noOtherKeyPressed = true;
+		for (int32 i = 0; i < 16; ++i) {
+			if (states[i] != 0) {
+				noOtherKeyPressed = false;
+				break;
+			}
+		}
+
+		if (noOtherKeyPressed) {
+			BMessenger deskbar("application/x-bnd.Be-TSKB");
+			if (deskbar.IsValid())
+				deskbar.SendMessage('BeMn');
+		}
+	}
+
+	if (keycode < 256) {
+		if (isKeyDown)
+			states[(keycode) >> 3] |= (1 << (7 - (keycode & 0x7)));
+		else
+			states[(keycode) >> 3] &= (!(1 << (7 - (keycode & 0x7))));
+	}
+#if false
+	if (isKeyDown && keycode == 0x34 // DELETE KEY
+		&& (states[fCommandKey >> 3] & (1 << (7 - (fCommandKey & 0x7))))
+		&& (states[fControlKey >> 3] & (1 << (7 - (fControlKey & 0x7))))) {
+		//LOG_EVENT("TeamMonitor called\n");
+
+		// show the team monitor
+		if (fOwner->fTeamMonitorWindow == NULL)
+			fOwner->fTeamMonitorWindow = new(std::nothrow) TeamMonitorWindow();
+
+		if (fOwner->fTeamMonitorWindow != NULL)
+			fOwner->fTeamMonitorWindow->Enable();
+
+		ctrlAltDelPressed = true;
+	}
+
+	if (ctrlAltDelPressed) {
+		if (fOwner->fTeamMonitorWindow != NULL) {
+			BMessage message(kMsgCtrlAltDelPressed);
+			message.AddBool("key down", isKeyDown);
+			fOwner->fTeamMonitorWindow->PostMessage(&message);
+		}
+
+		if (!isKeyDown)
+			ctrlAltDelPressed = false;
+	}
+#endif
+	BAutolock lock(fKeymapLock);
+
+	uint32 modifiers = fKeymap.Modifier(keycode);
+	bool isLock
+		= (modifiers & (B_CAPS_LOCK | B_NUM_LOCK | B_SCROLL_LOCK)) != 0;
+	if (modifiers != 0 && (!isLock || isKeyDown)) {
+		uint32 oldModifiers = fModifiers;
+
+		if ((isKeyDown && !isLock)
+			|| (isKeyDown && !(fModifiers & modifiers)))
+			fModifiers |= modifiers;
+		else {
+			fModifiers &= ~modifiers;
+
+			// ensure that we don't clear a combined B_*_KEY when still
+			// one of the individual B_{LEFT|RIGHT}_*_KEY is pressed
+			if (fModifiers & (B_LEFT_SHIFT_KEY | B_RIGHT_SHIFT_KEY))
+				fModifiers |= B_SHIFT_KEY;
+			if (fModifiers & (B_LEFT_COMMAND_KEY | B_RIGHT_COMMAND_KEY))
+				fModifiers |= B_COMMAND_KEY;
+			if (fModifiers & (B_LEFT_CONTROL_KEY | B_RIGHT_CONTROL_KEY))
+				fModifiers |= B_CONTROL_KEY;
+			if (fModifiers & (B_LEFT_OPTION_KEY | B_RIGHT_OPTION_KEY))
+				fModifiers |= B_OPTION_KEY;
+		}
+
+		if (fModifiers != oldModifiers) {
+			BMessage* message = new BMessage(B_MODIFIERS_CHANGED);
+			if (message == NULL)
+				return;
+
+			message->AddInt64("when", timestamp);
+			message->AddInt32("be:old_modifiers", oldModifiers);
+			message->AddInt32("modifiers", fModifiers);
+			message->AddData("states", B_UINT8_TYPE, states, 16);
+
+			if (EnqueueMessage(message) != B_OK)
+				delete message;
+		}
+	}
+
+	uint8 newDeadKey = 0;
+	if (activeDeadKey == 0 || !isKeyDown)
+		newDeadKey = fKeymap.ActiveDeadKey(keycode, fModifiers);
+
+	char* string = NULL;
+	char* rawString = NULL;
+	int32 numBytes = 0, rawNumBytes = 0;
+	if (newDeadKey == 0) {
+		fKeymap.GetChars(keycode, fModifiers, activeDeadKey, &string,
+			&numBytes);
+	}
+	fKeymap.GetChars(keycode, 0, 0, &rawString, &rawNumBytes);
+
+	BMessage* msg = new BMessage;
+	if (msg == NULL) {
+		delete[] string;
+		delete[] rawString;
+		return;
+	}
+
+	if (numBytes > 0)
+		msg->what = isKeyDown ? B_KEY_DOWN : B_KEY_UP;
+	else
+		msg->what = isKeyDown ? B_UNMAPPED_KEY_DOWN : B_UNMAPPED_KEY_UP;
+
+	msg->AddInt64("when", timestamp);
+	msg->AddInt32("key", keycode);
+	msg->AddInt32("modifiers", fModifiers);
+	msg->AddData("states", B_UINT8_TYPE, states, 16);
+	if (numBytes > 0) {
+		for (int i = 0; i < numBytes; i++)
+			msg->AddInt8("byte", (int8)string[i]);
+		msg->AddData("bytes", B_STRING_TYPE, string, numBytes + 1);
+
+		if (rawNumBytes <= 0) {
+			rawNumBytes = 1;
+			delete[] rawString;
+			rawString = string;
+		} else
+			delete[] string;
+
+		if (isKeyDown && lastKeyCode == keycode) {
+			repeatCount++;
+			msg->AddInt32("be:key_repeat", repeatCount);
+		} else
+			repeatCount = 1;
+	} else
+		delete[] string;
+
+	if (rawNumBytes > 0)
+		msg->AddInt32("raw_char", (uint32)((uint8)rawString[0] & 0x7f));
+
+	delete[] rawString;
+#if 0
+	if (newDeadKey == 0) {
+		if (isKeyDown && !modifiers && activeDeadKey != 0) {
+			// a dead key was completed
+			activeDeadKey = 0;
+			if (fInputMethodStarted) {
+				_EnqueueInlineInputMethod(B_INPUT_METHOD_CHANGED,
+					string, true, msg);
+				_EnqueueInlineInputMethod(B_INPUT_METHOD_STOPPED);
+				fInputMethodStarted = false;
+				msg = NULL;
+			}
+		}
+	} else if (isKeyDown
+		&& _EnqueueInlineInputMethod(B_INPUT_METHOD_STARTED) == B_OK) {
+		// start of a dead key
+		char* string = NULL;
+		int32 numBytes = 0;
+		fKeymap.GetChars(keycode, fModifiers, 0, &string, &numBytes);
+
+		if (_EnqueueInlineInputMethod(B_INPUT_METHOD_CHANGED, string)
+				== B_OK)
+			fInputMethodStarted = true;
+
+		activeDeadKey = newDeadKey;
+		delete[] string;
+	}
+#endif
+	if (msg != NULL && EnqueueMessage(msg) != B_OK)
+		delete msg;
+
+	lastKeyCode = isKeyDown ? keycode : 0;
 }
 
 void
 uSynergyKeyboardCallbackHaiku(uSynergyCookie cookie, uint16_t key, uint16_t modifiers, uSynergyBool down, uSynergyBool repeat)
 {
-
+	((uSynergyInputServerDevice*)cookie)->_ProcessKeyboard(key, modifiers, down, repeat);
 }
 
 void
@@ -311,7 +527,6 @@ uSynergyClipboardCallbackHaiku(uSynergyCookie cookie, enum uSynergyClipboardForm
 
 }
 
-}
 
 extern "C" BInputServerDevice*
 instantiate_input_device()

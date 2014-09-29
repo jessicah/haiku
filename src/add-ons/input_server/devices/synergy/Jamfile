@@ -2,11 +2,12 @@ SubDir HAIKU_TOP src add-ons input_server devices synergy ;
 
 SetSubDirSupportedPlatformsBeOSCompatible ;
 
-UsePrivateHeaders input network shared ;
+UsePrivateHeaders input interface network shared ;
 UsePrivateSystemHeaders ;
 
 Addon <input>synergy :
 	uSynergy.c
 	haiku-usynergy.cpp
+	Keymap.cpp
 
-	: input_server be network [ TargetLibsupc++ ] ;
+	: input_server be libshared.a network [ TargetLibsupc++ ] ;
