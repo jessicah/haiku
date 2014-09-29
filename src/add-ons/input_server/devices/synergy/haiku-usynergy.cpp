@@ -15,6 +15,8 @@
 
 #include <keyboard_mouse_driver.h>
 
+#include "ATKeymap.h"
+
 
 #include "haiku-usynergy.h"
 
@@ -275,6 +277,7 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 	static uint32_t			 oldButtons = 0;
 	uint32_t			 buttons = 0;
 	static uint16_t			 oldX = 0, oldY = 0;
+	static int16_t			oldWheelX = 0, oldWheelY = 0;
 	float				 xVal = (float)x / (float)inputDevice->uSynergyHaikuContext->m_clientWidth;
 	float				 yVal = (float)y / (float)inputDevice->uSynergyHaikuContext->m_clientHeight;
 
@@ -306,47 +309,55 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 		oldY = y;
 	}
 
-	if (wheelX != 0 && wheelY != 0) {
+	if (wheelX != 0 || wheelY != 0) {
 		BMessage* message = new BMessage(B_MOUSE_WHEEL_CHANGED);
 		if (message != NULL) {
 			if (message->AddInt64("when", timestamp) == B_OK
-			    && message->AddFloat("be:wheel_delta_x", wheelX) == B_OK
-			    && message->AddFloat("be:wheel_delta_y", wheelY) == B_OK)
+			    && message->AddFloat("be:wheel_delta_x", (oldWheelX - wheelX) / 120) == B_OK
+			    && message->AddFloat("be:wheel_delta_y", (oldWheelY - wheelY) / 120) == B_OK)
 				inputDevice->EnqueueMessage(message);
 			else
 				delete message;
 		}
+		oldWheelX = wheelX;
+		oldWheelY = wheelY;
 	}
 }
 
+/* Synergy modifier definitions */
+#define	SYNERGY_SHIFT		0x0001
+#define	SYNERGY_CONTROL		0x0002
+#define SYNERGY_ALT		0x0004
+#define SYNERGY_META		0x0008
+#define SYNERGY_SUPER		0x0010
+#define SYNERGY_ALTGR		0x0020
+#define SYNERGY_LEVEL5LOCK	0x0040
+#define SYNERGY_CAPSLOCK	0x1000
+#define SYNERGY_NUMLOCK		0x2000
+#define SYNERGY_SCROLLLOCK	0x4000
+#define EXTENDED_KEY		0xe000
+
 void
-uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifiers, bool isKeyDown, bool isKeyRepeat)
+uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifiers, bool isKeyDown, bool isKeyRepeat)
 {
-	static uint8 activeDeadKey = 0;
-	static uint32 lastKeyCode = 0;
+	static uint32 lastScanCode = 0;
 	static uint32 repeatCount = 1;
 	static uint8 states[16];
 
+	bool isExtended = false;
+
+	if (scancode & EXTENDED_KEY != 0) {
+		isExtended = true;
+		TRACE("synergy: extended key\n");
+	}
+
 	int64 timestamp = system_time();
 
-	TRACE("synergy: keycode = %04x, modifiers = %04x\n", keycode, _modifiers);
-
-	if (isKeyDown && keycode == 0x68) {
-		// MENU KEY for Tracker
-		bool noOtherKeyPressed = true;
-		for (int32 i = 0; i < 16; ++i) {
-			if (states[i] != 0) {
-				noOtherKeyPressed = false;
-				break;
-			}
-		}
-
-		if (noOtherKeyPressed) {
-			BMessenger deskbar("application/x-bnd.Be-TSKB");
-			if (deskbar.IsValid())
-				deskbar.SendMessage('BeMn');
-		}
-	}
+	//TRACE("synergy: scancode = 0x%02x\n", scancode);
+	uint32_t keycode = 0;
+	if (scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
+		keycode = kATKeycodeMap[scancode - 1];
+	//TRACE("synergy: keycode = 0x%x\n", keycode);
 
 	if (keycode < 256) {
 		if (isKeyDown)
@@ -354,39 +365,50 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifier
 		else
 			states[(keycode) >> 3] &= (!(1 << (7 - (keycode & 0x7))));
 	}
-#if false
-	if (isKeyDown && keycode == 0x34 // DELETE KEY
+
+	if (isKeyDown && keycode == 0x1E // DELETE KEY
 		&& (states[fCommandKey >> 3] & (1 << (7 - (fCommandKey & 0x7))))
 		&& (states[fControlKey >> 3] & (1 << (7 - (fControlKey & 0x7))))) {
-		//LOG_EVENT("TeamMonitor called\n");
-
-		// show the team monitor
-		if (fOwner->fTeamMonitorWindow == NULL)
-			fOwner->fTeamMonitorWindow = new(std::nothrow) TeamMonitorWindow();
-
-		if (fOwner->fTeamMonitorWindow != NULL)
-			fOwner->fTeamMonitorWindow->Enable();
-
-		ctrlAltDelPressed = true;
+		TRACE("synergy: TeamMonitor called\n");
 	}
 
-	if (ctrlAltDelPressed) {
-		if (fOwner->fTeamMonitorWindow != NULL) {
-			BMessage message(kMsgCtrlAltDelPressed);
-			message.AddBool("key down", isKeyDown);
-			fOwner->fTeamMonitorWindow->PostMessage(&message);
-		}
-
-		if (!isKeyDown)
-			ctrlAltDelPressed = false;
+	uint32 modifiers = 0;
+	TRACE("synergy: modifiers: ");
+	if (_modifiers & SYNERGY_SHIFT) {
+		TRACE("SHIFT ");
+		modifiers |= B_SHIFT_KEY;
 	}
-#endif
-	BAutolock lock(fKeymapLock);
+	if (_modifiers & SYNERGY_CONTROL) {
+		TRACE("CONTROL ");
+		modifiers |= B_CONTROL_KEY;
+	}
+	if (_modifiers & SYNERGY_ALT) {
+		TRACE("COMMAND(ALT) ");
+		modifiers |= B_COMMAND_KEY;
+	}
+	if (_modifiers & SYNERGY_META) {
+		TRACE("MENU(META) ");
+		modifiers |= B_MENU_KEY;
+	}
+	if (_modifiers & SYNERGY_SUPER) {
+		TRACE("OPTION(SUPER) ");
+		modifiers |= B_OPTION_KEY;
+	}
+	if (_modifiers & SYNERGY_ALTGR) {
+		TRACE("RIGHT_OPTION(ALTGR) ");
+		modifiers |= B_RIGHT_OPTION_KEY;
+	}
+	if (_modifiers & SYNERGY_CAPSLOCK)
+		modifiers |= B_CAPS_LOCK;
+	if (_modifiers & SYNERGY_NUMLOCK)
+		modifiers |= B_NUM_LOCK;
+	if (_modifiers & SYNERGY_SCROLLLOCK)
+		modifiers |= B_SCROLL_LOCK;
+	TRACE("\n");
 
-	uint32 modifiers = fKeymap.Modifier(keycode);
 	bool isLock
 		= (modifiers & (B_CAPS_LOCK | B_NUM_LOCK | B_SCROLL_LOCK)) != 0;
-	if (modifiers != 0 && (!isLock || isKeyDown)) {
+	if (true) {
 		uint32 oldModifiers = fModifiers;
 
 		if ((isKeyDown && !isLock)
@@ -412,6 +434,8 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifier
 			if (message == NULL)
 				return;
 
+			TRACE("synergy: modifiers changed: 0x%04lx => 0x%04lx\n", oldModifiers, fModifiers);
+
 			message->AddInt64("when", timestamp);
 			message->AddInt32("be:old_modifiers", oldModifiers);
 			message->AddInt32("modifiers", fModifiers);
@@ -422,25 +446,20 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifier
 		}
 	}
 
-	uint8 newDeadKey = 0;
-	if (activeDeadKey == 0 || !isKeyDown)
-		newDeadKey = fKeymap.ActiveDeadKey(keycode, fModifiers);
+	if (scancode == 0 || scancode == EXTENDED_KEY) {
+		TRACE("empty scancode\n");
+		return;
+	}
+
+	BMessage* msg = new BMessage;
+	if (msg == NULL)
+		return;
 
 	char* string = NULL;
 	char* rawString = NULL;
 	int32 numBytes = 0, rawNumBytes = 0;
-	if (newDeadKey == 0) {
-		fKeymap.GetChars(keycode, fModifiers, activeDeadKey, &string,
-			&numBytes);
-	}
+	fKeymap.GetChars(keycode, fModifiers, 0, &string, &numBytes);
 	fKeymap.GetChars(keycode, 0, 0, &rawString, &rawNumBytes);
-
-	BMessage* msg = new BMessage;
-	if (msg == NULL) {
-		delete[] string;
-		delete[] rawString;
-		return;
-	}
 
 	if (numBytes > 0)
 		msg->what = isKeyDown ? B_KEY_DOWN : B_KEY_UP;
@@ -452,8 +471,11 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifier
 	msg->AddInt32("modifiers", fModifiers);
 	msg->AddData("states", B_UINT8_TYPE, states, 16);
 	if (numBytes > 0) {
-		for (int i = 0; i < numBytes; i++)
+		for (int i = 0; i < numBytes; i++) {
+			TRACE("%02x:", (int8)string[i]);
 			msg->AddInt8("byte", (int8)string[i]);
+		}
+		TRACE("\n");
 		msg->AddData("bytes", B_STRING_TYPE, string, numBytes + 1);
 
 		if (rawNumBytes <= 0) {
@@ -463,7 +485,7 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifier
 		} else
 			delete[] string;
 
-		if (isKeyDown && lastKeyCode == keycode) {
+		if (isKeyDown && isKeyRepeat) {
 			repeatCount++;
 			msg->AddInt32("be:key_repeat", repeatCount);
 		} else
@@ -475,38 +497,11 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t keycode, uint16_t _modifier
 		msg->AddInt32("raw_char", (uint32)((uint8)rawString[0] & 0x7f));
 
 	delete[] rawString;
-#if 0
-	if (newDeadKey == 0) {
-		if (isKeyDown && !modifiers && activeDeadKey != 0) {
-			// a dead key was completed
-			activeDeadKey = 0;
-			if (fInputMethodStarted) {
-				_EnqueueInlineInputMethod(B_INPUT_METHOD_CHANGED,
-					string, true, msg);
-				_EnqueueInlineInputMethod(B_INPUT_METHOD_STOPPED);
-				fInputMethodStarted = false;
-				msg = NULL;
-			}
-		}
-	} else if (isKeyDown
-		&& _EnqueueInlineInputMethod(B_INPUT_METHOD_STARTED) == B_OK) {
-		// start of a dead key
-		char* string = NULL;
-		int32 numBytes = 0;
-		fKeymap.GetChars(keycode, fModifiers, 0, &string, &numBytes);
 
-		if (_EnqueueInlineInputMethod(B_INPUT_METHOD_CHANGED, string)
-				== B_OK)
-			fInputMethodStarted = true;
-
-		activeDeadKey = newDeadKey;
-		delete[] string;
-	}
-#endif
 	if (msg != NULL && EnqueueMessage(msg) != B_OK)
 		delete msg;
 
-	lastKeyCode = isKeyDown ? keycode : 0;
+	lastScanCode = isKeyDown ? scancode : 0;
 }
 
 void

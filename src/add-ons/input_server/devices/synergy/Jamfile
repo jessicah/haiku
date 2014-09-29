@@ -2,6 +2,8 @@ SubDir HAIKU_TOP src add-ons input_server devices synergy ;
 
 SetSubDirSupportedPlatformsBeOSCompatible ;
 
+SubDirHdrs $(HAIKU_TOP) src add-ons kernel bus_managers ps2 ;
+
 UsePrivateHeaders input interface network shared ;
 UsePrivateSystemHeaders ;
 

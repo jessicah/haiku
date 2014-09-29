@@ -47,7 +47,7 @@ class uSynergyInputServerDevice : public BInputServerDevice {
 		uSynergyContext		*uSynergyHaikuContext;
 
 		BMessage*		_BuildMouseMessage(uint32 what, uint64 when, uint32 buttons, float x, float y) const;
-		void			_ProcessKeyboard(uint16_t keycode, uint16_t modifiers, bool isKeyDown, bool isKeyRepeat);
+		void			_ProcessKeyboard(uint16_t scancode, uint16_t modifiers, bool isKeyDown, bool isKeyRepeat);
 		void			_UpdateSettings();
 	public:
 		struct sockaddr_in	 synergyServerData;
