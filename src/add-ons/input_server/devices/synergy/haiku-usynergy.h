@@ -30,13 +30,14 @@ void              uSynergyKeyboardCallbackHaiku(uSynergyCookie cookie, uint16_t 
 void              uSynergyJoystickCallbackHaiku(uSynergyCookie cookie, uint8_t joyNum, uint16_t buttons, int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY);
 void              uSynergyClipboardCallbackHaiku(uSynergyCookie cookie, enum uSynergyClipboardFormat format, const uint8_t *data, uint32_t size);
 
-class uSynergyInputServerDevice : public BInputServerDevice {
+class uSynergyInputServerDevice : public BHandler, public BInputServerDevice {
 	public:
 					 uSynergyInputServerDevice();
 		virtual			~uSynergyInputServerDevice();
 
 		virtual status_t	 InitCheck();
 
+		virtual	void		 MessageReceived(BMessage* message);
 		virtual status_t	 Start(const char* name, void* cookie);
 		virtual status_t	 Stop(const char* name, void* cookie);
 
@@ -49,6 +50,7 @@ class uSynergyInputServerDevice : public BInputServerDevice {
 		BMessage*		_BuildMouseMessage(uint32 what, uint64 when, uint32 buttons, float x, float y) const;
 		void			_ProcessKeyboard(uint16_t scancode, uint16_t modifiers, bool isKeyDown, bool isKeyRepeat);
 		void			_UpdateSettings();
+		void			_PostClipboard(const BString &mimetype, const uint8_t *data, uint32_t size);
 	public:
 		struct sockaddr_in	 synergyServerData;
 		int			 synergyServerSocket;
@@ -63,6 +65,7 @@ class uSynergyInputServerDevice : public BInputServerDevice {
 
 		Keymap		fKeymap;
 		BLocker		fKeymapLock;
+		BClipboard	*fClipboard;
 
 	public:
 		/* callbacks for uSynergy */

@@ -1,6 +1,7 @@
 
 #include <Application.h>
 #include <Autolock.h>
+#include <Clipboard.h>
 #include <Notification.h>
 #include <Screen.h>
 #include <OS.h>
@@ -41,8 +42,10 @@ const static uint32 kSynergyThreadPriority = B_FIRST_REAL_TIME_PRIORITY + 4;
 
 uSynergyInputServerDevice::uSynergyInputServerDevice()
 	:
+	BHandler("uSynergy Handler"),
 	fUpdateSettings(false),
-	fKeymapLock("synergy keymap lock")
+	fKeymapLock("synergy keymap lock"),
+	fClipboard(new BClipboard("system"))
 {
 	CALLED();
 	uSynergyHaikuContext = (uSynergyContext*)malloc(sizeof(uSynergyContext));
@@ -65,6 +68,11 @@ uSynergyInputServerDevice::uSynergyInputServerDevice()
 	BRect screenRect = BScreen().Frame();
 	uSynergyHaikuContext->m_clientWidth		= (uint16_t)screenRect.Width() + 1;
 	uSynergyHaikuContext->m_clientHeight		= (uint16_t)screenRect.Height() + 1;
+
+	if (be_app->Lock()) {
+		be_app->AddHandler(this);
+		be_app->Unlock();
+	}
 }
 
 uSynergyInputServerDevice::~uSynergyInputServerDevice()
@@ -90,6 +98,28 @@ uSynergyInputServerDevice::InitCheck()
 	return B_OK;
 }
 
+void
+uSynergyInputServerDevice::MessageReceived(BMessage* message)
+{
+	if (message->what != B_CLIPBOARD_CHANGED) {
+		BHandler::MessageReceived(message);
+		return;
+	}
+
+	const char *text = NULL;
+	int32 len = 0;
+	BMessage *clip = NULL;
+	if (fClipboard->Lock()) {
+		if ((clip = fClipboard->Data()) == B_OK) {
+			clip->FindData("text/plain", B_MIME_TYPE, (const void **)&text, &len);
+		}
+		fClipboard->Unlock();
+	}
+	if (len > 0 && text != NULL) {
+		uSynergySendClipboard(this->uSynergyHaikuContext, text);
+	}
+}
+
 status_t
 uSynergyInputServerDevice::Start(const char* name, void* cookie)
 {
@@ -108,6 +138,7 @@ uSynergyInputServerDevice::Start(const char* name, void* cookie)
 		status = uSynergyThread;
 	else {
 		threadActive = true;
+		fClipboard->StartWatching(this);
 		status = resume_thread(uSynergyThread);
 	}
 clean:
@@ -120,6 +151,7 @@ uSynergyInputServerDevice::Stop(const char* name, void* cookie)
 	CALLED();
 	threadActive = false;
 	// this will stop the thread as soon as it reads the next packet
+	fClipboard->StopWatching(this);
 
 	if (uSynergyThread >= 0) {
 		// unblock the thread, which might wait on a semaphore.
@@ -249,7 +281,7 @@ uSynergySleepHaiku(uSynergyCookie cookie, int timeMs)
 uint32_t
 uSynergyGetTimeHaiku()
 {
-	return system_time();
+	return system_time() / 1000; // return milliseconds, not microseconds
 }
 
 void
@@ -261,7 +293,7 @@ uSynergyTraceHaiku(uSynergyCookie cookie, const char *text)
 
 	notify->SetGroup(group);
 	notify->SetContent(content);
-	notify->Send(5000);
+	notify->Send(2000000);
 }
 
 void
@@ -274,10 +306,11 @@ void
 uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_t wheelX, int16_t wheelY, uSynergyBool buttonLeft, uSynergyBool buttonRight, uSynergyBool buttonMiddle)
 {
 	uSynergyInputServerDevice	*inputDevice = (uSynergyInputServerDevice*)cookie;
-	static uint32_t			 oldButtons = 0;
+	static uint32_t			 oldButtons = 0, oldPressedButtons = 0;
 	uint32_t			 buttons = 0;
-	static uint16_t			 oldX = 0, oldY = 0;
+	static uint16_t			 oldX = 0, oldY = 0, clicks = 0;
 	static int16_t			oldWheelX = 0, oldWheelY = 0;
+	static uint64			oldWhen = system_time();
 	float				 xVal = (float)x / (float)inputDevice->uSynergyHaikuContext->m_clientWidth;
 	float				 yVal = (float)y / (float)inputDevice->uSynergyHaikuContext->m_clientHeight;
 
@@ -296,8 +329,21 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 	if (buttons != oldButtons) {
 		bool pressedButton = buttons > 0;
 		BMessage* message = inputDevice->_BuildMouseMessage(pressedButton ? B_MOUSE_DOWN : B_MOUSE_UP, timestamp, buttons, xVal, yVal);
+		if (pressedButton) {
+			if ((buttons == oldPressedButtons) && ((timestamp - oldWhen) < 500000))
+				clicks++;
+			else
+				clicks = 1;
+			message->AddInt32("clicks", clicks);
+			oldWhen = timestamp;
+			oldPressedButtons = buttons;
+		}
+		else
+			clicks = 1;
+
 		if (message != NULL)
 			inputDevice->EnqueueMessage(message);
+
 		oldButtons = buttons;
 	}
 
@@ -355,7 +401,7 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 
 	//TRACE("synergy: scancode = 0x%02x\n", scancode);
 	uint32_t keycode = 0;
-	if (scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
+	if (scancode > 0 && scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
 		keycode = kATKeycodeMap[scancode - 1];
 	//TRACE("synergy: keycode = 0x%x\n", keycode);
 
@@ -366,7 +412,7 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 			states[(keycode) >> 3] &= (!(1 << (7 - (keycode & 0x7))));
 	}
 
-	if (isKeyDown && keycode == 0x1E // DELETE KEY
+	if (isKeyDown && keycode == 0x34 // DELETE KEY
 		&& (states[fCommandKey >> 3] & (1 << (7 - (fCommandKey & 0x7))))
 		&& (states[fControlKey >> 3] & (1 << (7 - (fControlKey & 0x7))))) {
 		TRACE("synergy: TeamMonitor called\n");
@@ -408,7 +454,7 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 
 	bool isLock
 		= (modifiers & (B_CAPS_LOCK | B_NUM_LOCK | B_SCROLL_LOCK)) != 0;
-	if (true) {
+	if (!isKeyRepeat) {
 		uint32 oldModifiers = fModifiers;
 
 		if ((isKeyDown && !isLock)
@@ -517,9 +563,28 @@ uSynergyJoystickCallbackHaiku(uSynergyCookie cookie, uint8_t joyNum, uint16_t bu
 }
 
 void
+uSynergyInputServerDevice::_PostClipboard(const BString &mimetype, const uint8_t *data, uint32_t size)
+{
+	if (fClipboard->Lock()) {
+		fClipboard->Clear();
+		BMessage *clip = fClipboard->Data();
+		clip->AddData(mimetype, B_MIME_TYPE, data, size);
+		status_t result = fClipboard->Commit();
+		if (result != B_OK) {
+			TRACE("synergy: failed to commit data to clipboard\n");
+		}
+
+		fClipboard->Unlock();
+	} else {
+		TRACE("syenrgy: could not lock clipboard\n");
+	}
+}
+
+void
 uSynergyClipboardCallbackHaiku(uSynergyCookie cookie, enum uSynergyClipboardFormat format, const uint8_t *data, uint32_t size)
 {
-
+	if (format == USYNERGY_CLIPBOARD_FORMAT_TEXT)
+		((uSynergyInputServerDevice*)cookie)->_PostClipboard("text/plain", data, size);
 }
 
 
