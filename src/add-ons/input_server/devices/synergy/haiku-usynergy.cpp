@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <strings.h>
 #include <errno.h>
+#include <arpa/inet.h>
 
 #include <keyboard_mouse_driver.h>
 
@@ -128,7 +129,6 @@ uSynergyInputServerDevice::Control(const char* name, void* cookie, uint32 comman
 BMessage*
 uSynergyInputServerDevice::_BuildMouseMessage(uint32 what, uint64 when, uint32 buttons, float x, float y) const
 {
-	CALLED();
 	BMessage* message = new BMessage(what);
 	if (message == NULL)
 		return NULL;
@@ -147,14 +147,11 @@ uSynergyInputServerDevice::_BuildMouseMessage(uint32 what, uint64 when, uint32 b
 status_t
 uSynergyInputServerDevice::uSynergyThreadLoop(void* arg)
 {
-	CALLED();
 	uSynergyContext *uSynergyHaikuContext = (uSynergyContext*)arg;
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)uSynergyHaikuContext->m_cookie;
 
 	while (inputDevice->threadActive) {
 		uSynergyUpdate(uSynergyHaikuContext);
-		TRACE("synergy: update triggered\n");
-		snooze(1000000);
 	}
 
 	return B_OK;
@@ -168,31 +165,28 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 	CALLED();
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
 
-	struct hostent *host = gethostbyname("10.20.30.18");
-	if (host == NULL) {
-		TRACE("synergy: host 10.20.30.18 doesn't exist!\n");
-		snooze(1000000);
-		return USYNERGY_FALSE;
-	}
-	bzero(&inputDevice->synergyServerData, sizeof(inputDevice->synergyServerData));
-	bcopy(host->h_addr, &(inputDevice->synergyServerData.sin_addr.s_addr), host->h_length);
-	inputDevice->synergyServerData.sin_family = AF_INET;
-	inputDevice->synergyServerData.sin_port = htons(24800);
-	inputDevice->synergyServerSocket = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in server;
+	
+	server.sin_family = AF_INET;
+	server.sin_port = htons(24800);
+	inet_aton("10.20.30.18", &server.sin_addr);
+	
+	inputDevice->synergyServerSocket = socket(PF_INET, SOCK_STREAM, 0);
 
 	if (inputDevice->synergyServerSocket < 0) {
-		TRACE("SYNERGY: socket couldn't be created\n");
+		TRACE("synergy: socket couldn't be created\n");
 		snooze(1000000);
 		return USYNERGY_FALSE;
 	}
 
-	if (connect(inputDevice->synergyServerSocket, (struct sockaddr*)&inputDevice->synergyServerData, sizeof(struct sockaddr*)) < 0 ) {
-		TRACE("%s: %d\n", "failed to connect to remote host", errno);
+	if (connect(inputDevice->synergyServerSocket, (struct sockaddr*)&server, sizeof(struct sockaddr)) < 0 ) {
+		TRACE("synergy: %s: %d\n", "failed to connect to remote host", errno);
 		close(inputDevice->synergyServerSocket);
 		snooze(1000000); // temporary workaround to avoid filling up log too quickly
 		return USYNERGY_FALSE;
 	}
 	else {
+		TRACE("synergy: connected to remote host!!!\n");
 		return USYNERGY_TRUE;
 	}
 }
@@ -200,7 +194,6 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 uSynergyBool
 uSynergySendHaiku(uSynergyCookie cookie, const uint8_t *buffer, int length)
 {
-	CALLED();
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
 
 	if (send(inputDevice->synergyServerSocket, buffer, length, 0) != length)
@@ -211,7 +204,6 @@ uSynergySendHaiku(uSynergyCookie cookie, const uint8_t *buffer, int length)
 uSynergyBool
 uSynergyReceiveHaiku(uSynergyCookie cookie, uint8_t *buffer, int maxLength, int* outLength)
 {
-	CALLED();
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
 
 	if ((*outLength = recv(inputDevice->synergyServerSocket, buffer, maxLength, 0)) == -1)
@@ -222,14 +214,12 @@ uSynergyReceiveHaiku(uSynergyCookie cookie, uint8_t *buffer, int maxLength, int*
 void
 uSynergySleepHaiku(uSynergyCookie cookie, int timeMs)
 {
-	CALLED();
 	snooze(timeMs * 1000);
 }
 
 uint32_t
 uSynergyGetTimeHaiku()
 {
-	CALLED();
 	return system_time();
 }
 
@@ -254,7 +244,6 @@ uSynergyScreenActiveCallbackHaiku(uSynergyCookie cookie, uSynergyBool active)
 void
 uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_t wheelX, int16_t wheelY, uSynergyBool buttonLeft, uSynergyBool buttonRight, uSynergyBool buttonMiddle)
 {
-	CALLED();
 	uSynergyInputServerDevice	*inputDevice = (uSynergyInputServerDevice*)cookie;
 	static uint32_t			 oldButtons = 0;
 	uint32_t			 buttons = 0;
