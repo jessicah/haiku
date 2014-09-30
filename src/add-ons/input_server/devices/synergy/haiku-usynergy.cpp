@@ -43,9 +43,11 @@ const static uint32 kSynergyThreadPriority = B_FIRST_REAL_TIME_PRIORITY + 4;
 uSynergyInputServerDevice::uSynergyInputServerDevice()
 	:
 	BHandler("uSynergy Handler"),
+	threadActive(false),
+	uSynergyHaikuContext(NULL),
+	synergyServerSocket(-1),
 	fUpdateSettings(false),
-	fKeymapLock("synergy keymap lock"),
-	fClipboard(new BClipboard("system"))
+	fKeymapLock("synergy keymap lock")
 {
 	CALLED();
 	uSynergyHaikuContext = (uSynergyContext*)malloc(sizeof(uSynergyContext));
@@ -101,6 +103,8 @@ uSynergyInputServerDevice::InitCheck()
 void
 uSynergyInputServerDevice::MessageReceived(BMessage* message)
 {
+	CALLED();
+
 	if (message->what != B_CLIPBOARD_CHANGED) {
 		BHandler::MessageReceived(message);
 		return;
@@ -109,15 +113,17 @@ uSynergyInputServerDevice::MessageReceived(BMessage* message)
 	const char *text = NULL;
 	int32 len = 0;
 	BMessage *clip = NULL;
-	if (fClipboard->Lock()) {
-		if ((clip = fClipboard->Data()) == B_OK) {
+	if (be_clipboard->Lock()) {
+		if ((clip = be_clipboard->Data()) == B_OK) {
 			clip->FindData("text/plain", B_MIME_TYPE, (const void **)&text, &len);
 		}
-		fClipboard->Unlock();
+		be_clipboard->Unlock();
 	}
 	if (len > 0 && text != NULL) {
 		uSynergySendClipboard(this->uSynergyHaikuContext, text);
-	}
+		TRACE("synergy: data added to clipboard\n");
+	} else
+		TRACE("synergy: couldn't add data to clipboard\n");
 }
 
 status_t
@@ -128,18 +134,23 @@ uSynergyInputServerDevice::Start(const char* name, void* cookie)
 	char threadName[B_OS_NAME_LENGTH];
 	snprintf(threadName, B_OS_NAME_LENGTH, "uSynergy haiku");
 
-	thread_info info;
-	if ((get_thread_info(uSynergyThread, &info) == B_OK) || threadActive)
+	TRACE("synergy: thread active = %d\n", threadActive);
+
+	if ((atomic_get_and_set((int32*)&threadActive, true) & true) == true) {
+		TRACE("synergy: skipping thread spawn\n");
 		goto clean;
+	}
 
 	uSynergyThread = spawn_thread(uSynergyThreadLoop, threadName, kSynergyThreadPriority, (void*)this->uSynergyHaikuContext);
 
-	if (uSynergyThread < 0)
+	if (uSynergyThread < 0) {
+		threadActive = false;
 		status = uSynergyThread;
-	else {
-		threadActive = true;
-		fClipboard->StartWatching(this);
+		TRACE("synergy: spawn thread failed: %lx\n", status);
+	} else {
+		be_clipboard->StartWatching(this);
 		status = resume_thread(uSynergyThread);
+		TRACE("synergy: spawned uSynergyThreadLoop!\n");
 	}
 clean:
 	return status;
@@ -151,14 +162,17 @@ uSynergyInputServerDevice::Stop(const char* name, void* cookie)
 	CALLED();
 	threadActive = false;
 	// this will stop the thread as soon as it reads the next packet
-	fClipboard->StopWatching(this);
+	be_clipboard->StopWatching(this);
 
 	if (uSynergyThread >= 0) {
 		// unblock the thread, which might wait on a semaphore.
+		TRACE("synergy: asking thread to stop...\n");
 		suspend_thread(uSynergyThread);
 		resume_thread(uSynergyThread);
 		status_t dummy;
 		wait_for_thread(uSynergyThread, &dummy);
+		uSynergyThread = -1;
+		TRACE("synergy: all stopped\n");
 	}
 
 	return B_OK;
@@ -216,6 +230,11 @@ uSynergyInputServerDevice::uSynergyThreadLoop(void* arg)
 		}
 	}
 
+	TRACE("synergy: exiting thread loop\n");
+
+	close(inputDevice->synergyServerSocket);
+	inputDevice->synergyServerSocket = -1;
+
 	return B_OK;
 }
 
@@ -243,6 +262,7 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 	if (connect(inputDevice->synergyServerSocket, (struct sockaddr*)&server, sizeof(struct sockaddr)) < 0 ) {
 		TRACE("synergy: %s: %d\n", "failed to connect to remote host", errno);
 		close(inputDevice->synergyServerSocket);
+		inputDevice->synergyServerSocket = -1;
 		snooze(1000000); // temporary workaround to avoid filling up log too quickly
 		return USYNERGY_FALSE;
 	}
@@ -399,11 +419,11 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 
 	int64 timestamp = system_time();
 
-	//TRACE("synergy: scancode = 0x%02x\n", scancode);
+	TRACE("synergy: scancode = 0x%02x\n", scancode);
 	uint32_t keycode = 0;
 	if (scancode > 0 && scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
 		keycode = kATKeycodeMap[scancode - 1];
-	//TRACE("synergy: keycode = 0x%x\n", keycode);
+	TRACE("synergy: keycode = 0x%x\n", keycode);
 
 	if (keycode < 256) {
 		if (isKeyDown)
@@ -419,30 +439,30 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 	}
 
 	uint32 modifiers = 0;
-	TRACE("synergy: modifiers: ");
+	//TRACE("synergy: modifiers: ");
 	if (_modifiers & SYNERGY_SHIFT) {
-		TRACE("SHIFT ");
-		modifiers |= B_SHIFT_KEY;
+	//	TRACE("SHIFT ");
+		modifiers |= B_SHIFT_KEY | B_LEFT_SHIFT_KEY;
 	}
 	if (_modifiers & SYNERGY_CONTROL) {
-		TRACE("CONTROL ");
-		modifiers |= B_CONTROL_KEY;
+	//	TRACE("CONTROL ");
+		modifiers |= B_CONTROL_KEY | B_LEFT_CONTROL_KEY;
 	}
 	if (_modifiers & SYNERGY_ALT) {
-		TRACE("COMMAND(ALT) ");
-		modifiers |= B_COMMAND_KEY;
+	//	TRACE("COMMAND(ALT) ");
+		modifiers |= B_COMMAND_KEY | B_LEFT_COMMAND_KEY;
 	}
 	if (_modifiers & SYNERGY_META) {
-		TRACE("MENU(META) ");
+	//	TRACE("MENU(META) ");
 		modifiers |= B_MENU_KEY;
 	}
 	if (_modifiers & SYNERGY_SUPER) {
-		TRACE("OPTION(SUPER) ");
-		modifiers |= B_OPTION_KEY;
+	//	TRACE("OPTION(SUPER) ");
+		modifiers |= B_OPTION_KEY | B_LEFT_OPTION_KEY;
 	}
 	if (_modifiers & SYNERGY_ALTGR) {
-		TRACE("RIGHT_OPTION(ALTGR) ");
-		modifiers |= B_RIGHT_OPTION_KEY;
+	//	TRACE("RIGHT_OPTION(ALTGR) ");
+		modifiers |= B_RIGHT_OPTION_KEY | B_OPTION_KEY;
 	}
 	if (_modifiers & SYNERGY_CAPSLOCK)
 		modifiers |= B_CAPS_LOCK;
@@ -450,42 +470,31 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 		modifiers |= B_NUM_LOCK;
 	if (_modifiers & SYNERGY_SCROLLLOCK)
 		modifiers |= B_SCROLL_LOCK;
-	TRACE("\n");
+	//TRACE("\n");
 
-	bool isLock
-		= (modifiers & (B_CAPS_LOCK | B_NUM_LOCK | B_SCROLL_LOCK)) != 0;
+	//bool isLock
+	//	= (modifiers & (B_CAPS_LOCK | B_NUM_LOCK | B_SCROLL_LOCK)) != 0;
 	if (!isKeyRepeat) {
-		uint32 oldModifiers = fModifiers;
-
-		if ((isKeyDown && !isLock)
-			|| (isKeyDown && !(fModifiers & modifiers)))
-			fModifiers |= modifiers;
-		else {
-			fModifiers &= ~modifiers;
-
-			// ensure that we don't clear a combined B_*_KEY when still
-			// one of the individual B_{LEFT|RIGHT}_*_KEY is pressed
-			if (fModifiers & (B_LEFT_SHIFT_KEY | B_RIGHT_SHIFT_KEY))
-				fModifiers |= B_SHIFT_KEY;
-			if (fModifiers & (B_LEFT_COMMAND_KEY | B_RIGHT_COMMAND_KEY))
-				fModifiers |= B_COMMAND_KEY;
-			if (fModifiers & (B_LEFT_CONTROL_KEY | B_RIGHT_CONTROL_KEY))
-				fModifiers |= B_CONTROL_KEY;
-			if (fModifiers & (B_LEFT_OPTION_KEY | B_RIGHT_OPTION_KEY))
-				fModifiers |= B_OPTION_KEY;
-		}
-
-		if (fModifiers != oldModifiers) {
+		if (fModifiers != modifiers) {
 			BMessage* message = new BMessage(B_MODIFIERS_CHANGED);
 			if (message == NULL)
 				return;
 
-			TRACE("synergy: modifiers changed: 0x%04lx => 0x%04lx\n", oldModifiers, fModifiers);
+			TRACE("synergy: modifiers: 0x%04lx & 0x%04lx\n", modifiers, fModifiers);
+
+			if (isKeyDown)
+				modifiers |= fModifiers;
+			else
+				modifiers &= ~fModifiers;
+
+			TRACE("synergy: modifiers changed: 0x%04lx => 0x%04lx\n", fModifiers, modifiers);
 
 			message->AddInt64("when", timestamp);
-			message->AddInt32("be:old_modifiers", oldModifiers);
-			message->AddInt32("modifiers", fModifiers);
+			message->AddInt32("be:old_modifiers", fModifiers);
+			message->AddInt32("modifiers", modifiers);
 			message->AddData("states", B_UINT8_TYPE, states, 16);
+
+			fModifiers = modifiers;
 
 			if (EnqueueMessage(message) != B_OK)
 				delete message;
@@ -565,18 +574,19 @@ uSynergyJoystickCallbackHaiku(uSynergyCookie cookie, uint8_t joyNum, uint16_t bu
 void
 uSynergyInputServerDevice::_PostClipboard(const BString &mimetype, const uint8_t *data, uint32_t size)
 {
-	if (fClipboard->Lock()) {
-		fClipboard->Clear();
-		BMessage *clip = fClipboard->Data();
+	if (be_clipboard->Lock()) {
+		be_clipboard->Clear();
+		BMessage *clip = be_clipboard->Data();
 		clip->AddData(mimetype, B_MIME_TYPE, data, size);
-		status_t result = fClipboard->Commit();
+		status_t result = be_clipboard->Commit();
 		if (result != B_OK) {
 			TRACE("synergy: failed to commit data to clipboard\n");
-		}
+		} else
+			TRACE("synergy: received clipboard data\n");
 
-		fClipboard->Unlock();
+		be_clipboard->Unlock();
 	} else {
-		TRACE("syenrgy: could not lock clipboard\n");
+		TRACE("synergy: could not lock clipboard\n");
 	}
 }
 

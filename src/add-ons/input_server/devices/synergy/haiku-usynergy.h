@@ -65,7 +65,6 @@ class uSynergyInputServerDevice : public BHandler, public BInputServerDevice {
 
 		Keymap		fKeymap;
 		BLocker		fKeymapLock;
-		BClipboard	*fClipboard;
 
 	public:
 		/* callbacks for uSynergy */
