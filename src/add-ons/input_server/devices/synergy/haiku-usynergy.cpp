@@ -280,7 +280,10 @@ uSynergyInputServerDevice::_UpdateSettings()
 		return;
 
 	fEnableSynergy = get_driver_boolean_parameter(handle, "enable", false, false);
-	fServerAddress = get_driver_parameter(handle, "server", NULL, NULL);
+	const char *server = get_driver_parameter(handle, "server", NULL, NULL);
+	TRACE("synergy: settings: enable = %s, server = %s\n", fEnableSynergy ? "yes" : "no", server == NULL ? "(null)" : server);
+	if (server != NULL)
+		fServerAddress.SetTo(server);
 
 	unload_driver_settings(handle);
 }
@@ -315,14 +318,15 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 	CALLED();
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
 
-	if (inputDevice->fServerAddress == NULL || inputDevice->fEnableSynergy == false)
+	if (inputDevice->fServerAddress.Length() == 0 || inputDevice->fEnableSynergy == false)
 		goto exit;
 
 	struct sockaddr_in server;
 
 	server.sin_family = AF_INET;
 	server.sin_port = htons(24800);
-	inet_aton(inputDevice->fServerAddress, &server.sin_addr);
+	inet_aton(inputDevice->fServerAddress.String(), &server.sin_addr);
+	TRACE("synergy: connecting to %s:%d\n", inputDevice->fServerAddress.String(), 24800);
 
 	inputDevice->synergyServerSocket = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -502,6 +506,11 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 	uint32_t keycode = 0;
 	if (scancode > 0 && scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
 		keycode = kATKeycodeMap[scancode - 1];
+	else {
+		scancode = (uint8)(scancode | 0x80);
+		if (scancode > 0 && scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
+			keycode = kATKeycodeMap[scancode - 1];
+	}
 	TRACE("synergy: keycode = 0x%x\n", keycode);
 
 	if (keycode < 256) {
