@@ -40,6 +40,8 @@ class uSynergyInputServerDevice : public BHandler, public BInputServerDevice {
 		virtual	void		 MessageReceived(BMessage* message);
 		virtual status_t	 Start(const char* name, void* cookie);
 		virtual status_t	 Stop(const char* name, void* cookie);
+		virtual status_t	 SystemShuttingDown();
+
 
 		virtual status_t	 Control(const char* name, void* cookie, uint32 command, BMessage* message);
 	private:
@@ -60,6 +62,9 @@ class uSynergyInputServerDevice : public BHandler, public BInputServerDevice {
 		uint32		fModifiers;
 		uint32		fCommandKey;
 		uint32		fControlKey;
+		char*		fFilename;
+		bool		fEnableSynergy;
+		const char*	fServerAddress;
 
 	volatile bool	fUpdateSettings;
 

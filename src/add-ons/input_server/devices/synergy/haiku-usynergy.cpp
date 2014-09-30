@@ -2,9 +2,15 @@
 #include <Application.h>
 #include <Autolock.h>
 #include <Clipboard.h>
+#include <FindDirectory.h>
+#include <NodeMonitor.h>
 #include <Notification.h>
 #include <Screen.h>
 #include <OS.h>
+#include <Path.h>
+#include <PathFinder.h>
+#include <PathMonitor.h>
+
 #include <cstdlib>
 #include <strings.h>
 #include <errno.h>
@@ -14,12 +20,16 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include <driver_settings.h>
 #include <keyboard_mouse_driver.h>
 
 #include "ATKeymap.h"
 
 
 #include "haiku-usynergy.h"
+
+#define FILE_UPDATED 'fiUp'
+
 
 #define TRACE_SYNERGY_DEVICE
 #ifdef TRACE_SYNERGY_DEVICE
@@ -46,6 +56,8 @@ uSynergyInputServerDevice::uSynergyInputServerDevice()
 	threadActive(false),
 	uSynergyHaikuContext(NULL),
 	synergyServerSocket(-1),
+	fEnableSynergy(false),
+	fServerAddress(NULL),
 	fUpdateSettings(false),
 	fKeymapLock("synergy keymap lock")
 {
@@ -75,6 +87,21 @@ uSynergyInputServerDevice::uSynergyInputServerDevice()
 		be_app->AddHandler(this);
 		be_app->Unlock();
 	}
+
+	BPath path;
+	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK)
+		path.Append("kernel/drivers/synergy");
+
+	fFilename = new char[strlen(path.Path()) + 1];
+	strcpy(fFilename, path.Path());
+
+	BEntry entry(fFilename);
+
+	BPrivate::BPathMonitor::StartWatching(fFilename, B_WATCH_STAT | B_WATCH_FILES_ONLY, this);
+
+	_UpdateSettings();
+
+	TRACE("synergy: monitoring settings file at '%s'\n", fFilename);
 }
 
 uSynergyInputServerDevice::~uSynergyInputServerDevice()
@@ -104,32 +131,54 @@ void
 uSynergyInputServerDevice::MessageReceived(BMessage* message)
 {
 	CALLED();
-
-	if (message->what != B_CLIPBOARD_CHANGED) {
-		BHandler::MessageReceived(message);
-		return;
-	}
-
-	const char *text = NULL;
-	int32 len = 0;
-	BMessage *clip = NULL;
-	if (be_clipboard->Lock()) {
-		if ((clip = be_clipboard->Data()) == B_OK) {
-			clip->FindData("text/plain", B_MIME_TYPE, (const void **)&text, &len);
+	switch (message->what) {
+		case B_PATH_MONITOR:
+		{
+			const char* path = "";
+			// only fall through for appropriate file
+			if (!(message->FindString("path", &path) == B_OK
+					&& strcmp(path, fFilename) == 0)) {
+				break; // not the file we're looking for
+			}
 		}
-		be_clipboard->Unlock();
+		// fall-through
+		case FILE_UPDATED:
+		{
+			_UpdateSettings();
+			if (threadActive)
+				Stop(NULL, NULL);
+			Start(NULL, NULL);
+			break;
+		}
+		case B_CLIPBOARD_CHANGED:
+		{
+			const char *text = NULL;
+			int32 len = 0;
+			BMessage *clip = NULL;
+			if (be_clipboard->Lock()) {
+				if ((clip = be_clipboard->Data()) == B_OK) {
+					clip->FindData("text/plain", B_MIME_TYPE, (const void **)&text, &len);
+				}
+				be_clipboard->Unlock();
+			}
+			if (len > 0 && text != NULL) {
+				uSynergySendClipboard(this->uSynergyHaikuContext, text);
+				TRACE("synergy: data added to clipboard\n");
+			} else
+				TRACE("synergy: couldn't add data to clipboard\n");
+		}
+		default:
+			BHandler::MessageReceived(message);
 	}
-	if (len > 0 && text != NULL) {
-		uSynergySendClipboard(this->uSynergyHaikuContext, text);
-		TRACE("synergy: data added to clipboard\n");
-	} else
-		TRACE("synergy: couldn't add data to clipboard\n");
 }
 
 status_t
 uSynergyInputServerDevice::Start(const char* name, void* cookie)
 {
 	CALLED();
+	if (fServerAddress == NULL || fEnableSynergy == false)
+		return B_NO_ERROR;
+
 	status_t status = B_OK;
 	char threadName[B_OS_NAME_LENGTH];
 	snprintf(threadName, B_OS_NAME_LENGTH, "uSynergy haiku");
@@ -179,12 +228,22 @@ uSynergyInputServerDevice::Stop(const char* name, void* cookie)
 }
 
 status_t
-uSynergyInputServerDevice::Control(const char* name, void* cookie, uint32 command, BMessage* message)
+uSynergyInputServerDevice::SystemShuttingDown()
 {
-	if (command == B_KEY_MAP_CHANGED)
-		fUpdateSettings = true;
+	threadActive = false;
 
 	return B_OK;
+}
+
+status_t
+uSynergyInputServerDevice::Control(const char* name, void* cookie, uint32 command, BMessage* message)
+{
+	if (command == B_KEY_MAP_CHANGED) {
+		fUpdateSettings = true;
+		return B_OK;
+	}
+
+	return B_BAD_VALUE;
 }
 
 BMessage*
@@ -213,6 +272,15 @@ uSynergyInputServerDevice::_UpdateSettings()
 	fModifiers = fKeymap.Map().lock_settings;
 	fControlKey = fKeymap.KeyForModifier(B_LEFT_CONTROL_KEY);
 	fCommandKey = fKeymap.KeyForModifier(B_LEFT_COMMAND_KEY);
+
+	void* handle = load_driver_settings("synergy");
+	if (handle == NULL)
+		return;
+
+	fEnableSynergy = get_driver_boolean_parameter(handle, "enable", false, false);
+	fServerAddress = get_driver_parameter(handle, "server", NULL, NULL);
+
+	unload_driver_settings(handle);
 }
 
 status_t
@@ -245,6 +313,9 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 	CALLED();
 	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
 
+	if (inputDevice->fServerAddress == NULL || inputDevice->fEnableSynergy == false)
+		goto exit;
+
 	struct sockaddr_in server;
 
 	server.sin_family = AF_INET;
@@ -255,21 +326,22 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 
 	if (inputDevice->synergyServerSocket < 0) {
 		TRACE("synergy: socket couldn't be created\n");
-		snooze(1000000);
-		return USYNERGY_FALSE;
+		goto exit;
 	}
 
 	if (connect(inputDevice->synergyServerSocket, (struct sockaddr*)&server, sizeof(struct sockaddr)) < 0 ) {
 		TRACE("synergy: %s: %d\n", "failed to connect to remote host", errno);
 		close(inputDevice->synergyServerSocket);
 		inputDevice->synergyServerSocket = -1;
-		snooze(1000000); // temporary workaround to avoid filling up log too quickly
-		return USYNERGY_FALSE;
+		goto exit;
 	}
 	else {
 		TRACE("synergy: connected to remote host!!!\n");
 		return USYNERGY_TRUE;
 	}
+exit:
+	snooze(1000000);
+	return USYNERGY_FALSE;
 }
 
 uSynergyBool
