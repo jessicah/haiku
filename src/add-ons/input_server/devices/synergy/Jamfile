@@ -4,7 +4,7 @@ SetSubDirSupportedPlatformsBeOSCompatible ;
 
 SubDirHdrs $(HAIKU_TOP) src add-ons kernel bus_managers ps2 ;
 
-UsePrivateHeaders input interface network shared storage ;
+UsePrivateHeaders input interface network shared storage translation ;
 UsePrivateSystemHeaders ;
 
 Addon <input>synergy :
@@ -12,4 +12,4 @@ Addon <input>synergy :
 	haiku-usynergy.cpp
 	Keymap.cpp
 
-	: input_server be libshared.a network [ TargetLibsupc++ ] ;
+	: input_server be libshared.a network translation [ TargetLibsupc++ ] ;

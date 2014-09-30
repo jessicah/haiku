@@ -3,13 +3,15 @@
 #include <Autolock.h>
 #include <Clipboard.h>
 #include <FindDirectory.h>
+#include <Mime.h>
 #include <NodeMonitor.h>
 #include <Notification.h>
-#include <Screen.h>
 #include <OS.h>
 #include <Path.h>
 #include <PathFinder.h>
 #include <PathMonitor.h>
+#include <Screen.h>
+#include <TranslationUtils.h>
 
 #include <cstdlib>
 #include <strings.h>
@@ -320,7 +322,7 @@ uSynergyConnectHaiku(uSynergyCookie cookie)
 
 	server.sin_family = AF_INET;
 	server.sin_port = htons(24800);
-	inet_aton("10.20.30.18", &server.sin_addr);
+	inet_aton(inputDevice->fServerAddress, &server.sin_addr);
 
 	inputDevice->synergyServerSocket = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -380,12 +382,17 @@ void
 uSynergyTraceHaiku(uSynergyCookie cookie, const char *text)
 {
 	BNotification *notify = new BNotification(B_INFORMATION_NOTIFICATION);
-	BString group("uSynergy");
+	BString group("Synergy");
 	BString content(text);
 
 	notify->SetGroup(group);
 	notify->SetContent(content);
-	notify->Send(2000000);
+	BBitmap* bitmap = BTranslationUtils::GetBitmap("/boot/home/config/non-packaged/data/synergy-32.png");
+	if (bitmap != NULL)
+		notify->SetIcon(bitmap);
+	else
+		TRACE("synergy: couldn't load bitmap\n");
+	notify->Send();
 }
 
 void
