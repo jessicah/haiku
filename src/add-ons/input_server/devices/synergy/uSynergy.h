@@ -68,10 +68,15 @@ extern "C" {
 /**
 @brief Boolean type
 **/
+#if defined(__cplusplus)
+typedef bool		uSynergyBool;
+#define				USYNERGY_FALSE					false
+#define				USYNERGY_TRUE					true
+#else
 typedef int			uSynergyBool;
 #define				USYNERGY_FALSE					0				/* False value */
 #define				USYNERGY_TRUE					1				/* True value */
-
+#endif
 
 /**
 @brief User context type

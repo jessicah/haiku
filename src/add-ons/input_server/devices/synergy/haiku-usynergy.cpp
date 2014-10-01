@@ -1,4 +1,20 @@
-
+/*
+ * Copyright (c)
+ *      2014  Ed Robbins <edd.robbins@gmail.com>
+ *      2014  Jessica Hamilton <jessica.l.hamilton@gmail.com>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 #include <Application.h>
 #include <Autolock.h>
 #include <Bitmap.h>
@@ -31,60 +47,88 @@
 
 #include "haiku-usynergy.h"
 
-#define FILE_UPDATED 'fiUp'
-
 
 #define TRACE_SYNERGY_DEVICE
 #ifdef TRACE_SYNERGY_DEVICE
-
-#	define CALLED(x...) \
-		debug_printf("%s:%s\n", "SynergyDevice", __FUNCTION__)
 #	define TRACE(x...) \
 		do { debug_printf(x); } while (0)
-#	define LOG_EVENT(text...) debug_printf(text)
-#	define LOG_ERR(text...) TRACE(text)
 #else
 #	define TRACE(x...) do {} while (0)
-#	define CALLED(x...) TRACE(x)
-#	define LOG_ERR(text...) debug_printf(text)
-#	define LOG_EVENT(text...) TRACE(x)
 #endif
+
+#define FILE_UPDATED 'fiUp'
 
 
 const static uint32 kSynergyThreadPriority = B_FIRST_REAL_TIME_PRIORITY + 4;
+
+#define _U uSynergyInputServerDevice
+static bool uConnect(_U* device) {
+	return device->Connect();
+}
+static bool uSend(_U* device, const uint8* buffer, int length) {
+	return device->Send(buffer, length);
+}
+static bool uReceive(_U* device, uint8* buffer, int maxLength, int* outLength) {
+	return device->Receive(buffer, maxLength, outLength);
+}
+static void uSleep(void* unused, int milliseconds) {
+	snooze(milliseconds * 1000);
+}
+static uint32_t uGetTime() {
+	return system_time() / 1000;
+}
+static void uTrace(_U* device, const char* text) {
+	device->Trace(text);
+}
+static void uScreenActive(_U* device, bool active) {
+	device->ScreenActive(active);
+}
+static void uMouseCallback(_U* device, uint16 x, uint16 y, int16 wheelX, int16 wheelY, bool buttonLeft, bool buttonRight, bool buttonMiddle) {
+	device->MouseCallback(x, y, wheelX, wheelY, buttonLeft, buttonRight, buttonMiddle);
+}
+static void uKeyboardCallback(_U* device, uint16 key, uint16 modifiers, bool isKeyDown, bool isKeyRepeat) {
+	device->KeyboardCallback(key, modifiers, isKeyDown, isKeyRepeat);
+}
+static void uJoystickCallback(_U* device, uint8_t joyNum, uint16_t buttons, int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY) {
+	device->JoystickCallback(joyNum, buttons, leftStickX, leftStickY, rightStickX, rightStickY);
+}
+static void uClipboardCallback(_U* device, enum uSynergyClipboardFormat format, const uint8_t* data, uint32_t size) {
+	device->ClipboardCallback(format, data, size);
+}
+#undef _U
+
 
 uSynergyInputServerDevice::uSynergyInputServerDevice()
 	:
 	BHandler("uSynergy Handler"),
 	threadActive(false),
-	uSynergyHaikuContext(NULL),
-	synergyServerSocket(-1),
+	fContext(NULL),
+	fSocket(-1),
 	fEnableSynergy(false),
 	fServerAddress(NULL),
 	fUpdateSettings(false),
 	fKeymapLock("synergy keymap lock")
 {
-	CALLED();
-	uSynergyHaikuContext = (uSynergyContext*)malloc(sizeof(uSynergyContext));
-	uSynergyInit(uSynergyHaikuContext);
+	fContext = (uSynergyContext*)malloc(sizeof(uSynergyContext));
+	uSynergyInit(fContext);
 
-	uSynergyHaikuContext->m_connectFunc		= uSynergyConnectHaiku;
-	uSynergyHaikuContext->m_receiveFunc		= uSynergyReceiveHaiku;
-	uSynergyHaikuContext->m_sendFunc		= uSynergySendHaiku;
-	uSynergyHaikuContext->m_getTimeFunc		= uSynergyGetTimeHaiku;
-	uSynergyHaikuContext->m_screenActiveCallback	= uSynergyScreenActiveCallbackHaiku;
-	uSynergyHaikuContext->m_mouseCallback		= uSynergyMouseCallbackHaiku;
-	uSynergyHaikuContext->m_keyboardCallback	= uSynergyKeyboardCallbackHaiku;
-	uSynergyHaikuContext->m_sleepFunc		= uSynergySleepHaiku;
-	uSynergyHaikuContext->m_traceFunc		= uSynergyTraceHaiku;
-	uSynergyHaikuContext->m_joystickCallback	= uSynergyJoystickCallbackHaiku;
-	uSynergyHaikuContext->m_clipboardCallback	= uSynergyClipboardCallbackHaiku;
-	uSynergyHaikuContext->m_clientName		= "haiku";
-	uSynergyHaikuContext->m_cookie			= (uSynergyCookie)this;
+	fContext->m_connectFunc				= &uConnect;
+	fContext->m_receiveFunc				= &uReceive;
+	fContext->m_sendFunc				= &uSend;
+	fContext->m_getTimeFunc				= &uGetTime;
+	fContext->m_screenActiveCallback	= &uScreenActive;
+	fContext->m_mouseCallback			= &uMouseCallback;
+	fContext->m_keyboardCallback		= &uKeyboardCallback;
+	fContext->m_sleepFunc				= &uSleep;
+	fContext->m_traceFunc				= &uTrace;
+	fContext->m_joystickCallback		= &uJoystickCallback;
+	fContext->m_clipboardCallback		= &uClipboardCallback;
+	fContext->m_clientName				= "haiku";
+	fContext->m_cookie					= (uSynergyCookie)this;
 
 	BRect screenRect = BScreen().Frame();
-	uSynergyHaikuContext->m_clientWidth		= (uint16_t)screenRect.Width() + 1;
-	uSynergyHaikuContext->m_clientHeight		= (uint16_t)screenRect.Height() + 1;
+	fContext->m_clientWidth		= (uint16_t)screenRect.Width() + 1;
+	fContext->m_clientHeight	= (uint16_t)screenRect.Height() + 1;
 
 	if (be_app->Lock()) {
 		be_app->AddHandler(this);
@@ -93,7 +137,7 @@ uSynergyInputServerDevice::uSynergyInputServerDevice()
 
 	BPath path;
 	if (find_directory(B_USER_SETTINGS_DIRECTORY, &path) == B_OK)
-		path.Append("kernel/drivers/synergy");
+		path.Append("synergy_settings");
 
 	fFilename = new char[strlen(path.Path()) + 1];
 	strcpy(fFilename, path.Path());
@@ -103,19 +147,23 @@ uSynergyInputServerDevice::uSynergyInputServerDevice()
 	BPrivate::BPathMonitor::StartWatching(fFilename, B_WATCH_STAT | B_WATCH_FILES_ONLY, this);
 
 	_UpdateSettings();
-
-	TRACE("synergy: monitoring settings file at '%s'\n", fFilename);
 }
+
 
 uSynergyInputServerDevice::~uSynergyInputServerDevice()
 {
-	free(uSynergyHaikuContext);
+	if (be_app->Lock()) {
+		be_app->RemoveHandler(this);
+		be_app->Unlock();
+	}
+
+	free(fContext);
 }
+
 
 status_t
 uSynergyInputServerDevice::InitCheck()
 {
-	CALLED();
 	input_device_ref *devices[3];
 
 	input_device_ref mouse = { "uSynergy Mouse", B_POINTING_DEVICE, (void *)this };
@@ -130,10 +178,10 @@ uSynergyInputServerDevice::InitCheck()
 	return B_OK;
 }
 
+
 void
 uSynergyInputServerDevice::MessageReceived(BMessage* message)
 {
-	CALLED();
 	switch (message->what) {
 		case B_PATH_MONITOR:
 		{
@@ -165,7 +213,7 @@ uSynergyInputServerDevice::MessageReceived(BMessage* message)
 				be_clipboard->Unlock();
 			}
 			if (len > 0 && text != NULL) {
-				uSynergySendClipboard(this->uSynergyHaikuContext, text);
+				uSynergySendClipboard(fContext, text);
 				TRACE("synergy: data added to clipboard\n");
 			} else
 				TRACE("synergy: couldn't add data to clipboard\n");
@@ -175,12 +223,14 @@ uSynergyInputServerDevice::MessageReceived(BMessage* message)
 	}
 }
 
+
 status_t
 uSynergyInputServerDevice::Start(const char* name, void* cookie)
 {
-	CALLED();
-	if (fServerAddress == NULL || fEnableSynergy == false)
+	if (fServerAddress.Length() == 0 || fEnableSynergy == false) {
+		TRACE("synergy: not enabled, or no server specified\n");
 		return B_NO_ERROR;
+	}
 
 	status_t status = B_OK;
 	char threadName[B_OS_NAME_LENGTH];
@@ -189,11 +239,11 @@ uSynergyInputServerDevice::Start(const char* name, void* cookie)
 	TRACE("synergy: thread active = %d\n", threadActive);
 
 	if ((atomic_get_and_set((int32*)&threadActive, true) & true) == true) {
-		TRACE("synergy: skipping thread spawn\n");
-		goto clean;
+		TRACE("synergy: main thread already running\n");
+		return B_OK;
 	}
 
-	uSynergyThread = spawn_thread(uSynergyThreadLoop, threadName, kSynergyThreadPriority, (void*)this->uSynergyHaikuContext);
+	uSynergyThread = spawn_thread(_MainLoop, threadName, kSynergyThreadPriority, (void*)this);
 
 	if (uSynergyThread < 0) {
 		threadActive = false;
@@ -202,33 +252,30 @@ uSynergyInputServerDevice::Start(const char* name, void* cookie)
 	} else {
 		be_clipboard->StartWatching(this);
 		status = resume_thread(uSynergyThread);
-		TRACE("synergy: spawned uSynergyThreadLoop!\n");
 	}
-clean:
+
 	return status;
 }
+
 
 status_t
 uSynergyInputServerDevice::Stop(const char* name, void* cookie)
 {
-	CALLED();
 	threadActive = false;
 	// this will stop the thread as soon as it reads the next packet
 	be_clipboard->StopWatching(this);
 
 	if (uSynergyThread >= 0) {
 		// unblock the thread, which might wait on a semaphore.
-		TRACE("synergy: asking thread to stop...\n");
 		suspend_thread(uSynergyThread);
 		resume_thread(uSynergyThread);
 		status_t dummy;
 		wait_for_thread(uSynergyThread, &dummy);
-		uSynergyThread = -1;
-		TRACE("synergy: all stopped\n");
 	}
 
 	return B_OK;
 }
+
 
 status_t
 uSynergyInputServerDevice::SystemShuttingDown()
@@ -237,6 +284,7 @@ uSynergyInputServerDevice::SystemShuttingDown()
 
 	return B_OK;
 }
+
 
 status_t
 uSynergyInputServerDevice::Control(const char* name, void* cookie, uint32 command, BMessage* message)
@@ -248,6 +296,123 @@ uSynergyInputServerDevice::Control(const char* name, void* cookie, uint32 comman
 
 	return B_BAD_VALUE;
 }
+
+
+status_t
+uSynergyInputServerDevice::_MainLoop(void* arg)
+{
+	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)arg;
+
+	while (inputDevice->threadActive) {
+		uSynergyUpdate(inputDevice->fContext);
+
+		if (inputDevice->fUpdateSettings) {
+			inputDevice->_UpdateSettings();
+			inputDevice->fUpdateSettings = false;
+		}
+	}
+
+	close(inputDevice->fSocket);
+	inputDevice->fSocket = -1;
+
+	return B_OK;
+}
+
+
+void
+uSynergyInputServerDevice::_UpdateSettings()
+{
+	BAutolock lock(fKeymapLock);
+	fKeymap.RetrieveCurrent();
+	fModifiers = fKeymap.Map().lock_settings;
+	fControlKey = fKeymap.KeyForModifier(B_LEFT_CONTROL_KEY);
+	fCommandKey = fKeymap.KeyForModifier(B_LEFT_COMMAND_KEY);
+
+	void* handle = load_driver_settings(fFilename);
+	if (handle == NULL)
+		return;
+
+	fEnableSynergy = get_driver_boolean_parameter(handle, "enable", false, false);
+	fServerAddress = get_driver_parameter(handle, "server", NULL, NULL);
+
+	unload_driver_settings(handle);
+}
+
+
+bool
+uSynergyInputServerDevice::Connect()
+{
+	if (fServerAddress.Length() == 0 || fEnableSynergy == false)
+		goto exit;
+
+	struct sockaddr_in server;
+
+	server.sin_family = AF_INET;
+	server.sin_port = htons(24800);
+	inet_aton(fServerAddress.String(), &server.sin_addr);
+
+	TRACE("synergy: connecting to %s:%d\n", fServerAddress.String(), 24800);
+
+	fSocket = socket(PF_INET, SOCK_STREAM, 0);
+	if (fSocket < 0) {
+		TRACE("synergy: socket couldn't be created\n");
+		goto exit;
+	}
+
+	if (connect(fSocket, (struct sockaddr*)&server, sizeof(struct sockaddr)) < 0 ) {
+		TRACE("synergy: %s: %x\n", "failed to connect to remote host", errno);
+		close(fSocket);
+		fSocket = -1;
+		goto exit;
+	}
+	else
+		return true;
+exit:
+	snooze(1000000);
+	return false;
+}
+
+
+bool
+uSynergyInputServerDevice::Send(const uint8_t* buffer, int32_t length)
+{
+	if (send(fSocket, buffer, length, 0) != length)
+		return false;
+	return true;
+}
+
+
+bool
+uSynergyInputServerDevice::Receive(uint8_t *buffer, int maxLength, int* outLength)
+{
+	if ((*outLength = recv(fSocket, buffer, maxLength, 0)) == -1)
+		return false;
+	return true;
+}
+
+
+void
+uSynergyInputServerDevice::Trace(const char *text)
+{
+	BNotification notify(B_INFORMATION_NOTIFICATION);
+	BString group("Synergy");
+	BString content(text);
+
+	notify.SetGroup(group);
+	notify.SetContent(content);
+	BBitmap* bitmap = BTranslationUtils::GetBitmap("/boot/home/config/non-packaged/data/synergy-32.png");
+	if (bitmap != NULL)
+		notify.SetIcon(bitmap);
+	notify.Send();
+	delete bitmap;
+}
+
+
+void
+uSynergyInputServerDevice::ScreenActive(bool active)
+{
+}
+
 
 BMessage*
 uSynergyInputServerDevice::_BuildMouseMessage(uint32 what, uint64 when, uint32 buttons, float x, float y) const
@@ -267,157 +432,17 @@ uSynergyInputServerDevice::_BuildMouseMessage(uint32 what, uint64 when, uint32 b
 	return message;
 }
 
-void
-uSynergyInputServerDevice::_UpdateSettings()
-{
-	BAutolock lock(fKeymapLock);
-	fKeymap.RetrieveCurrent();
-	fModifiers = fKeymap.Map().lock_settings;
-	fControlKey = fKeymap.KeyForModifier(B_LEFT_CONTROL_KEY);
-	fCommandKey = fKeymap.KeyForModifier(B_LEFT_COMMAND_KEY);
-
-	void* handle = load_driver_settings("synergy");
-	if (handle == NULL)
-		return;
-
-	fEnableSynergy = get_driver_boolean_parameter(handle, "enable", false, false);
-	const char *server = get_driver_parameter(handle, "server", NULL, NULL);
-	TRACE("synergy: settings: enable = %s, server = %s\n", fEnableSynergy ? "yes" : "no", server == NULL ? "(null)" : server);
-	if (server != NULL)
-		fServerAddress.SetTo(server);
-
-	unload_driver_settings(handle);
-}
-
-status_t
-uSynergyInputServerDevice::uSynergyThreadLoop(void* arg)
-{
-	uSynergyContext *uSynergyHaikuContext = (uSynergyContext*)arg;
-	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)uSynergyHaikuContext->m_cookie;
-
-	while (inputDevice->threadActive) {
-		uSynergyUpdate(uSynergyHaikuContext);
-
-		if (inputDevice->fUpdateSettings) {
-			inputDevice->_UpdateSettings();
-			inputDevice->fUpdateSettings = false;
-		}
-	}
-
-	TRACE("synergy: exiting thread loop\n");
-
-	close(inputDevice->synergyServerSocket);
-	inputDevice->synergyServerSocket = -1;
-
-	return B_OK;
-}
-
-
-uSynergyBool
-uSynergyConnectHaiku(uSynergyCookie cookie)
-{
-	CALLED();
-	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
-
-	if (inputDevice->fServerAddress.Length() == 0 || inputDevice->fEnableSynergy == false)
-		goto exit;
-
-	struct sockaddr_in server;
-
-	server.sin_family = AF_INET;
-	server.sin_port = htons(24800);
-	inet_aton(inputDevice->fServerAddress.String(), &server.sin_addr);
-	TRACE("synergy: connecting to %s:%d\n", inputDevice->fServerAddress.String(), 24800);
-
-	inputDevice->synergyServerSocket = socket(PF_INET, SOCK_STREAM, 0);
-
-	if (inputDevice->synergyServerSocket < 0) {
-		TRACE("synergy: socket couldn't be created\n");
-		goto exit;
-	}
-
-	if (connect(inputDevice->synergyServerSocket, (struct sockaddr*)&server, sizeof(struct sockaddr)) < 0 ) {
-		TRACE("synergy: %s: %d\n", "failed to connect to remote host", errno);
-		close(inputDevice->synergyServerSocket);
-		inputDevice->synergyServerSocket = -1;
-		goto exit;
-	}
-	else {
-		TRACE("synergy: connected to remote host!!!\n");
-		return USYNERGY_TRUE;
-	}
-exit:
-	snooze(1000000);
-	return USYNERGY_FALSE;
-}
-
-uSynergyBool
-uSynergySendHaiku(uSynergyCookie cookie, const uint8_t *buffer, int length)
-{
-	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
-
-	if (send(inputDevice->synergyServerSocket, buffer, length, 0) != length)
-		return USYNERGY_FALSE;
-	return USYNERGY_TRUE;
-}
-
-uSynergyBool
-uSynergyReceiveHaiku(uSynergyCookie cookie, uint8_t *buffer, int maxLength, int* outLength)
-{
-	uSynergyInputServerDevice *inputDevice = (uSynergyInputServerDevice*)cookie;
-
-	if ((*outLength = recv(inputDevice->synergyServerSocket, buffer, maxLength, 0)) == -1)
-		return USYNERGY_FALSE;
-	return USYNERGY_TRUE;
-}
 
 void
-uSynergySleepHaiku(uSynergyCookie cookie, int timeMs)
+uSynergyInputServerDevice::MouseCallback(uint16_t x, uint16_t y, int16_t wheelX, int16_t wheelY, uSynergyBool buttonLeft, uSynergyBool buttonRight, uSynergyBool buttonMiddle)
 {
-	snooze(timeMs * 1000);
-}
-
-uint32_t
-uSynergyGetTimeHaiku()
-{
-	return system_time() / 1000; // return milliseconds, not microseconds
-}
-
-void
-uSynergyTraceHaiku(uSynergyCookie cookie, const char *text)
-{
-	BNotification notify(B_INFORMATION_NOTIFICATION);
-	BString group("Synergy");
-	BString content(text);
-
-	notify.SetGroup(group);
-	notify.SetContent(content);
-	BBitmap* bitmap = BTranslationUtils::GetBitmap("/boot/home/config/non-packaged/data/synergy-32.png");
-	if (bitmap != NULL)
-		notify.SetIcon(bitmap);
-	else
-		TRACE("synergy: couldn't load bitmap\n");
-	notify.Send();
-	delete bitmap;
-}
-
-void
-uSynergyScreenActiveCallbackHaiku(uSynergyCookie cookie, uSynergyBool active)
-{
-
-}
-
-void
-uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_t wheelX, int16_t wheelY, uSynergyBool buttonLeft, uSynergyBool buttonRight, uSynergyBool buttonMiddle)
-{
-	uSynergyInputServerDevice	*inputDevice = (uSynergyInputServerDevice*)cookie;
 	static uint32_t			 oldButtons = 0, oldPressedButtons = 0;
 	uint32_t			 buttons = 0;
 	static uint16_t			 oldX = 0, oldY = 0, clicks = 0;
 	static int16_t			oldWheelX = 0, oldWheelY = 0;
 	static uint64			oldWhen = system_time();
-	float				 xVal = (float)x / (float)inputDevice->uSynergyHaikuContext->m_clientWidth;
-	float				 yVal = (float)y / (float)inputDevice->uSynergyHaikuContext->m_clientHeight;
+	float				 xVal = (float)x / (float)fContext->m_clientWidth;
+	float				 yVal = (float)y / (float)fContext->m_clientHeight;
 
 	int64 timestamp = system_time();
 
@@ -433,7 +458,7 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 
 	if (buttons != oldButtons) {
 		bool pressedButton = buttons > 0;
-		BMessage* message = inputDevice->_BuildMouseMessage(pressedButton ? B_MOUSE_DOWN : B_MOUSE_UP, timestamp, buttons, xVal, yVal);
+		BMessage* message = _BuildMouseMessage(pressedButton ? B_MOUSE_DOWN : B_MOUSE_UP, timestamp, buttons, xVal, yVal);
 		if (pressedButton) {
 			if ((buttons == oldPressedButtons) && ((timestamp - oldWhen) < 500000))
 				clicks++;
@@ -447,15 +472,15 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 			clicks = 1;
 
 		if (message != NULL)
-			inputDevice->EnqueueMessage(message);
+			EnqueueMessage(message);
 
 		oldButtons = buttons;
 	}
 
 	if ((x != oldX) || (y != oldY)) {
-		BMessage* message = inputDevice->_BuildMouseMessage(B_MOUSE_MOVED, timestamp, buttons, xVal, yVal);
+		BMessage* message = _BuildMouseMessage(B_MOUSE_MOVED, timestamp, buttons, xVal, yVal);
 		if (message != NULL)
-			inputDevice->EnqueueMessage(message);
+			EnqueueMessage(message);
 		oldX = x;
 		oldY = y;
 	}
@@ -466,7 +491,7 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 			if (message->AddInt64("when", timestamp) == B_OK
 			    && message->AddFloat("be:wheel_delta_x", (oldWheelX - wheelX) / 120) == B_OK
 			    && message->AddFloat("be:wheel_delta_y", (oldWheelY - wheelY) / 120) == B_OK)
-				inputDevice->EnqueueMessage(message);
+				EnqueueMessage(message);
 			else
 				delete message;
 		}
@@ -475,36 +500,16 @@ uSynergyMouseCallbackHaiku(uSynergyCookie cookie, uint16_t x, uint16_t y, int16_
 	}
 }
 
-/* Synergy modifier definitions */
-#define	SYNERGY_SHIFT		0x0001
-#define	SYNERGY_CONTROL		0x0002
-#define SYNERGY_ALT		0x0004
-#define SYNERGY_META		0x0008
-#define SYNERGY_SUPER		0x0010
-#define SYNERGY_ALTGR		0x0020
-#define SYNERGY_LEVEL5LOCK	0x0040
-#define SYNERGY_CAPSLOCK	0x1000
-#define SYNERGY_NUMLOCK		0x2000
-#define SYNERGY_SCROLLLOCK	0x4000
-#define EXTENDED_KEY		0xe000
 
 void
-uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifiers, bool isKeyDown, bool isKeyRepeat)
+uSynergyInputServerDevice::KeyboardCallback(uint16_t scancode, uint16_t _modifiers, bool isKeyDown, bool isKeyRepeat)
 {
 	static uint32 lastScanCode = 0;
 	static uint32 repeatCount = 1;
 	static uint8 states[16];
 
-	bool isExtended = false;
-
-	if (scancode & EXTENDED_KEY != 0) {
-		isExtended = true;
-		TRACE("synergy: extended key\n");
-	}
-
 	int64 timestamp = system_time();
 
-	TRACE("synergy: scancode = 0x%02x\n", scancode);
 	uint32_t keycode = 0;
 	if (scancode > 0 && scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
 		keycode = kATKeycodeMap[scancode - 1];
@@ -513,7 +518,8 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 		if (scancode > 0 && scancode < sizeof(kATKeycodeMap)/sizeof(uint32))
 			keycode = kATKeycodeMap[scancode - 1];
 	}
-	TRACE("synergy: keycode = 0x%x\n", keycode);
+
+	TRACE("synergy: scancode = 0x%02x, keycode = 0x%x\n", scancode, keycode);
 
 	if (keycode < 256) {
 		if (isKeyDown)
@@ -522,45 +528,34 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 			states[(keycode) >> 3] &= (!(1 << (7 - (keycode & 0x7))));
 	}
 
+#if false
 	if (isKeyDown && keycode == 0x34 // DELETE KEY
 		&& (states[fCommandKey >> 3] & (1 << (7 - (fCommandKey & 0x7))))
 		&& (states[fControlKey >> 3] & (1 << (7 - (fControlKey & 0x7))))) {
 		TRACE("synergy: TeamMonitor called\n");
 	}
+#endif
 
 	uint32 modifiers = 0;
-	//TRACE("synergy: modifiers: ");
-	if (_modifiers & SYNERGY_SHIFT) {
-	//	TRACE("SHIFT ");
+
+	if (_modifiers & USYNERGY_MODIFIER_SHIFT)
 		modifiers |= B_SHIFT_KEY | B_LEFT_SHIFT_KEY;
-	}
-	if (_modifiers & SYNERGY_CONTROL) {
-	//	TRACE("CONTROL ");
+	if (_modifiers & USYNERGY_MODIFIER_CTRL)
 		modifiers |= B_CONTROL_KEY | B_LEFT_CONTROL_KEY;
-	}
-	if (_modifiers & SYNERGY_ALT) {
-	//	TRACE("COMMAND(ALT) ");
+	if (_modifiers & USYNERGY_MODIFIER_ALT)
 		modifiers |= B_COMMAND_KEY | B_LEFT_COMMAND_KEY;
-	}
-	if (_modifiers & SYNERGY_META) {
-	//	TRACE("MENU(META) ");
+	if (_modifiers & USYNERGY_MODIFIER_META)
 		modifiers |= B_MENU_KEY;
-	}
-	if (_modifiers & SYNERGY_SUPER) {
-	//	TRACE("OPTION(SUPER) ");
+	if (_modifiers & USYNERGY_MODIFIER_WIN)
 		modifiers |= B_OPTION_KEY | B_LEFT_OPTION_KEY;
-	}
-	if (_modifiers & SYNERGY_ALTGR) {
-	//	TRACE("RIGHT_OPTION(ALTGR) ");
+	if (_modifiers & USYNERGY_MODIFIER_ALT_GR)
 		modifiers |= B_RIGHT_OPTION_KEY | B_OPTION_KEY;
-	}
-	if (_modifiers & SYNERGY_CAPSLOCK)
+	if (_modifiers & USYNERGY_MODIFIER_CAPSLOCK)
 		modifiers |= B_CAPS_LOCK;
-	if (_modifiers & SYNERGY_NUMLOCK)
+	if (_modifiers & USYNERGY_MODIFIER_NUMLOCK)
 		modifiers |= B_NUM_LOCK;
-	if (_modifiers & SYNERGY_SCROLLLOCK)
+	if (_modifiers & USYNERGY_MODIFIER_SCROLLOCK)
 		modifiers |= B_SCROLL_LOCK;
-	//TRACE("\n");
 
 	//bool isLock
 	//	= (modifiers & (B_CAPS_LOCK | B_NUM_LOCK | B_SCROLL_LOCK)) != 0;
@@ -591,10 +586,8 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 		}
 	}
 
-	if (scancode == 0 || scancode == EXTENDED_KEY) {
-		TRACE("empty scancode\n");
+	if (scancode == 0)
 		return;
-	}
 
 	BMessage* msg = new BMessage;
 	if (msg == NULL)
@@ -649,42 +642,31 @@ uSynergyInputServerDevice::_ProcessKeyboard(uint16_t scancode, uint16_t _modifie
 	lastScanCode = isKeyDown ? scancode : 0;
 }
 
+
 void
-uSynergyKeyboardCallbackHaiku(uSynergyCookie cookie, uint16_t key, uint16_t modifiers, uSynergyBool down, uSynergyBool repeat)
+uSynergyInputServerDevice::JoystickCallback(uint8_t joyNum, uint16_t buttons, int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY)
 {
-	((uSynergyInputServerDevice*)cookie)->_ProcessKeyboard(key, modifiers, down, repeat);
 }
 
-void
-uSynergyJoystickCallbackHaiku(uSynergyCookie cookie, uint8_t joyNum, uint16_t buttons, int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY)
-{
-
-}
 
 void
-uSynergyInputServerDevice::_PostClipboard(const BString &mimetype, const uint8_t *data, uint32_t size)
+uSynergyInputServerDevice::ClipboardCallback(enum uSynergyClipboardFormat format, const uint8_t *data, uint32_t size)
 {
+	if (format != USYNERGY_CLIPBOARD_FORMAT_TEXT)
+		return;
+
 	if (be_clipboard->Lock()) {
 		be_clipboard->Clear();
 		BMessage *clip = be_clipboard->Data();
-		clip->AddData(mimetype, B_MIME_TYPE, data, size);
+		clip->AddData("text/plain", B_MIME_TYPE, data, size);
 		status_t result = be_clipboard->Commit();
-		if (result != B_OK) {
+		if (result != B_OK)
 			TRACE("synergy: failed to commit data to clipboard\n");
-		} else
-			TRACE("synergy: received clipboard data\n");
 
 		be_clipboard->Unlock();
 	} else {
 		TRACE("synergy: could not lock clipboard\n");
 	}
-}
-
-void
-uSynergyClipboardCallbackHaiku(uSynergyCookie cookie, enum uSynergyClipboardFormat format, const uint8_t *data, uint32_t size)
-{
-	if (format == USYNERGY_CLIPBOARD_FORMAT_TEXT)
-		((uSynergyInputServerDevice*)cookie)->_PostClipboard("text/plain", data, size);
 }
 
 
