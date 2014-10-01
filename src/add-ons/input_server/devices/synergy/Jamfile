@@ -3,6 +3,7 @@ SubDir HAIKU_TOP src add-ons input_server devices synergy ;
 SetSubDirSupportedPlatformsBeOSCompatible ;
 
 SubDirHdrs $(HAIKU_TOP) src add-ons kernel bus_managers ps2 ;
+SubDirHdrs $(HAIKU_TOP) src add-ons input_server devices keyboard ;
 
 UsePrivateHeaders input interface network shared storage translation ;
 UsePrivateSystemHeaders ;
@@ -13,3 +14,6 @@ Addon <input>synergy :
 	Keymap.cpp
 
 	: input_server be libshared.a network translation [ TargetLibsupc++ ] ;
+
+SEARCH on [ FGristFiles Keymap.cpp ]
+ 	= [ FDirName $(SUBDIR) $(DOTDOT) keyboard ] ;
