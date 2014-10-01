@@ -1,6 +1,7 @@
 
 #include <Application.h>
 #include <Autolock.h>
+#include <Bitmap.h>
 #include <Clipboard.h>
 #include <FindDirectory.h>
 #include <Mime.h>
@@ -385,18 +386,19 @@ uSynergyGetTimeHaiku()
 void
 uSynergyTraceHaiku(uSynergyCookie cookie, const char *text)
 {
-	BNotification *notify = new BNotification(B_INFORMATION_NOTIFICATION);
+	BNotification notify(B_INFORMATION_NOTIFICATION);
 	BString group("Synergy");
 	BString content(text);
 
-	notify->SetGroup(group);
-	notify->SetContent(content);
+	notify.SetGroup(group);
+	notify.SetContent(content);
 	BBitmap* bitmap = BTranslationUtils::GetBitmap("/boot/home/config/non-packaged/data/synergy-32.png");
 	if (bitmap != NULL)
-		notify->SetIcon(bitmap);
+		notify.SetIcon(bitmap);
 	else
 		TRACE("synergy: couldn't load bitmap\n");
-	notify->Send();
+	notify.Send();
+	delete bitmap;
 }
 
 void
