@@ -61,41 +61,95 @@
 
 const static uint32 kSynergyThreadPriority = B_FIRST_REAL_TIME_PRIORITY + 4;
 
-#define _U uSynergyInputServerDevice
-static bool uConnect(_U* device) {
+
+// Static hook functions for uSynergy
+
+static bool
+uConnect(void* cookie)
+{
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
 	return device->Connect();
 }
-static bool uSend(_U* device, const uint8* buffer, int length) {
+
+
+static bool
+uSend(void* cookie, const uint8* buffer, int length)
+{
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
 	return device->Send(buffer, length);
 }
-static bool uReceive(_U* device, uint8* buffer, int maxLength, int* outLength) {
-	return device->Receive(buffer, maxLength, outLength);
+
+
+static bool
+uReceive(void* cookie, uint8* buffer, int maxLength, int* outLength) {
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
+	return (uSynergyInputServerDevice*)device->Receive(buffer, maxLength, outLength);
 }
-static void uSleep(void* unused, int milliseconds) {
+
+
+static void
+uSleep(void* unused, int milliseconds)
+{
 	snooze(milliseconds * 1000);
 }
-static uint32_t uGetTime() {
+
+
+static uint32_t
+uGetTime()
+{
 	return system_time() / 1000;
 }
-static void uTrace(_U* device, const char* text) {
+
+
+static void
+uTrace(void* cookie, const char* text) {
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
 	device->Trace(text);
 }
-static void uScreenActive(_U* device, bool active) {
+
+
+static void
+uScreenActive(void* cookie, bool active) {
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
 	device->ScreenActive(active);
 }
-static void uMouseCallback(_U* device, uint16 x, uint16 y, int16 wheelX, int16 wheelY, bool buttonLeft, bool buttonRight, bool buttonMiddle) {
-	device->MouseCallback(x, y, wheelX, wheelY, buttonLeft, buttonRight, buttonMiddle);
+
+
+static void
+uMouseCallback(void* cookie, uint16 x, uint16 y, int16 wheelX, int16 wheelY,
+	bool buttonLeft, bool buttonRight, bool buttonMiddle)
+{
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
+	device->MouseCallback(x, y, wheelX, wheelY, buttonLeft,
+		buttonRight, buttonMiddle);
 }
-static void uKeyboardCallback(_U* device, uint16 key, uint16 modifiers, bool isKeyDown, bool isKeyRepeat) {
+
+
+static void
+uKeyboardCallback(void* cookie, uint16 key, uint16 modifiers,
+	bool isKeyDown, bool isKeyRepeat)
+{
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
 	device->KeyboardCallback(key, modifiers, isKeyDown, isKeyRepeat);
 }
-static void uJoystickCallback(_U* device, uint8_t joyNum, uint16_t buttons, int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY) {
-	device->JoystickCallback(joyNum, buttons, leftStickX, leftStickY, rightStickX, rightStickY);
+
+
+static void
+uJoystickCallback(void* cookie, uint8_t joyNum, uint16_t buttons,
+	int8_t leftStickX, int8_t leftStickY, int8_t rightStickX, int8_t rightStickY)
+{
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
+	device->JoystickCallback(joyNum, buttons, leftStickX, leftStickY,
+		rightStickX, rightStickY);
 }
-static void uClipboardCallback(_U* device, enum uSynergyClipboardFormat format, const uint8_t* data, uint32_t size) {
+
+
+static void
+uClipboardCallback(void* cookie, enum uSynergyClipboardFormat format, const uint8_t* data, uint32_t size)
+{
+	uSynergyInputServerDevice* device = (uSynergyInputServerDevice*)cookie;
 	device->ClipboardCallback(format, data, size);
 }
-#undef _U
 
 
 uSynergyInputServerDevice::uSynergyInputServerDevice()
@@ -112,17 +166,17 @@ uSynergyInputServerDevice::uSynergyInputServerDevice()
 	fContext = (uSynergyContext*)malloc(sizeof(uSynergyContext));
 	uSynergyInit(fContext);
 
-	fContext->m_connectFunc				= &uConnect;
-	fContext->m_receiveFunc				= &uReceive;
-	fContext->m_sendFunc				= &uSend;
-	fContext->m_getTimeFunc				= &uGetTime;
-	fContext->m_screenActiveCallback	= &uScreenActive;
-	fContext->m_mouseCallback			= &uMouseCallback;
-	fContext->m_keyboardCallback		= &uKeyboardCallback;
-	fContext->m_sleepFunc				= &uSleep;
-	fContext->m_traceFunc				= &uTrace;
-	fContext->m_joystickCallback		= &uJoystickCallback;
-	fContext->m_clipboardCallback		= &uClipboardCallback;
+	fContext->m_connectFunc				= uConnect;
+	fContext->m_receiveFunc				= uReceive;
+	fContext->m_sendFunc				= uSend;
+	fContext->m_getTimeFunc				= uGetTime;
+	fContext->m_screenActiveCallback	= uScreenActive;
+	fContext->m_mouseCallback			= uMouseCallback;
+	fContext->m_keyboardCallback		= uKeyboardCallback;
+	fContext->m_sleepFunc				= uSleep;
+	fContext->m_traceFunc				= uTrace;
+	fContext->m_joystickCallback		= uJoystickCallback;
+	fContext->m_clipboardCallback		= uClipboardCallback;
 	fContext->m_clientName				= "haiku";
 	fContext->m_cookie					= (uSynergyCookie)this;
 
@@ -166,8 +220,8 @@ uSynergyInputServerDevice::InitCheck()
 {
 	input_device_ref *devices[3];
 
-	input_device_ref mouse = { "uSynergy Mouse", B_POINTING_DEVICE, (void *)this };
-	input_device_ref keyboard = { "uSynergy Keyboard", B_KEYBOARD_DEVICE, (void *)this };
+	input_device_ref mouse = { (char*)"uSynergy Mouse", B_POINTING_DEVICE, (void *)this };
+	input_device_ref keyboard = { (char*)"uSynergy Keyboard", B_KEYBOARD_DEVICE, (void *)this };
 
 	devices[0] = &mouse;
 	devices[1] = &keyboard;
