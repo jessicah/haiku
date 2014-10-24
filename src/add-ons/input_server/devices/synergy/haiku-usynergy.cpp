@@ -258,7 +258,7 @@ uSynergyInputServerDevice::MessageReceived(BMessage* message)
 		case B_CLIPBOARD_CHANGED:
 		{
 			const char *text = NULL;
-			int32 len = 0;
+			ssize_t len = 0;
 			BMessage *clip = NULL;
 			if (be_clipboard->Lock()) {
 				if ((clip = be_clipboard->Data()) == B_OK) {
@@ -302,7 +302,7 @@ uSynergyInputServerDevice::Start(const char* name, void* cookie)
 	if (uSynergyThread < 0) {
 		threadActive = false;
 		status = uSynergyThread;
-		TRACE("synergy: spawn thread failed: %lx\n", status);
+		TRACE("synergy: spawn thread failed: %" B_PRIx32 "\n", status);
 	} else {
 		be_clipboard->StartWatching(this);
 		status = resume_thread(uSynergyThread);
@@ -619,14 +619,14 @@ uSynergyInputServerDevice::KeyboardCallback(uint16_t scancode, uint16_t _modifie
 			if (message == NULL)
 				return;
 
-			TRACE("synergy: modifiers: 0x%04lx & 0x%04lx\n", modifiers, fModifiers);
+			TRACE("synergy: modifiers: 0x%04" B_PRIx32 " & 0x%04" B_PRIx32 "\n", modifiers, fModifiers);
 
 			if (isKeyDown)
 				modifiers |= fModifiers;
 			else
 				modifiers &= ~fModifiers;
 
-			TRACE("synergy: modifiers changed: 0x%04lx => 0x%04lx\n", fModifiers, modifiers);
+			TRACE("synergy: modifiers changed: 0x%04" B_PRIx32 " => 0x%04" B_PRIx32 "\n", fModifiers, modifiers);
 
 			message->AddInt64("when", timestamp);
 			message->AddInt32("be:old_modifiers", fModifiers);
