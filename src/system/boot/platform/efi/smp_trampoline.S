@@ -1,4 +1,4 @@
-/* 
+/*
 ** Copyright 2001, Travis Geiselbrecht. All rights reserved.
 ** Copyright 2012, Alex Smith, alex@alex-smith.me.uk.
 ** Distributed under the terms of the NewOS License.
@@ -86,7 +86,7 @@ trampoline_32:
 	// Jump into the 64-bit code segment.
 	pushl	$KERNEL_CODE_SELECTOR
 	pushl	(.Llmode - smp_trampoline)(%ebx)
-	retf	
+	retf
 .align 8
 .code64
 .Llmode:
@@ -124,3 +124,4 @@ trampoline_32:
 
 	// Call the entry point.
 	call	*%rax
+smp_trampoline_end:

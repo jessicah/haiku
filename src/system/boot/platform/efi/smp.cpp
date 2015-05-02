@@ -278,11 +278,15 @@ smp_boot_other_cpus(uint32 pml4, uint32 gdt64, uint64 kernel_entry)
 #endif
 
 	// copy the trampoline code over
+	TRACE(("copying the trampoline code to %p from %p\n", (char*)trampolineCode, (const void*)&smp_trampoline));
+	TRACE(("size of trampoline code = %d bytes\n", (uint64)&smp_trampoline_end - (uint64)&smp_trampoline));
 	memcpy((char *)trampolineCode, (const void*)&smp_trampoline,
 		(uint64)&smp_trampoline_end - (uint64)&smp_trampoline);
 
 	// boot the cpus
+	TRACE(("we have %d CPUs to boot...\n", gKernelArgs.num_cpus - 1));
 	for (uint32 i = 1; i < gKernelArgs.num_cpus; i++) {
+		TRACE(("trampolining CPU %d\n", i));
 		uint32 config;
 		uint64 numStartups;
 		uint32 j;
