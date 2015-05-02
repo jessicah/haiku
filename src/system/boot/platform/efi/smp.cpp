@@ -335,7 +335,7 @@ smp_boot_other_cpus(uint32 pml4, uint32 gdt64, uint64 kernel_entry)
 					  {0xff, 0xff, 0, 0, 0, 0x9a, 0xcf, 0},
 					  {0xff, 0xff, 0, 0, 0, 0x92, 0xcf, 0}};
 		args->pml4 = pml4;
-		args->gdt64 = gdt64;
+		args->gdt64 = gdtr64;
 		args->kernel_entry = kernel_entry;
 		args->kernel_args = (uint64)&gKernelArgs;
 		args->current_cpu = i;
