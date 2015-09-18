@@ -8,8 +8,10 @@
 
 #include <boot/stage2.h>
 #include <boot/platform.h>
+#include <boot/menu.h>
 #include <boot/kernel_args.h>
 #include <boot/platform/generic/video.h>
+#include <util/list.h>
 
 
 static EFI_GUID sGraphicsOutputGuid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
@@ -64,7 +66,20 @@ platform_init_video()
 	gKernelArgs.frame_buffer.bytes_per_row =
 		sGraphicsOutput->Mode->Info->PixelsPerScanLine * 4;
 	gKernelArgs.frame_buffer.depth = 32;
-
+#if 0
+	list_init(&sModeList); // where is sModeList
+	gKernelArgs.vesa_capabilities = 0; // this appears to indicate vesa is broken??
+	
+	// We'll only ever be able to support a single mode
+	vesa_mode *mode = (vesa_mode *)kernel_args_malloc(sizeof(vesa_mode));
+	mode->mode = NULL;
+	mode->width = gKernelArgs.frame_buffer.width;
+	mode->height = gKernelArgs.frame_buffer.height;
+	mode->bits_per_pixel = gKernelArgs.frame_buffer.depth;
+	
+	gKernelArgs.vesa_modes = mode;
+	gKernelArgs.vesa_modes_size = sizeof(vesa_mode);
+#endif
 	video_display_splash(gKernelArgs.frame_buffer.physical_buffer.start);
 	return B_OK;
 }
