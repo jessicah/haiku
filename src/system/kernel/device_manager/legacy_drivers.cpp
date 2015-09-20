@@ -1183,12 +1183,8 @@ probe_for_drivers(const char *type)
 {
 	TRACE(("probe_for_drivers(type = %s)\n", type));
 
-	if (gBootDevice < 0) {
-		TRACE(("legacy probe_for_drivers: no boot device, exiting\n"));
+	if (gBootDevice < 0)
 		return B_OK;
-	} else {
-		TRACE(("legacy probe_for_drivers: boot device found\n"));
-	}
 
 	DriverEntryList drivers;
 

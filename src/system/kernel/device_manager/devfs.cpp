@@ -200,10 +200,6 @@ scan_mode(void)
 	// We may scan every device twice:
 	//  - once before there is a boot device,
 	//  - and once when there is one
-	if (gBootDevice >= 0)
-		dprintf("devfs: scan_mode = normal\n");
-	else
-		dprintf("devfs: scan_mode = boot\n");
 
 	return gBootDevice >= 0 ? kNormalScan : kBootScan;
 }

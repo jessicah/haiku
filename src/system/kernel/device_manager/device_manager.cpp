@@ -35,7 +35,7 @@
 #include "IOSchedulerRoster.h"
 
 
-#define TRACE_DEVICE_MANAGER
+//#define TRACE_DEVICE_MANAGER
 #ifdef TRACE_DEVICE_MANAGER
 #	define TRACE(a) dprintf a
 #else
@@ -384,10 +384,8 @@ static void
 publish_directories(const char* subPath)
 {
 	if (gBootDevice < 0) {
-		TRACE(("publish_directories: no boot device, publishing\n"));
 		if (subPath[0]) {
 			// we only support the top-level directory for modules
-			TRACE(("exiting, only support top-level directory for modules\n"));
 			return;
 		}
 
@@ -418,7 +416,6 @@ publish_directories(const char* subPath)
 		}
 		close_module_list(list);
 	} else {
-		TRACE(("publish_directories: have boot device, skipping, is TODO\n"));
 		// TODO: implement module directory traversal!
 	}
 }
