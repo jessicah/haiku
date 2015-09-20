@@ -66,19 +66,17 @@ main(stage2_args *args)
 	if (get_boot_file_system(args, bootVolume) != B_OK
 		|| (platform_boot_options() & BOOT_OPTION_MENU) != 0) {
 		if (!bootVolume.IsValid())
-			dprintf("\tno boot path found, scan for all partitions...\n");
+			puts("\tno boot path found, scan for all partitions...\n");
 
 		if (mount_file_systems(args) < B_OK) {
 			// That's unfortunate, but we still give the user the possibility
 			// to insert a CD-ROM or just rescan the available devices
-			dprintf("Could not locate any supported boot devices!\n");
+			puts("Could not locate any supported boot devices!\n");
 		}
 
 		// ToDo: check if there is only one bootable volume!
 
 		mountedAllVolumes = true;
-		
-		dprintf("entering user menu to select a boot volume...\n");
 
 		if (user_menu(bootVolume, pathBlacklist) < B_OK) {
 			// user requested to quit the loader

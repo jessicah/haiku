@@ -693,49 +693,34 @@ status_t
 mount_file_systems(stage2_args *args)
 {
 	// mount other partitions on boot device (if any)
-	dprintf("mount_file_systems...\n");
 	NodeIterator iterator = gPartitions.GetIterator();
-	dprintf("1.");
 
 	Partition *partition = NULL;
 	while ((partition = (Partition *)iterator.Next()) != NULL) {
-		dprintf("2.");
 		// don't scan known partitions again
 		if (partition->IsFileSystem())
 			continue;
 
-		dprintf("3.");
 		// remove the partition if it doesn't contain a (known) file system
 		if (partition->Scan(true) != B_OK && !partition->IsFileSystem()) {
-			dprintf("4.");
 			gPartitions.Remove(partition);
-			dprintf("5.");
 			delete partition;
 		}
-		dprintf("6.");
 	}
 
 	// add all block devices the platform has for us
-	dprintf("7.");
 	status_t status = platform_add_block_devices(args, &gBootDevices);
-	dprintf("8.");
-	if (status < B_OK) {
-		dprintf("exit\n");
+	if (status < B_OK)
 		return status;
-	}
 
 	iterator = gBootDevices.GetIterator();
-	dprintf("9.");
 	Node *device = NULL, *last = NULL;
 	while ((device = iterator.Next()) != NULL) {
-		dprintf("10.");
 		// don't scan former boot device again
 		if (device == sBootDevice)
 			continue;
 
-		dprintf("11.");
 		if (add_partitions_for(device, true) == B_OK) {
-			dprintf("12.");
 			// ToDo: we can't delete the object here, because it must
 			//	be removed from the list before we know that it was
 			//	deleted.
@@ -748,15 +733,11 @@ mount_file_systems(stage2_args *args)
 */
 (void)last;
 		}
-		dprintf("13.");
 		last = device;
 	}
 
-	dprintf("14.");
-	if (gPartitions.IsEmpty()) {
-		dprintf("exit2\n");
+	if (gPartitions.IsEmpty())
 		return B_ENTRY_NOT_FOUND;
-	}
 
 #if 0
 	void *cookie;
@@ -779,7 +760,6 @@ mount_file_systems(stage2_args *args)
 	}
 #endif
 
-	dprintf("finished\n");
 	return B_OK;
 }
 
