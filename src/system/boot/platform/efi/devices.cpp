@@ -7,6 +7,7 @@
 
 
 #include "efi_platform.h"
+#include "efigpt.h"
 
 #include <KernelExport.h>
 #include <boot/platform.h>
@@ -22,6 +23,8 @@
 #else
 #	define TRACE(x) ;
 #endif
+
+#define UUID_LEN	16
 
 
 static uint8 sDriveIdentifier = 0;
@@ -42,197 +45,90 @@ class EFIBlockDevice : public Node {
 		virtual off_t Size() const;
 
 		uint32 BlockSize() const { return fBlockSize; }
-
-		status_t FillIdentifier();
+		uint64 DeviceOffset() const { return fDeviceOffset; }
 
 		disk_identifier &Identifier() { return fIdentifier; }
 		uint8 DriveID() const { return fDriveID; }
+
+		const uint8* UUID() const { return fUUID; }
+
+		void SetParameters(uint64 deviceOffset, uint8 *partitionUUID, uint8 *diskUUID);
 
 	protected:
 		EFI_BLOCK_IO	*fBlockIO;
 		uint8			fDriveID;
 		uint64			fSize;
 		uint32			fBlockSize;
+		uint64			fDeviceOffset;
+		uint8			fUUID[UUID_LEN];
 		disk_identifier	fIdentifier;
 };
 
 
 static bool sBlockDevicesAdded = false;
 
-#if false
-// we can actually determine this with EFI... to fix up
+static const char* media_device_subtypes[] = {
+	"unknown",
+	"harddrive",
+	"cdrom",
+	"vendor",
+	"filepath",
+};
+
+
 static void
-check_cd_boot(EFIBlockDevice *device)
+dump_device_path(EFI_DEVICE_PATH *devicePath)
 {
-	gBootVolume.SetInt32(BOOT_METHOD, BOOT_METHOD_HARD_DISK);
+	dprintf("device path: type = %02x, subtype = %02x, node length = %d, is the end = %s\n",
+		DevicePathType(devicePath), DevicePathSubType(devicePath),
+		DevicePathNodeLength(devicePath), IsDevicePathEnd(devicePath) ? "yes" : "no");
 
-	if (device->DriveID() != 0)
-		return;
-
-	// we obviously were booted from CD!
-
-	//specification_packet *packet = (specification_packet *)kDataSegmentScratch;
-	//if (packet->media_type != 0)
-		gBootVolume.SetInt32(BOOT_METHOD, BOOT_METHOD_CD);
-
-
-}
-
-
-// think all of this checksum stuff can be removed
-// should be able to use the device path to generate a unique identifier
-
-
-static off_t
-get_next_check_sum_offset(int32 index, off_t maxSize)
-{
-	// The boot block often contains the disk superblock, and should be
-	// unique enough for most cases
-	if (index < 2)
-		return index * 512;
-
-	// Try some data in the first part of the drive
-	if (index < 4)
-		return (maxSize >> 10) + index * 2048;
-
-	// Some random value might do
-	return ((system_time() + index) % (maxSize >> 9)) * 512;
-}
-
-
-/**	Computes a check sum for the specified block.
- *	The check sum is the sum of all data in that block interpreted as an
- *	array of uint32 values.
- *	Note, this must use the same method as the one used in kernel/fs/vfs_boot.cpp.
- */
-static uint32
-compute_check_sum(EFIBlockDevice *device, off_t offset)
-{
-	char buffer[512];
-	ssize_t bytesRead = device->ReadAt(NULL, offset, buffer, sizeof(buffer));
-	if (bytesRead < B_OK)
-		return 0;
-
-	if (bytesRead < (ssize_t)sizeof(buffer))
-		memset(buffer + bytesRead, 0, sizeof(buffer) - bytesRead);
-
-	uint32 *array = (uint32 *)buffer;
-	uint32 sum = 0;
-
-	for (uint32 i = 0; i < (bytesRead + sizeof(uint32) - 1) / sizeof(uint32); i++) {
-		sum += array[i];
+	if (DevicePathType(devicePath) == MESSAGING_DEVICE_PATH
+			&& DevicePathSubType(devicePath) == MSG_SATA_DP) {
+		SATA_DEVICE_PATH* sata = (SATA_DEVICE_PATH*)devicePath;
+		dprintf("connected to SATA bus: hba = %d (%x), multiplier = %d (%x), lun = %d (%x)\n\n",
+			sata->HBAPortNumber, sata->HBAPortNumber,
+			sata->PortMultiplierPortNumber, sata->PortMultiplierPortNumber,
+			sata->LogicalUnitNumber, sata->LogicalUnitNumber);
 	}
 
-	return sum;
-}
-
-
-static void
-find_unique_check_sums(NodeList *devices)
-{
-	NodeIterator iterator = devices->GetIterator();
-	Node *device;
-	int32 index = 0;
-	off_t minSize = 0;
-	const int32 kMaxTries = 200;
-
-	while (index < kMaxTries) {
-		bool clash = false;
-
-		iterator.Rewind();
-
-		while ((device = iterator.Next()) != NULL) {
-			EFIBlockDevice *drive = (EFIBlockDevice *)device;
-#if 0
-			// there is no RTTI in the boot loader...
-			BIOSDrive *drive = dynamic_cast<BIOSDrive *>(device);
-			if (drive == NULL)
-				continue;
-#endif
-
-			// TODO: currently, we assume that the BIOS provided us with unique
-			//	disk identifiers... hopefully this is a good idea
-			if (drive->Identifier().device_type != UNKNOWN_DEVICE)
-				continue;
-
-			if (minSize == 0 || drive->Size() < minSize)
-				minSize = drive->Size();
-
-			// check for clashes
-
-			NodeIterator compareIterator = devices->GetIterator();
-			while ((device = compareIterator.Next()) != NULL) {
-				EFIBlockDevice *compareDrive = (EFIBlockDevice *)device;
-
-				if (compareDrive == drive
-					|| compareDrive->Identifier().device_type != UNKNOWN_DEVICE)
-					continue;
-
-// TODO: Until we can actually get and compare *all* fields of the disk
-// identifier in the kernel, we cannot compare the whole structure (we also
-// should be more careful zeroing the structure before we fill it).
-#if 0
-				if (!memcmp(&drive->Identifier(), &compareDrive->Identifier(),
-						sizeof(disk_identifier))) {
-					clash = true;
-					break;
+	if (DevicePathType(devicePath) == MEDIA_DEVICE_PATH) {
+		dprintf("media device path: subtype = %s\n",
+			media_device_subtypes[DevicePathSubType(devicePath)]);
+		switch (DevicePathSubType(devicePath)) {
+			case MEDIA_HARDDRIVE_DP:
+				{
+				HARDDRIVE_DEVICE_PATH* harddrive = (HARDDRIVE_DEVICE_PATH*)devicePath;
+				dprintf("\thard drive: partition %d, start = %ld, size = %ld, is gpt = %s\n",
+					harddrive->PartitionNumber, harddrive->PartitionStart,
+					harddrive->PartitionSize, harddrive->SignatureType == SIGNATURE_TYPE_GUID ? "yes" : "no");
+				break;
 				}
-#else
-				const disk_identifier& ourId = drive->Identifier();
-				const disk_identifier& otherId = compareDrive->Identifier();
-				if (memcmp(&ourId.device.unknown.check_sums,
-						&otherId.device.unknown.check_sums,
-						sizeof(ourId.device.unknown.check_sums)) == 0) {
-					clash = true;
-				}
-#endif
-			}
-
-			if (clash)
+			default:
+				dprintf("\t%s: don't care about this type\n",
+					media_device_subtypes[DevicePathSubType(devicePath)]);
 				break;
 		}
-
-		if (!clash) {
-			// our work here is done.
-			return;
-		}
-
-		// add a new block to the check sums
-
-		off_t offset = get_next_check_sum_offset(index, minSize);
-		int32 i = index % NUM_DISK_CHECK_SUMS;
-		iterator.Rewind();
-
-		while ((device = iterator.Next()) != NULL) {
-			EFIBlockDevice *drive = (EFIBlockDevice *)device;
-
-			disk_identifier& disk = drive->Identifier();
-			disk.device.unknown.check_sums[i].offset = offset;
-			disk.device.unknown.check_sums[i].sum = compute_check_sum(drive, offset);
-
-			TRACE(("disk %x, offset %Ld, sum %lu\n", drive->DriveID(), offset,
-				disk.device.unknown.check_sums[i].sum));
-		}
-
-		index++;
 	}
-
-	// If we get here, we couldn't find a way to differentiate all disks from each other.
-	// It's very likely that one disk is an exact copy of the other, so there is nothing
-	// we could do, anyway.
-
-	dprintf("Could not make EFI block devices unique! Might boot from the wrong disk...\n");
 }
-#endif
+
+
+typedef struct _sata_device : public DoublyLinkedListLinkImpl<_sata_device> {
+	uint16	port;
+	uint16	multiplier;
+	uint16	lun;
+	uint8	uuid[UUID_LEN];
+} sata_device;
+
+typedef DoublyLinkedList<sata_device> SataDeviceList;
+typedef SataDeviceList::Iterator SataDeviceIterator;
+
 
 static status_t
 add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool be a reference?
 {
-	dprintf("add_block_devices\n");
-	if (sBlockDevicesAdded) {
-		dprintf("exit\n");
+	if (sBlockDevicesAdded)
 		return B_OK;
-	}
 
 	EFI_BLOCK_IO *blockIO;
 	EFI_DEVICE_PATH *devicePath, *node;
@@ -240,52 +136,95 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 	EFI_STATUS status;
 	UINTN size;
 
+	SataDeviceList sataDevices;
+	SataDeviceIterator iterator = sataDevices.GetIterator();
+
 	size = 0;
 	handles = NULL;
 
 	status = kBootServices->LocateHandle(ByProtocol, &sBlockIOGuid, 0, &size, 0);
-	dprintf("1.");
 	if (status == EFI_BUFFER_TOO_SMALL) {
-		dprintf("2.");
 		handles = (EFI_HANDLE *)malloc(size);
-		dprintf("3.");
 		status = kBootServices->LocateHandle(ByProtocol, &sBlockIOGuid, 0, &size, handles);
-		dprintf("4.");
-		if (status != EFI_SUCCESS) {
-			dprintf("5.");
+		if (status != EFI_SUCCESS)
 			free(handles);
-		}
 	}
-	if (status != EFI_SUCCESS) {
-		dprintf("exit2\n");
+	if (status != EFI_SUCCESS)
 		return B_ERROR;
-	}
 
-	dprintf("6.");
 	for (unsigned int n = 0; n < size / sizeof(EFI_HANDLE); n++) {
-		dprintf("7.");
 		status = kBootServices->HandleProtocol(handles[n], &sDevicePathGuid, (void **)&devicePath);
-		dprintf("8.");
 		if (status != EFI_SUCCESS)
 			continue;
 
 		node = devicePath;
 
-		dprintf("9.");
+		dprintf("next handle...\n");
+		dump_device_path(devicePath);
+
+		sata_device *sataDevice = NULL;
+
+		int i = 1;
 		while (!IsDevicePathEnd(NextDevicePathNode(node))) {
-			dprintf("10.");
 			node = NextDevicePathNode(node);
+			dprintf("node %d\n", i++);
+			if (DevicePathType(node) == MESSAGING_DEVICE_PATH
+				&& DevicePathSubType(node) == MSG_SATA_DP) {
+				// Add to sataDevices, if it's not there already...
+				SATA_DEVICE_PATH *current = (SATA_DEVICE_PATH*)node;
+
+				iterator.Rewind();
+				while ((sataDevice = iterator.Next()) != NULL) {
+					if (sataDevice->port == current->HBAPortNumber
+							&& sataDevice->multiplier == current->PortMultiplierPortNumber
+							&& sataDevice->lun == current->LogicalUnitNumber) {
+						dprintf("Already contains this sata device path\n");
+						break;
+					}
+				}
+				if (sataDevice == NULL) {
+					sataDevice = (sata_device*)malloc(sizeof(sata_device));
+					sataDevice->port = current->HBAPortNumber;
+					sataDevice->multiplier = current->PortMultiplierPortNumber;
+					sataDevice->lun = current->LogicalUnitNumber;
+					memset(sataDevice->uuid, 0, UUID_LEN);
+
+					sataDevices.Insert(sataDevice);
+					dprintf("Added sata device path\n");
+				}
+			}
+
+			dump_device_path(node);
 		}
 
-		dprintf("11.");
 		status = kBootServices->HandleProtocol(handles[n], &sBlockIOGuid, (void **)&blockIO);
-		dprintf("12.");
 		if (status != EFI_SUCCESS) {
-			dprintf("13.");
 			continue;
 		}
 		if (blockIO->Media->LogicalPartition == false) {
-			dprintf("14.");
+			if (!blockIO->Media->RemovableMedia && blockIO->Media->MediaPresent) {
+				EFI_PARTITION_TABLE_HEADER *header =
+					(EFI_PARTITION_TABLE_HEADER*)malloc(blockIO->Media->BlockSize);
+				status = blockIO->ReadBlocks(blockIO, blockIO->Media->MediaId, 1,
+						blockIO->Media->BlockSize, header);
+				if (status == EFI_SUCCESS) {
+					dprintf("guid: %08x-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x\n",
+						header->DiskGUID.Data1, header->DiskGUID.Data2, header->DiskGUID.Data3,
+						header->DiskGUID.Data4[0], header->DiskGUID.Data4[1],
+						header->DiskGUID.Data4[2], header->DiskGUID.Data4[3],
+						header->DiskGUID.Data4[4], header->DiskGUID.Data4[5],
+						header->DiskGUID.Data4[6], header->DiskGUID.Data4[7]);
+					if (sataDevice == NULL) {
+						dprintf("humm, this shouldn't happen...\n");
+						continue;
+					}
+					memcpy(sataDevice->uuid, (uint8*)&header->DiskGUID, UUID_LEN);
+					dprintf("uuid stored in sata device: ");
+					for (int32 i = 0; i < UUID_LEN; ++i)
+						dprintf("%02x", sataDevice->uuid[i]);
+					dprintf("\n");
+				}
+			}
 			continue;
 		}
 
@@ -295,41 +234,44 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 		 * we try to find the parent device and add that instead as
 		 * that will be the CD fileystem.
 		 */
-		dprintf("15.");
 		if (DevicePathType(node) == MEDIA_DEVICE_PATH &&
 				DevicePathSubType(node) == MEDIA_CDROM_DP) {
-			dprintf("16.");
 			node->Type = END_DEVICE_PATH_TYPE;
 			node->SubType = END_ENTIRE_DEVICE_PATH_SUBTYPE;
-			dprintf("16a. kBootServices->LocateDevicePath fails!\n");
+			// was testing under QEMU, caused VM panic!
 			//status = kBootServices->LocateDevicePath(&sBlockIOGuid, &devicePath, &handle);
-			dprintf("17.");
 			// TODO: actually care about CD-ROMs
 			continue;
 		}
 
-		dprintf("18.");
+		if (DevicePathType(node) != MEDIA_DEVICE_PATH ||
+				DevicePathSubType(node) != MEDIA_HARDDRIVE_DP)
+			continue;
+
+		// This is a partition we want to add :-)
+		HARDDRIVE_DEVICE_PATH* harddrive = (HARDDRIVE_DEVICE_PATH*)node;
 		EFIBlockDevice *device = new(std::nothrow) EFIBlockDevice(blockIO);
-		dprintf("19.");
+
 		if (device->InitCheck() != B_OK) {
-			dprintf("20.");
 			delete device;
 			continue;
 		}
 
-		dprintf("21.");
-		devicesList->Add(device);
+		if (sataDevice == NULL) {
+			dprintf("sata device is NULL?\n");
+			device->SetParameters(harddrive->PartitionSize, harddrive->Signature, harddrive->Signature);
+		} else
+			device->SetParameters(harddrive->PartitionSize, harddrive->Signature, sataDevice->uuid);
 
-		dprintf("22.");
-		if (device->FillIdentifier() != B_OK) {
-			dprintf("23.");
-			identifierMissing = true;
-		}
+		devicesList->Add(device);
 	}
 
-	dprintf("24.");
+	iterator.Rewind();
+	sata_device *p;
+	while ((p = iterator.Next()) != NULL)
+		free(p);
+
 	sBlockDevicesAdded = true;
-	dprintf("finished\n");
 	return B_OK;
 }
 
@@ -401,19 +343,19 @@ EFIBlockDevice::Size() const
 }
 
 
-status_t
-EFIBlockDevice::FillIdentifier()
+void
+EFIBlockDevice::SetParameters(uint64 deviceOffset, uint8 *partitionUUID, uint8 *diskUUID)
 {
+	fDeviceOffset = deviceOffset;
+	memcpy(fUUID, partitionUUID, UUID_LEN);
+	// Could probably actually retrieve these with the device path API
 	fIdentifier.bus_type = UNKNOWN_BUS;
 	fIdentifier.device_type = UNKNOWN_DEVICE;
 	fIdentifier.device.unknown.size = Size();
 
-	for (int32 i = 0; i < NUM_DISK_CHECK_SUMS; i++) {
-		fIdentifier.device.unknown.check_sums[i].offset = -1;
-		fIdentifier.device.unknown.check_sums[i].sum = 0;
-	}
-
-	return B_ERROR;
+	// This should be the UUID of the parent disk system
+	memcpy(fIdentifier.device.unknown.uuid, diskUUID, UUID_LEN);
+	fIdentifier.device.unknown.use_uuid = true;
 }
 
 
@@ -423,6 +365,7 @@ EFIBlockDevice::FillIdentifier()
 status_t
 platform_add_boot_device(struct stage2_args *args, NodeList *devicesList)
 {
+	add_block_devices(devicesList, false);
 	return B_ENTRY_NOT_FOUND;
 }
 
@@ -431,6 +374,7 @@ status_t
 platform_get_boot_partition(struct stage2_args *args, Node *bootDevice,
 	NodeList *list, boot::Partition **_partition)
 {
+	add_block_devices(list, false);
 	return B_ENTRY_NOT_FOUND;
 }
 
@@ -448,9 +392,16 @@ platform_register_boot_device(Node *device)
 {
 	EFIBlockDevice *drive = (EFIBlockDevice *)device;
 
-	//check_cd_boot(drive);
+	dprintf("register_boot_device: partition uuid = ");
+	for (int i = 0; i < UUID_LEN; ++i) {
+		dprintf("%02x", drive->UUID()[i]);
+	}
+	dprintf("\n");
 
-	gBootVolume.SetInt64("boot drive number", drive->DriveID());
+	if (gBootVolume.SetData(BOOT_VOLUME_PARTITION_UUID, B_RAW_TYPE,
+		drive->UUID(), UUID_LEN) != B_OK) {
+		dprintf("register_boot_device: SetData(BOOT_VOLUME_PARTITION_UUID) failed!\n");
+	}
 	gBootVolume.SetData(BOOT_VOLUME_DISK_IDENTIFIER, B_RAW_TYPE,
 		&drive->Identifier(), sizeof(disk_identifier));
 
