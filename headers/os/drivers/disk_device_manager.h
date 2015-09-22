@@ -39,6 +39,7 @@ typedef struct partition_data {
 	char			*content_parameters;
 	void			*cookie;
 	void			*content_cookie;
+	uint8			uuid[16];
 } partition_data;
 
 // C API disk device representation

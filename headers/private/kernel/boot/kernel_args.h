@@ -32,6 +32,7 @@
 #define BOOT_VOLUME_PACKAGES_STATE		"packages state"
 #define BOOT_VOLUME_PARTITION_OFFSET	"partition offset"
 #define BOOT_VOLUME_DISK_IDENTIFIER		"disk identifier"
+#define BOOT_VOLUME_PARTITION_UUID		"partition uuid"
 
 // boot methods
 enum {

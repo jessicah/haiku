@@ -97,6 +97,7 @@ efi_gpt_scan_partition(int fd, partition_data* partition, void* _cookie)
 	partition->flags |= B_PARTITION_PARTITIONING_SYSTEM;
 	partition->content_size = partition->size;
 	partition->content_cookie = header;
+	memcpy(partition->uuid, &header->UUID(), sizeof(guid_t));
 
 	// scan all children
 
@@ -135,6 +136,7 @@ efi_gpt_scan_partition(int fd, partition_data* partition, void* _cookie)
 		child->type = strdup(get_partition_type(entry.partition_type));
 		child->block_size = partition->block_size;
 		child->cookie = (void*)(addr_t)i;
+		memcpy(child->uuid, &entry.unique_guid, sizeof(guid_t));
 	}
 
 	return B_OK;
