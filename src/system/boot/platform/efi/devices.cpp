@@ -362,10 +362,161 @@ EFIBlockDevice::SetParameters(uint64 deviceOffset, uint8 *partitionUUID, uint8 *
 //	#pragma mark -
 
 
+extern EFI_HANDLE kImage;
+
+
+typedef struct {
+	uint32	data1;
+	uint16	data2;
+	uint16	data3;
+	uint16	data4;
+	uint8	data5[6];
+} uuid_t;
+
+#include <ctype.h>
+
+
+static bool
+parse_uuid(const char *in, uuid_t &out)
+{
+	const char *cp = in;
+	char buf[3];
+	
+	// validate the string first
+	for (int i = 0; i <= 36; i++, cp++) {
+		if ((i == 8) || (i == 13) || (i == 18) || (i == 23)) {
+			if (*cp == '-')
+				continue;
+			else {
+				dprintf("expected hyphen at %d\n", i);
+				return false;
+			}
+		}
+		if (i == 36) {
+			if (*cp != '\0') {
+				dprintf("expected terminating nul character at %d\n", i);
+				return false;
+			}
+			continue;
+		}
+		if (!isxdigit(*cp)) {
+			dprintf("expected hexadecimal character at %d\n", i);
+			return false;
+		}
+	}
+	out.data1 = strtoul(in, NULL, 16);
+	out.data2 = strtoul(in + 9, NULL, 16);
+	out.data3 = strtoul(in + 14, NULL, 16);
+	out.data4 = strtoul(in + 19, NULL, 16);
+	cp = in + 24;
+	buf[2] = '\0';
+	for (int i = 0; i < 6; ++i) {
+		buf[0] = *cp++;
+		buf[1] = *cp++;
+		out.data5[i] = strtoul(buf, NULL, 16);
+	}
+	
+	return true;
+}
+
+
+static void
+pack_uuid(const uuid_t &uu, uint8 *out)
+{
+	uint32 tmp;
+	
+	tmp = uu.data1;
+	out[3] = (uint8)tmp;
+	tmp >>= 8;
+	out[2] = (uint8)tmp;
+	tmp >>= 8;
+	out[1] = (uint8)tmp;
+	tmp >>= 8;
+	out[0] = (uint8)tmp;
+	
+	tmp = uu.data2;
+	out[5] = (uint8)tmp;
+	tmp >>= 8;
+	out[4] = (uint8)tmp;
+	
+	tmp = uu.data3;
+	out[7] = (uint8)tmp;
+	tmp >>= 8;
+	out[6] = (uint8)tmp;
+	
+	tmp = uu.data4;
+	out[9] = (uint8)tmp;
+	tmp >>= 8;
+	out[8] = (uint8)tmp;
+	
+	memcpy(out+10, uu.data5, 6);
+}
+
+
 status_t
 platform_add_boot_device(struct stage2_args *args, NodeList *devicesList)
 {
 	add_block_devices(devicesList, false);
+	
+	// Let's see if we can find out some information about our
+	// boot invocation
+	
+	EFI_STATUS status = EFI_SUCCESS;
+	EFI_LOADED_IMAGE* loaded_image = NULL;
+	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
+	status = kBootServices->HandleProtocol(kImage,
+			&loaded_image_protocol, (void**)&loaded_image);
+	if (status != EFI_SUCCESS || loaded_image == NULL)
+		return B_ENTRY_NOT_FOUND;
+	
+	dprintf("loaded image options length = %u bytes\n",
+		loaded_image->LoadOptionsSize);
+	
+	dprintf("loaded image options data = '");
+	// we used efibootmgr to provide our 'commandline options'
+	// in ascii, so don't need to deal with UCS-2 [ugh]
+	char* payload = (char*)loaded_image->LoadOptions;
+	for (uint32 i = 0; i < loaded_image->LoadOptionsSize; ++i) {
+		dprintf("%c", payload[i]);
+	}
+	dprintf("'\n");
+	
+	const char* identifier = "Target(";
+	const char* target = payload;
+	uint32 length = strlen(identifier);
+	for (uint32 i = 0; i < loaded_image->LoadOptionsSize; ++i) {
+		bool found = true;
+		for (uint32 j = 0; j < length; ++j) {
+			if (payload[i+j] != identifier[j]) {
+				found = false;
+				break;
+			}
+		}
+		if (found) {
+			dprintf("target uuid at offset %u bytes, %u remaining\n",
+				i + length, loaded_image->LoadOptionsSize - i + length);
+			target += i + length;
+			break;
+		}
+	}
+	
+	if (target == payload) {
+		dprintf("Don't know which volume to boot from\n");
+		return B_ENTRY_NOT_FOUND;
+	}
+	
+	uint8 uuid[16];
+	uuid_t uu;
+	if (!parse_uuid(strndup(target, 36), uu)) {
+		dprintf("failed to parse uuid\n");
+		return B_ENTRY_NOT_FOUND;
+	}
+	pack_uuid(uu, uuid);
+	dprintf("\n================================\n  uuid = ");
+	for (int i = 0; i < 16; ++i)
+		dprintf("%02x", uuid[i]);
+	dprintf("\n================================\nfinished our search!\n");
+	
 	return B_ENTRY_NOT_FOUND;
 }
 
