@@ -30,12 +30,15 @@
 static uint8 sDriveIdentifier = 0;
 static EFI_GUID sBlockIOGuid = BLOCK_IO_PROTOCOL;
 static EFI_GUID sDevicePathGuid = DEVICE_PATH_PROTOCOL;
+static uint8 sTargetUUID[16];
+static off_t sBootPartitionOffset = 0;
 
+class EFIDevice;
 
-class EFIBlockDevice : public Node {
+class EFIPartition : public Node {
 	public:
-		EFIBlockDevice(EFI_BLOCK_IO *blockIO);
-		virtual ~EFIBlockDevice();
+		EFIPartition(EFI_BLOCK_IO *blockIO, EFIDevice *parent);
+		virtual ~EFIPartition();
 
 		status_t InitCheck() const;
 
@@ -52,7 +55,7 @@ class EFIBlockDevice : public Node {
 
 		const uint8* UUID() const { return fUUID; }
 
-		void SetParameters(uint64 deviceOffset, uint8 *partitionUUID, uint8 *diskUUID);
+		void SetParameters(uint64 deviceOffset, const uint8 *partitionUUID, const uint8 *diskUUID);
 
 	protected:
 		EFI_BLOCK_IO	*fBlockIO;
@@ -62,10 +65,38 @@ class EFIBlockDevice : public Node {
 		uint64			fDeviceOffset;
 		uint8			fUUID[UUID_LEN];
 		disk_identifier	fIdentifier;
+		EFIDevice		*fParent;
+};
+
+typedef NodeList::ConstIterator ConstNodeIterator;
+
+class EFIDevice : public Node {
+	public:
+		EFIDevice(uint16 port, uint16 multiplier, uint16 lun);
+		virtual ~EFIDevice();
+		
+		virtual ssize_t ReadAt(void*, off_t, void*, size_t) { return B_UNSUPPORTED; }
+		virtual ssize_t WriteAt(void*, off_t, const void*, size_t) { return B_UNSUPPORTED; }
+		
+		void AddPartition(EFIPartition *partition) { fPartitions.Add(partition); }
+		const ConstNodeIterator GetPartitions() const { return fPartitions.GetIterator(); }
+		
+		void SetUUID(uint8 *uuid) { memcpy(fUUID, uuid, UUID_LEN); }
+		const uint8* UUID() const { return fUUID; }
+		
+		bool IsMatch(uint16 port, uint16 multiplier, uint16 lun) const {
+			return port == fPort && multiplier == fMultiplier && lun == fLUN;
+		}
+	protected:
+		uint8		fUUID[16];
+		NodeList	fPartitions;
+		uint16		fPort;
+		uint16		fMultiplier;
+		uint16		fLUN;
 };
 
 
-static bool sBlockDevicesAdded = false;
+static bool sDeviceNodesAdded = false;
 
 static const char* media_device_subtypes[] = {
 	"unknown",
@@ -112,22 +143,16 @@ dump_device_path(EFI_DEVICE_PATH *devicePath)
 	}
 }
 
-
-typedef struct _sata_device : public DoublyLinkedListLinkImpl<_sata_device> {
-	uint16	port;
-	uint16	multiplier;
-	uint16	lun;
-	uint8	uuid[UUID_LEN];
-} sata_device;
-
-typedef DoublyLinkedList<sata_device> SataDeviceList;
-typedef SataDeviceList::Iterator SataDeviceIterator;
+typedef enum {
+	DEVICE_NODES,
+	PARTITION_NODES
+} node_type;
 
 
 static status_t
-add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool be a reference?
+add_block_devices(NodeList *nodeList, node_type nodeType)
 {
-	if (sBlockDevicesAdded)
+	if (sDeviceNodesAdded)
 		return B_OK;
 
 	EFI_BLOCK_IO *blockIO;
@@ -135,9 +160,6 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 	EFI_HANDLE *handles, handle;
 	EFI_STATUS status;
 	UINTN size;
-
-	SataDeviceList sataDevices;
-	SataDeviceIterator iterator = sataDevices.GetIterator();
 
 	size = 0;
 	handles = NULL;
@@ -162,7 +184,7 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 		dprintf("next handle...\n");
 		dump_device_path(devicePath);
 
-		sata_device *sataDevice = NULL;
+		EFIDevice *device = NULL;
 
 		int i = 1;
 		while (!IsDevicePathEnd(NextDevicePathNode(node))) {
@@ -170,27 +192,28 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 			dprintf("node %d\n", i++);
 			if (DevicePathType(node) == MESSAGING_DEVICE_PATH
 				&& DevicePathSubType(node) == MSG_SATA_DP) {
+
 				// Add to sataDevices, if it's not there already...
 				SATA_DEVICE_PATH *current = (SATA_DEVICE_PATH*)node;
-
-				iterator.Rewind();
-				while ((sataDevice = iterator.Next()) != NULL) {
-					if (sataDevice->port == current->HBAPortNumber
-							&& sataDevice->multiplier == current->PortMultiplierPortNumber
-							&& sataDevice->lun == current->LogicalUnitNumber) {
-						dprintf("Already contains this sata device path\n");
+				
+				NodeIterator iterator = nodeList->GetIterator();
+				while ((device = (EFIDevice *)iterator.Next()) != NULL) {
+					if (device->IsMatch(current->HBAPortNumber,
+							current->PortMultiplierPortNumber,
+							current->LogicalUnitNumber)) {
 						break;
 					}
 				}
-				if (sataDevice == NULL) {
-					sataDevice = (sata_device*)malloc(sizeof(sata_device));
-					sataDevice->port = current->HBAPortNumber;
-					sataDevice->multiplier = current->PortMultiplierPortNumber;
-					sataDevice->lun = current->LogicalUnitNumber;
-					memset(sataDevice->uuid, 0, UUID_LEN);
-
-					sataDevices.Insert(sataDevice);
-					dprintf("Added sata device path\n");
+				if (device != NULL)
+					continue;
+				
+				device = new(std::nothrow) EFIDevice(current->HBAPortNumber,
+						current->PortMultiplierPortNumber,
+						current->LogicalUnitNumber);
+				
+				if (nodeType == DEVICE_NODES) {
+					dprintf("Added a device node\n");
+					nodeList->Add(device);
 				}
 			}
 
@@ -202,7 +225,7 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 			continue;
 		}
 		if (blockIO->Media->LogicalPartition == false) {
-			if (!blockIO->Media->RemovableMedia && blockIO->Media->MediaPresent) {
+			if (nodeType == DEVICE_NODES && !blockIO->Media->RemovableMedia && blockIO->Media->MediaPresent) {
 				EFI_PARTITION_TABLE_HEADER *header =
 					(EFI_PARTITION_TABLE_HEADER*)malloc(blockIO->Media->BlockSize);
 				status = blockIO->ReadBlocks(blockIO, blockIO->Media->MediaId, 1,
@@ -214,15 +237,11 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 						header->DiskGUID.Data4[2], header->DiskGUID.Data4[3],
 						header->DiskGUID.Data4[4], header->DiskGUID.Data4[5],
 						header->DiskGUID.Data4[6], header->DiskGUID.Data4[7]);
-					if (sataDevice == NULL) {
+					if (device == NULL) {
 						dprintf("humm, this shouldn't happen...\n");
 						continue;
 					}
-					memcpy(sataDevice->uuid, (uint8*)&header->DiskGUID, UUID_LEN);
-					dprintf("uuid stored in sata device: ");
-					for (int32 i = 0; i < UUID_LEN; ++i)
-						dprintf("%02x", sataDevice->uuid[i]);
-					dprintf("\n");
+					device->SetUUID((uint8*)&header->DiskGUID);
 				}
 			}
 			continue;
@@ -250,28 +269,34 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 
 		// This is a partition we want to add :-)
 		HARDDRIVE_DEVICE_PATH* harddrive = (HARDDRIVE_DEVICE_PATH*)node;
-		EFIBlockDevice *device = new(std::nothrow) EFIBlockDevice(blockIO);
+		EFIPartition *partition = new(std::nothrow) EFIPartition(blockIO, device);
 
-		if (device->InitCheck() != B_OK) {
-			delete device;
+		if (partition->InitCheck() != B_OK) {
+			delete partition;
 			continue;
 		}
 
-		if (sataDevice == NULL) {
-			dprintf("sata device is NULL?\n");
-			device->SetParameters(harddrive->PartitionSize, harddrive->Signature, harddrive->Signature);
-		} else
-			device->SetParameters(harddrive->PartitionSize, harddrive->Signature, sataDevice->uuid);
-
-		devicesList->Add(device);
+		partition->SetParameters(harddrive->PartitionStart, harddrive->Signature, device->UUID());
+		
+		if (memcmp(partition->UUID(), sTargetUUID, UUID_LEN) == 0 && nodeType == DEVICE_NODES) {
+			// we need to move the EFIDevice to the front of the list
+			nodeList->Swap(nodeList->Head(), device);
+			// we should also set sBootPartitionOffset, because it's the only way for
+			// platform_get_boot_partition to identify a boot::Partition object as the
+			// one we want to boot
+			dprintf("boot partition offset = %lu\n", harddrive->PartitionStart);
+			sBootPartitionOffset = harddrive->PartitionStart;
+		}
+		
+		if (nodeType == PARTITION_NODES) {
+			dprintf("Added a partition node\n");
+			nodeList->Add(partition);
+		}
 	}
 
-	iterator.Rewind();
-	sata_device *p;
-	while ((p = iterator.Next()) != NULL)
-		free(p);
+	if (nodeType == DEVICE_NODES)
+		sDeviceNodesAdded = true;
 
-	sBlockDevicesAdded = true;
 	return B_OK;
 }
 
@@ -279,11 +304,24 @@ add_block_devices(NodeList *devicesList, bool identifierMissing) // should bool 
 //	#pragma mark -
 
 
-EFIBlockDevice::EFIBlockDevice(EFI_BLOCK_IO *blockIO)
+EFIDevice::EFIDevice(uint16 port, uint16 multiplier, uint16 lun)
+	:
+	fPort(port),
+	fMultiplier(multiplier),
+	fLUN(lun)
+{
+}
+
+
+//	#pragma mark -
+
+
+EFIPartition::EFIPartition(EFI_BLOCK_IO *blockIO, EFIDevice *parent)
 	:
 	fBlockIO(blockIO),
 	fDriveID(++sDriveIdentifier),
-	fSize(0)
+	fSize(0),
+	fParent(parent)
 {
 	TRACE(("drive ID %u\n", fDriveID));
 
@@ -292,23 +330,25 @@ EFIBlockDevice::EFIBlockDevice(EFI_BLOCK_IO *blockIO)
 
 	fBlockSize = fBlockIO->Media->BlockSize;
 	fSize = (fBlockIO->Media->LastBlock + 1) * fBlockSize;
+	
+	fParent->AddPartition(this);
 }
 
 
-EFIBlockDevice::~EFIBlockDevice()
+EFIPartition::~EFIPartition()
 {
 }
 
 
 status_t
-EFIBlockDevice::InitCheck() const
+EFIPartition::InitCheck() const
 {
 	return fSize > 0 ? B_OK : B_ERROR;
 }
 
 
 ssize_t
-EFIBlockDevice::ReadAt(void *cookie, off_t pos, void *buffer, size_t bufferSize)
+EFIPartition::ReadAt(void *cookie, off_t pos, void *buffer, size_t bufferSize)
 {
 	uint32 offset = pos % fBlockSize;
 	pos /= fBlockSize;
@@ -329,7 +369,7 @@ EFIBlockDevice::ReadAt(void *cookie, off_t pos, void *buffer, size_t bufferSize)
 
 
 ssize_t
-EFIBlockDevice::WriteAt(void* cookie, off_t pos, const void* buffer,
+EFIPartition::WriteAt(void* cookie, off_t pos, const void* buffer,
 	size_t bufferSize)
 {
 	return B_UNSUPPORTED;
@@ -337,14 +377,14 @@ EFIBlockDevice::WriteAt(void* cookie, off_t pos, const void* buffer,
 
 
 off_t
-EFIBlockDevice::Size() const
+EFIPartition::Size() const
 {
 	return fSize;
 }
 
 
 void
-EFIBlockDevice::SetParameters(uint64 deviceOffset, uint8 *partitionUUID, uint8 *diskUUID)
+EFIPartition::SetParameters(uint64 deviceOffset, const uint8 *partitionUUID, const uint8 *diskUUID)
 {
 	fDeviceOffset = deviceOffset;
 	memcpy(fUUID, partitionUUID, UUID_LEN);
@@ -353,7 +393,6 @@ EFIBlockDevice::SetParameters(uint64 deviceOffset, uint8 *partitionUUID, uint8 *
 	fIdentifier.device_type = UNKNOWN_DEVICE;
 	fIdentifier.device.unknown.size = Size();
 
-	// This should be the UUID of the parent disk system
 	memcpy(fIdentifier.device.unknown.uuid, diskUUID, UUID_LEN);
 	fIdentifier.device.unknown.use_uuid = true;
 }
@@ -381,7 +420,7 @@ parse_uuid(const char *in, uuid_t &out)
 {
 	const char *cp = in;
 	char buf[3];
-	
+
 	// validate the string first
 	for (int i = 0; i <= 36; i++, cp++) {
 		if ((i == 8) || (i == 13) || (i == 18) || (i == 23)) {
@@ -415,7 +454,7 @@ parse_uuid(const char *in, uuid_t &out)
 		buf[1] = *cp++;
 		out.data5[i] = strtoul(buf, NULL, 16);
 	}
-	
+
 	return true;
 }
 
@@ -424,7 +463,7 @@ static void
 pack_uuid(const uuid_t &uu, uint8 *out)
 {
 	uint32 tmp;
-	
+
 	tmp = uu.data1;
 	out[3] = (uint8)tmp;
 	tmp >>= 8;
@@ -433,22 +472,22 @@ pack_uuid(const uuid_t &uu, uint8 *out)
 	out[1] = (uint8)tmp;
 	tmp >>= 8;
 	out[0] = (uint8)tmp;
-	
+
 	tmp = uu.data2;
 	out[5] = (uint8)tmp;
 	tmp >>= 8;
 	out[4] = (uint8)tmp;
-	
+
 	tmp = uu.data3;
 	out[7] = (uint8)tmp;
 	tmp >>= 8;
 	out[6] = (uint8)tmp;
-	
+
 	tmp = uu.data4;
 	out[9] = (uint8)tmp;
 	tmp >>= 8;
 	out[8] = (uint8)tmp;
-	
+
 	memcpy(out+10, uu.data5, 6);
 }
 
@@ -456,22 +495,24 @@ pack_uuid(const uuid_t &uu, uint8 *out)
 status_t
 platform_add_boot_device(struct stage2_args *args, NodeList *devicesList)
 {
-	add_block_devices(devicesList, false);
-	
+	dprintf("ENTER: platform_add_boot_device\n");
+
 	// Let's see if we can find out some information about our
 	// boot invocation
-	
+
 	EFI_STATUS status = EFI_SUCCESS;
 	EFI_LOADED_IMAGE* loaded_image = NULL;
 	EFI_GUID loaded_image_protocol = LOADED_IMAGE_PROTOCOL;
 	status = kBootServices->HandleProtocol(kImage,
 			&loaded_image_protocol, (void**)&loaded_image);
-	if (status != EFI_SUCCESS || loaded_image == NULL)
+	if (status != EFI_SUCCESS || loaded_image == NULL) {
+		dprintf("EXIT: platform_add_boot_device: can't get loaded image protocol\n");
 		return B_ENTRY_NOT_FOUND;
-	
+	}
+
 	dprintf("loaded image options length = %u bytes\n",
 		loaded_image->LoadOptionsSize);
-	
+
 	dprintf("loaded image options data = '");
 	// we used efibootmgr to provide our 'commandline options'
 	// in ascii, so don't need to deal with UCS-2 [ugh]
@@ -480,7 +521,7 @@ platform_add_boot_device(struct stage2_args *args, NodeList *devicesList)
 		dprintf("%c", payload[i]);
 	}
 	dprintf("'\n");
-	
+
 	const char* identifier = "Target(";
 	const char* target = payload;
 	uint32 length = strlen(identifier);
@@ -499,25 +540,31 @@ platform_add_boot_device(struct stage2_args *args, NodeList *devicesList)
 			break;
 		}
 	}
-	
+
 	if (target == payload) {
-		dprintf("Don't know which volume to boot from\n");
+		dprintf("EXIT: platform_add_boot_device: don't know which volume to boot from\n");
 		return B_ENTRY_NOT_FOUND;
 	}
-	
-	uint8 uuid[16];
+
+	uint8 uuid[UUID_LEN];
 	uuid_t uu;
 	if (!parse_uuid(strndup(target, 36), uu)) {
-		dprintf("failed to parse uuid\n");
+		dprintf("EXIT: platform_add_boot_device: failed to parse uuid\n");
 		return B_ENTRY_NOT_FOUND;
 	}
 	pack_uuid(uu, uuid);
 	dprintf("\n================================\n  uuid = ");
-	for (int i = 0; i < 16; ++i)
+	for (int i = 0; i < UUID_LEN; ++i)
 		dprintf("%02x", uuid[i]);
 	dprintf("\n================================\nfinished our search!\n");
 	
-	return B_ENTRY_NOT_FOUND;
+	memcpy(sTargetUUID, uuid, UUID_LEN);
+
+	// Now we have the UUID of the partition we want, BUT the
+	// loader doesn't want this information yet...
+	status_t result = add_block_devices(devicesList, DEVICE_NODES);
+	dprintf("EXIT: platform_add_boot_device\n");
+	return result;
 }
 
 
@@ -525,7 +572,24 @@ status_t
 platform_get_boot_partition(struct stage2_args *args, Node *bootDevice,
 	NodeList *list, boot::Partition **_partition)
 {
-	add_block_devices(list, false);
+	dprintf("ENTER: platform_get_boot_partition\n");
+	
+	//EFIDevice *device = (EFIDevice*)bootDevice;
+	//ConstNodeIterator iterator = device->GetPartitions();
+	
+	NodeIterator it = list->GetIterator();
+	while (it.HasNext()) {
+		boot::Partition *partition = (boot::Partition *)it.Next();
+		dprintf("partition offset = %ld, size = %ld\n",
+			partition->offset, partition->size);
+		if (sBootPartitionOffset == partition->offset) {
+			*_partition = partition;
+			dprintf("EXIT: platform_get_boot_partition: found boot partition\n");
+			return B_OK;
+		}
+	}
+
+	dprintf("EXIT: platform_get_boot_partition: don't know our boot partition\n");
 	return B_ENTRY_NOT_FOUND;
 }
 
@@ -533,29 +597,38 @@ platform_get_boot_partition(struct stage2_args *args, Node *bootDevice,
 status_t
 platform_add_block_devices(stage2_args *args, NodeList *devicesList)
 {
-	dprintf("platform_add_block_devices\n");
-	return add_block_devices(devicesList, false);
+	dprintf("ENTER: platform_add_block_devices\n");
+	status_t result = add_block_devices(devicesList, PARTITION_NODES);
+	dprintf("EXIT: platform_add_block_devices\n");
+	return result;
 }
 
 
 status_t
-platform_register_boot_device(Node *device)
+platform_register_boot_device(Node *bootDevice)
 {
-	EFIBlockDevice *drive = (EFIBlockDevice *)device;
+	dprintf("ENTER: platform_register_boot_device\n");
+	EFIPartition *partition = (EFIPartition *)bootDevice;
 
 	dprintf("register_boot_device: partition uuid = ");
 	for (int i = 0; i < UUID_LEN; ++i) {
-		dprintf("%02x", drive->UUID()[i]);
+		dprintf("%02x", partition->UUID()[i]);
 	}
 	dprintf("\n");
 
 	if (gBootVolume.SetData(BOOT_VOLUME_PARTITION_UUID, B_RAW_TYPE,
-		drive->UUID(), UUID_LEN) != B_OK) {
+		partition->UUID(), UUID_LEN) != B_OK) {
 		dprintf("register_boot_device: SetData(BOOT_VOLUME_PARTITION_UUID) failed!\n");
+	} else {
+		dprintf("set BOOT_VOLUME_PARTITION_UUID!\n");
 	}
-	gBootVolume.SetData(BOOT_VOLUME_DISK_IDENTIFIER, B_RAW_TYPE,
-		&drive->Identifier(), sizeof(disk_identifier));
-
+	if (gBootVolume.SetData(BOOT_VOLUME_DISK_IDENTIFIER, B_RAW_TYPE,
+		&partition->Identifier(), sizeof(disk_identifier)) != B_OK) {
+		dprintf("failed to set boot volume disk identifier :(\n");
+	} else {
+		dprintf("set BOOT_VOLUME_DISK_IDENTIFIER!\n");
+	}
+	dprintf("EXIT: platform_register_boot_device\n");
 	return B_OK;
 }
 
