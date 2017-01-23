@@ -641,7 +641,8 @@ NodeMonitorService::_ResolveMountPoint(dev_t device, ino_t directory,
 		vfs_put_vnode(vnode);
 	}
 	if (status != B_OK)
-		dprintf("Resolving mount point %ld:%lld failed!\n", device, directory);
+		dprintf("Resolving mount point %" B_PRIdDEV ":%" B_PRIdINO " failed!\n",
+			device, directory);
 }
 
 

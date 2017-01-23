@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD: src/libexec/ftpd/ftpcmd.y,v 1.66 2007/04/18 22:43:39 yar Exp
 #include <ctype.h>
 #include <errno.h>
 #include <glob.h>
+#include <inttypes.h>
 #include <libutil.h>
 #include <limits.h>
 #include <md5.h>
@@ -915,7 +916,7 @@ rcmd
 					free(fromname);
 				fromname = NULL;
 				restart_point = $4.o;
-				reply(350, "Restarting at %lld. %s",
+				reply(350, "Restarting at %" PRId64 ". %s",
 				    (intmax_t)restart_point,
 				    "Send STORE or RETRIEVE to initiate transfer.");
 			}
@@ -1608,7 +1609,7 @@ sizecmd(char *filename)
 		else if (!S_ISREG(stbuf.st_mode))
 			reply(550, "%s: not a plain file.", filename);
 		else
-			reply(213, "%lld", (intmax_t)stbuf.st_size);
+			reply(213, "%" PRId64, (intmax_t)stbuf.st_size);
 		break; }
 	case TYPE_A: {
 		FILE *fin;
@@ -1642,7 +1643,7 @@ sizecmd(char *filename)
 		}
 		(void) fclose(fin);
 
-		reply(213, "%lld", (intmax_t)count);
+		reply(213, "%" PRId64, (intmax_t)count);
 		break; }
 	default:
 		reply(504, "SIZE not implemented for type %s.",

@@ -87,12 +87,14 @@ int main( int argc, char* argv[] )
    if( uptime_days && uptime_hours && uptime_minutes )
    {
       if( !print_uptime_only )
-         printf( "%s, up %ld %s, %ld %s, %ld %s\n", buf,
+         printf( "%s, up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s, %" B_PRIdTIME
+                 " %s\n", buf,
                  uptime_days, day_string,
                  uptime_hours, hour_string,
                  uptime_minutes, minute_string );
       else
-         printf( "up %ld %s, %ld %s, %ld %s\n",
+         printf( "up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s, %" B_PRIdTIME
+                 " %s\n",
                  uptime_days, day_string,
                  uptime_hours, hour_string,
                  uptime_minutes, minute_string );
@@ -102,62 +104,62 @@ int main( int argc, char* argv[] )
       if( uptime_hours && uptime_minutes )
       {
          if( !print_uptime_only )
-            printf( "%s, up %ld %s, %ld %s\n", buf,
+            printf( "%s, up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s\n", buf,
                     uptime_hours, hour_string,
                     uptime_minutes, minute_string );
          else
-            printf( "up %ld %s, %ld %s\n",
+            printf( "up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s\n",
                     uptime_hours, hour_string,
                     uptime_minutes, minute_string );
       }
       else if( uptime_hours )
       {
          if( !print_uptime_only )
-            printf( "%s, up %ld %s\n", buf,
+            printf( "%s, up %" B_PRIdTIME " %s\n", buf,
                     uptime_hours, hour_string );
          else
-            printf( "up %ld %s\n",
+            printf( "up %" B_PRIdTIME " %s\n",
                     uptime_hours, hour_string );
       }
       else
       {
          if( !print_uptime_only )
-            printf( "%s, up %ld %s\n", buf,
+            printf( "%s, up %" B_PRIdTIME " %s\n", buf,
                     uptime_minutes, minute_string );
          else
-            printf( "up %ld %s\n",
+            printf( "up %" B_PRIdTIME " %s\n",
                     uptime_minutes, minute_string );
       }
    }
    else if( uptime_hours )
    {
       if( !print_uptime_only )
-         printf( "%s, up %ld %s, %ld %s\n", buf,
+         printf( "%s, up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s\n", buf,
                  uptime_days, day_string,
                  uptime_hours, hour_string );
       else
-         printf( "up %ld %s, %ld %s\n",
+         printf( "up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s\n",
                  uptime_days, day_string,
                  uptime_hours, hour_string );
    }
    else if( uptime_minutes )
    {
       if( !print_uptime_only )
-         printf( "%s, up %ld %s, %ld %s\n", buf,
+         printf( "%s, up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s\n", buf,
                  uptime_days, day_string,
                  uptime_minutes, minute_string );
       else
-         printf( "up %ld %s, %ld %s\n",
+         printf( "up %" B_PRIdTIME " %s, %" B_PRIdTIME " %s\n",
                  uptime_days, day_string,
                  uptime_minutes, minute_string );
    }
    else
    {
       if( !print_uptime_only )
-         printf( "%s, up %ld %s\n", buf,
+         printf( "%s, up %" B_PRIdTIME " %s\n", buf,
                  uptime_days, day_string );
       else
-         printf( "up %ld %s\n",
+         printf( "up %" B_PRIdTIME " %s\n",
                  uptime_days, day_string );
    }
 

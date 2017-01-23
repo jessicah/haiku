@@ -367,7 +367,7 @@ fs_mount(fs_volume *_vol, const char *device, ulong flags, const char *args,
 
 	strcpy(ns->devicePath,device);
 
-	sprintf(lockname, "ntfs_lock %lx", ns->id);
+	sprintf(lockname, "ntfs_lock %" B_PRIdDEV, ns->id);
 	recursive_lock_init_etc(&(ns->vlock), lockname, MUTEX_FLAG_CLONE_NAME);
 
 	handle = load_driver_settings("ntfs");

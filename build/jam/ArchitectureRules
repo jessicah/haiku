@@ -665,6 +665,8 @@ rule ArchitectureSetupWarnings architecture
 	EnableWerror src system libroot posix locale ;
 	EnableWerror src system libroot posix wchar ;
 	EnableWerror src system runtime_loader ;
+#	EnableWerror src tests ;
+#	EnableWerror src tools ;
 }
 
 

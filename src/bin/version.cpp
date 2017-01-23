@@ -56,9 +56,9 @@ get_version(const char *filename, version_kind kind, bool longFlag, bool numeric
 	}
 
 	if (numericalFlag) {
-		printf("%lu ", version.major);
-		printf("%lu ", version.middle);
-		printf("%lu ", version.minor);
+		printf("%" B_PRIu32 " ", version.major);
+		printf("%" B_PRIu32 " ", version.middle);
+		printf("%" B_PRIu32 " ", version.minor);
 
 		switch (version.variety) {
 			case B_DEVELOPMENT_VERSION:
@@ -83,10 +83,10 @@ get_version(const char *filename, version_kind kind, bool longFlag, bool numeric
 
 			case B_FINAL_VERSION:
 				printf("f ");
-				break;	
+				break;
 		}
 
-		printf("%lu\n", version.internal);
+		printf("%" B_PRIu32 "\n", version.internal);
 		return B_OK;
 	}
 
@@ -97,11 +97,11 @@ get_version(const char *filename, version_kind kind, bool longFlag, bool numeric
 
 /*!
 	determines whether  \a string1 contains at least one or more of the characters
-	of \a string2 but none of which \a string2 doesn't contain. 
+	of \a string2 but none of which \a string2 doesn't contain.
 
 	examples:
 	true == ("hel" == "help"); true == ("help" == "help"); true == ("h" == "help");
-	false == ("held" == "help"); false == ("helped" == "help"); 
+	false == ("held" == "help"); false == ("helped" == "help");
 */
 bool
 str_less_equal(const char *str1, const char *str2)
@@ -109,7 +109,7 @@ str_less_equal(const char *str1, const char *str2)
 	char *ptr1 = const_cast<char*>(str1);
 	char *ptr2 = const_cast<char*>(str2);
 
-	while (*ptr1 != '\0') {	
+	while (*ptr1 != '\0') {
 		if (*ptr1 != *ptr2)
 			return false;
 		++ptr1;
@@ -132,7 +132,7 @@ main(int argc, char *argv[])
 		usage();
 		return 0;
 	}
-	
+
 	for (i = 1; i < argc; ++i) {
 		if (argv[i][0] == '-') {
 			char *ptr = argv[i];

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1996 Be, Inc.
  * All Rights Reserved
- * 
+ *
  * This source code was published by Be, Inc. in the file gnu_x86.tar.gz for R3,
  * a mirror is at http://linux.inf.elte.hu/ftp/beos/development/gnu/r3.0/
  * needs to link to termcap.
@@ -216,7 +216,7 @@ compare(
 
 		if (columns <= 80)
 			t.name[16] = 0;
-		else if (columns - 64 < sizeof(t.name))
+		else if (columns - 64 < (int)sizeof(t.name))
 			t.name[columns - 64] = 0;
 
 		total = it->total_time();
@@ -229,7 +229,7 @@ compare(
 		}
 		if (!ignore && (!refresh || (linecount < (rows - 1)))) {
 
-			printf("%6ld %7.2f %7.2f %7.2f %4.1f %16s %s \n",
+			printf("%6" B_PRId32 " %7.2f %7.2f %7.2f %4.1f %16s %s \n",
 				it->thid,
 				total / 1000.0,
 				(double)(it->user_time / 1000),
@@ -241,7 +241,7 @@ compare(
 		}
 	}
 
-	printf("------ %7.2f %7.2f %7.2f %4.1f%% TOTAL (%4.1f%% idle time, %4.1f%% unknown)", 
+	printf("------ %7.2f %7.2f %7.2f %4.1f%% TOTAL (%4.1f%% idle time, %4.1f%% unknown)",
 		(double) (gtotal / 1000),
 		(double) (utotal / 1000),
 		(double) (ktotal / 1000),

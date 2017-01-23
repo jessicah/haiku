@@ -590,12 +590,12 @@ list_interface(const char* name)
 
 	ifreq_stats stats;
 	if (interface.GetStats(stats) == B_OK) {
-		printf("\tReceive: %d packets, %d errors, %Ld bytes, %d mcasts, %d "
-			"dropped\n", stats.receive.packets, stats.receive.errors,
+		printf("\tReceive: %d packets, %d errors, %" B_PRIu64 " bytes, %d "
+			"mcasts, %d dropped\n", stats.receive.packets, stats.receive.errors,
 			stats.receive.bytes, stats.receive.multicast_packets,
 			stats.receive.dropped);
-		printf("\tTransmit: %d packets, %d errors, %Ld bytes, %d mcasts, %d "
-			"dropped\n", stats.send.packets, stats.send.errors,
+		printf("\tTransmit: %d packets, %d errors, %" B_PRIu64 " bytes, %d "
+			"mcasts, %d dropped\n", stats.send.packets, stats.send.errors,
 			stats.send.bytes, stats.send.multicast_packets, stats.send.dropped);
 		printf("\tCollisions: %d\n", stats.collisions);
 	}

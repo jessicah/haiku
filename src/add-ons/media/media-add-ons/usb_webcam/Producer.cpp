@@ -180,9 +180,8 @@ VideoProducer::NodeRegistered()
 	state->AddItem(B_HOST_TO_LENDIAN_INT32(0x000000ff), "Blue");
 	*/
 
-	BParameter *p;
 	g = main->MakeGroup("Info");
-	p = g->MakeTextParameter(
+	g->MakeTextParameter(
 		P_INFO, B_MEDIA_RAW_VIDEO, "", "Info", 256);
 
 	int32 id = P_LAST;
@@ -289,7 +288,8 @@ VideoProducer::HandleEvent(const media_timed_event *event,
 		case BTimedEventQueue::B_DATA_STATUS:
 		case BTimedEventQueue::B_PARAMETER:
 		default:
-			PRINTF(-1, ("HandleEvent: Unhandled event -- %lx\n", event->type));
+			PRINTF(-1, ("HandleEvent: Unhandled event -- %" B_PRIx32 "\n",
+				event->type));
 			break;
 	}
 }
@@ -335,7 +335,7 @@ VideoProducer::FormatSuggestionRequested(
 
 	TOUCH(quality);
 
-	PRINTF(1, ("FormatSuggestionRequested() %ldx%ld\n", \
+	PRINTF(1, ("FormatSuggestionRequested() %" B_PRIu32 "x%" B_PRIu32 "\n", \
 			format->u.raw_video.display.line_width, \
 			format->u.raw_video.display.line_count));
 
@@ -361,7 +361,7 @@ VideoProducer::FormatProposal(const media_source &output, media_format *format)
 	if (output != fOutput.source)
 		return B_MEDIA_BAD_SOURCE;
 
-	PRINTF(1, ("FormatProposal() %ldx%ld\n", \
+	PRINTF(1, ("FormatProposal() %" B_PRIu32 "x%" B_PRIu32 "\n", \
 			format->u.raw_video.display.line_width, \
 			format->u.raw_video.display.line_count));
 
@@ -381,7 +381,7 @@ VideoProducer::FormatProposal(const media_source &output, media_format *format)
 		}
 	}
 
-	PRINTF(1, ("FormatProposal: %ldx%ld\n", \
+	PRINTF(1, ("FormatProposal: %" B_PRIu32 "x%" B_PRIu32 "\n", \
 			format->u.raw_video.display.line_width, \
 			format->u.raw_video.display.line_count));
 
@@ -464,7 +464,7 @@ VideoProducer::PrepareToConnect(const media_source &source,
 {
 	status_t err;
 
-	PRINTF(1, ("PrepareToConnect() %ldx%ld\n", \
+	PRINTF(1, ("PrepareToConnect() %" B_PRIu32 "x%" B_PRIu32 "\n", \
 			format->u.raw_video.display.line_width, \
 			format->u.raw_video.display.line_count));
 
@@ -539,7 +539,7 @@ VideoProducer::Connect(status_t error, const media_source &source,
 		const media_destination &destination, const media_format &format,
 		char *io_name)
 {
-	PRINTF(1, ("Connect() %ldx%ld\n", \
+	PRINTF(1, ("Connect() %" B_PRIu32 "x%" B_PRIu32 "\n", \
 			format.u.raw_video.display.line_width, \
 			format.u.raw_video.display.line_count));
 
@@ -710,7 +710,7 @@ VideoProducer::GetParameterValue(
 			*((uint32 *)value) = fColor;
 			return B_OK;
 		case P_INFO:
-			if (*size < fInfoString.Length() + 1)
+			if (*size < (size_t)(fInfoString.Length() + 1))
 				return EINVAL;
 			*last_change = fLastColorChange;
 			*size = fInfoString.Length() + 1;
@@ -785,7 +785,7 @@ VideoProducer::HandleStart(bigtime_t performance_time)
 {
 	/* Start producing frames, even if the output hasn't been connected yet. */
 
-	PRINTF(1, ("HandleStart(%Ld)\n", performance_time));
+	PRINTF(1, ("HandleStart(%" B_PRIdBIGTIME ")\n", performance_time));
 
 	if (fRunning) {
 		PRINTF(-1, ("HandleStart: Node already started\n"));
@@ -889,7 +889,9 @@ VideoProducer::FrameGenerator()
 	bigtime_t wait_until = system_time();
 
 	while (1) {
-		PRINTF(1, ("FrameGenerator: acquire_sem_etc() until %Ldµs (in %Ldµs)\n", wait_until, wait_until - system_time()));
+		PRINTF(1, ("FrameGenerator: acquire_sem_etc() until %" B_PRIdBIGTIME
+				"µs (in %" B_PRIdBIGTIME "µs)\n", wait_until, wait_until -
+					system_time()));
 		status_t err = acquire_sem_etc(fFrameSync, 1, B_ABSOLUTE_TIMEOUT,
 				wait_until);
 
@@ -915,7 +917,8 @@ PRINT(("PS: %Ld\n", fProcessingLatency));
 		if (wait_until < system_time())
 			continue;
 
-		PRINTF(1, ("FrameGenerator: wait until %Ld, %ctimed out, %crunning, %cenabled.\n",
+		PRINTF(1, ("FrameGenerator: wait until %" B_PRIdBIGTIME ", %ctimed out,"
+					" %crunning, %cenabled.\n",
 					wait_until,
 					(err == B_OK)?'!':' ',
 					(fRunning)?' ':'!',

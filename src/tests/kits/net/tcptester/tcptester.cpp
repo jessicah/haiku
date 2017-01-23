@@ -238,7 +238,7 @@ main(int argc, char *argv[])
 		thread_id newThread = spawn_thread(handle_client, "client",
 			B_NORMAL_PRIORITY, &newSock);
 
-		fprintf(stderr, "New client %d from %s with thread id %ld.\n",
+		fprintf(stderr, "New client %d from %s with thread id %" B_PRId32 ".\n",
 			newSock, buf, (int32)newThread);
 
 		resume_thread(newThread);

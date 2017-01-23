@@ -2613,9 +2613,9 @@ status_t ABSApp::AddPositionIOToDatabase (
   NewAge = m_TotalGenuineMessages + m_TotalSpamMessages;
   if (NewAge >= 0xFFFFFFF0UL)
   {
-    sprintf (ErrorMessage, "The database is full!  There are %lu messages in "
-      "it and we can't add any more without overflowing the maximum integer "
-      "representation in 32 bits", NewAge);
+    sprintf (ErrorMessage, "The database is full!  There are %" B_PRIu32
+      " messages in it and we can't add any more without overflowing the "
+      "maximum integer representation in 32 bits", NewAge);
     return B_NO_MEMORY;
   }
 
@@ -3708,7 +3708,7 @@ status_t ABSApp::LoadSaveDatabase (bool DoLoad, char *ErrorMessage)
   else /* Saving */
   {
     fprintf (DatabaseFile,
-      "Classifications and total messages:\t%s\t%lu\t%s\t%lu\n",
+      "Classifications and total messages:\t%s\t%" B_PRIu32 "\t%s\t%" B_PRIu32 "\n",
       g_ClassifiedGenuine, m_TotalGenuineMessages,
       g_ClassifiedSpam, m_TotalSpamMessages);
   }
@@ -3799,7 +3799,7 @@ status_t ABSApp::LoadSaveDatabase (bool DoLoad, char *ErrorMessage)
     EndIter = m_WordMap.end ();
     for (DataIter = m_WordMap.begin (); DataIter != EndIter; DataIter++)
     {
-      if (fprintf (DatabaseFile, "%s\t%lu\t%lu\t%lu\n",
+      if (fprintf (DatabaseFile, "%s\t%" B_PRIu32 "\t%" B_PRIu32 "\t%" B_PRIu32 "\n",
       DataIter->first.c_str (), DataIter->second.age,
       DataIter->second.genuineCount, DataIter->second.spamCount) <= 0)
       {
@@ -4240,7 +4240,7 @@ ABSApp::ProcessScriptingMessage (
     CommandText.Append (ArgumentBool ? " true" : " false");
   if (ArgumentGotInt32)
   {
-    sprintf (TempString, " %ld", ArgumentInt32);
+    sprintf (TempString, " %" B_PRId32, ArgumentInt32);
     CommandText.Append (TempString);
   }
 
@@ -4760,8 +4760,8 @@ ABSApp::PurgeOldWords (char *ErrorMessage)
   /* Just a little bug check here.  Just in case. */
 
   if (m_WordCount != m_WordMap.size ()) {
-    sprintf (TempString, "Our word count of %lu doesn't match the "
-      "size of the database, %lu", m_WordCount, m_WordMap.size());
+    sprintf (TempString, "Our word count of %" B_PRIu32 " doesn't match the "
+      "size of the database, %" B_PRIuSIZE, m_WordCount, m_WordMap.size());
     DisplayErrorMessage (TempString, -1, "Bug!");
     m_WordCount = m_WordMap.size ();
   }
@@ -5634,7 +5634,7 @@ CommanderLooper::CommandReferences (
 /* This function is called by other threads to see if the CommanderLooper is
 busy working on something. */
 
-bool 
+bool
 CommanderLooper::IsBusy ()
 {
   if (m_IsBusy)
@@ -6946,7 +6946,7 @@ ControlsView::PollServerForChanges ()
   m_PurgeAgeTextboxPntr != NULL)
   {
     m_PurgeAgeCachedValue = MyAppPntr->m_PurgeAge;
-    sprintf (TempString, "%lu", m_PurgeAgeCachedValue);
+    sprintf (TempString, "%" B_PRIu32, m_PurgeAgeCachedValue);
     m_PurgeAgeTextboxPntr->SetText (TempString);
   }
 
@@ -6956,7 +6956,7 @@ ControlsView::PollServerForChanges ()
   m_PurgePopularityTextboxPntr != NULL)
   {
     m_PurgePopularityCachedValue = MyAppPntr->m_PurgePopularity;
-    sprintf (TempString, "%lu", m_PurgePopularityCachedValue);
+    sprintf (TempString, "%" B_PRIu32, m_PurgePopularityCachedValue);
     m_PurgePopularityTextboxPntr->SetText (TempString);
   }
 
@@ -6978,7 +6978,7 @@ ControlsView::PollServerForChanges ()
   m_GenuineCountTextboxPntr != NULL)
   {
     m_GenuineCountCachedValue = MyAppPntr->m_TotalGenuineMessages;
-    sprintf (TempString, "%lu", m_GenuineCountCachedValue);
+    sprintf (TempString, "%" B_PRIu32, m_GenuineCountCachedValue);
     m_GenuineCountTextboxPntr->SetText (TempString);
   }
 
@@ -6988,7 +6988,7 @@ ControlsView::PollServerForChanges ()
   m_SpamCountTextboxPntr != NULL)
   {
     m_SpamCountCachedValue = MyAppPntr->m_TotalSpamMessages;
-    sprintf (TempString, "%lu", m_SpamCountCachedValue);
+    sprintf (TempString, "%" B_PRIu32, m_SpamCountCachedValue);
     m_SpamCountTextboxPntr->SetText (TempString);
   }
 
@@ -6998,7 +6998,7 @@ ControlsView::PollServerForChanges ()
   m_WordCountTextboxPntr != NULL)
   {
     m_WordCountCachedValue = MyAppPntr->m_WordCount;
-    sprintf (TempString, "%lu", m_WordCountCachedValue);
+    sprintf (TempString, "%" B_PRIu32, m_WordCountCachedValue);
     m_WordCountTextboxPntr->SetText (TempString);
   }
 
@@ -7090,11 +7090,11 @@ DatabaseWindow::DatabaseWindow ()
   if (m_WordsViewPntr == NULL)
     goto ErrorExit;
   AddChild (m_WordsViewPntr);
- 
- /* Minimize the window if we are starting up in server mode.  This is done 	 
-	before the window is open so it doesn't flash onto the screen, and possibly 	 
-	steal a keystroke or two.  The ControlsView will further update the minimize 	 
-	mode when it detects changes in the server mode. */ 
+
+ /* Minimize the window if we are starting up in server mode.  This is done
+	before the window is open so it doesn't flash onto the screen, and possibly
+	steal a keystroke or two.  The ControlsView will further update the minimize
+	mode when it detects changes in the server mode. */
   Minimize (g_ServerMode);
 
   return;
@@ -7487,7 +7487,7 @@ WordsView::Draw (BRect UpdateRect)
     SetHighColor (0, 0, 0);
     SetDrawingMode (B_OP_OVER); /* So that antialiased text mixes better. */
 
-    sprintf (TempString, "%lu", StatisticsPntr->genuineCount);
+    sprintf (TempString, "%" B_PRIu32, StatisticsPntr->genuineCount);
     Width = m_TextFont.StringWidth (TempString);
     MovePenTo (ceilf (ColumnLeftCenterX - Width / 2), Y + m_AscentHeight);
     DrawString (TempString);
@@ -7497,7 +7497,7 @@ WordsView::Draw (BRect UpdateRect)
     MovePenTo (ceilf (ColumnMiddleCenterX - Width / 2), Y + m_AscentHeight);
     DrawString (TempString);
 
-    sprintf (TempString, "%lu", StatisticsPntr->spamCount);
+    sprintf (TempString, "%" B_PRIu32, StatisticsPntr->spamCount);
     Width = m_TextFont.StringWidth (TempString);
     MovePenTo (ceilf (ColumnRightCenterX - Width / 2), Y + m_AscentHeight);
     DrawString (TempString);

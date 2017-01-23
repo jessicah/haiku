@@ -43,56 +43,56 @@ void PrintUsage();
 void CreateVolumeLabel(void *sector, const char *label);
 status_t Initialize(int fatbits, const char *device, const char *label, bool noprompt, bool testmode);
 
-int 
+int
 main(int argc, char *argv[])
 {
 	if (sizeof(bootsector1216) != 512 || sizeof(bootsector32) != 512 || sizeof(fsinfosector32) != 512) {
 		printf("compilation error: struct alignment wrong\n");
 		return 1;
 	}
-	
+
 	const char *device = NULL;
 	const char *label = NULL;
 	bool noprompt = false;
 	bool test = false;
 	int fat = 0;
-	
-	while (1) { 
-		int c;
-		int option_index = 0; 
-		static struct option long_options[] = 
-		{ 
-		 	{"noprompt", no_argument, 0, 'n'}, 
-			{"test", no_argument, 0, 't'}, 
-			{"fat", required_argument, 0, 'f'}, 
-			{0, 0, 0, 0} 
-		}; 
-		
-		c = getopt_long (argc, argv, "ntf:", long_options, &option_index); 
-		if (c == -1) 
-			break; 
 
-		switch (c) { 
-			case 'n': 
+	while (1) {
+		int c;
+		int option_index = 0;
+		static struct option long_options[] =
+		{
+		 	{"noprompt", no_argument, 0, 'n'},
+			{"test", no_argument, 0, 't'},
+			{"fat", required_argument, 0, 'f'},
+			{0, 0, 0, 0}
+		};
+
+		c = getopt_long (argc, argv, "ntf:", long_options, &option_index);
+		if (c == -1)
+			break;
+
+		switch (c) {
+			case 'n':
 				noprompt = true;
-		 		break; 
+		 		break;
 
 			case 't':
 				test = true;
-				break; 
+				break;
 
 			case 'f':
 				fat = strtol(optarg, NULL, 10);
-				if (fat == 0) 
+				if (fat == 0)
 					fat = -1;
-				break; 
+				break;
 
-			default: 
+			default:
 		        printf("\n");
 				PrintUsage();
 				return 1;
-		} 
-	} 
+		}
+	}
 
 	if (optind < argc)
 		device = argv[optind];
@@ -121,7 +121,7 @@ main(int argc, char *argv[])
 
 	if (test)
 		printf("test mode enabled (no writes will occur)\n");
-		
+
 	status_t s;
 	s = Initialize(fat, device, label, noprompt, test);
 
@@ -175,21 +175,28 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		isRawDevice = true;
 
 	if (hasBiosGeometry) {
-		printf("bios geometry: %ld heads, %ld cylinders, %ld sectors/track, %ld bytes/sector\n",
-			biosGeometry.head_count,biosGeometry.cylinder_count,biosGeometry.sectors_per_track,biosGeometry.bytes_per_sector);
+		printf("bios geometry: %" B_PRIu32 " heads, %" B_PRIu32 " cylinders, "
+			"%" B_PRIu32 " sectors/track, %" B_PRIu32 " bytes/sector\n",
+			biosGeometry.head_count, biosGeometry.cylinder_count,
+			biosGeometry.sectors_per_track, biosGeometry.bytes_per_sector);
 	}
 	if (hasBiosGeometry) {
-		printf("device geometry: %ld heads, %ld cylinders, %ld sectors/track, %ld bytes/sector\n",
-			deviceGeometry.head_count,deviceGeometry.cylinder_count,deviceGeometry.sectors_per_track,deviceGeometry.bytes_per_sector);
+		printf("device geometry: %" B_PRIu32 " heads, %" B_PRIu32 " cylinders, "
+			"%" B_PRIu32 " sectors/track, %" B_PRIu32 " bytes/sector\n",
+			deviceGeometry.head_count, deviceGeometry.cylinder_count,
+			deviceGeometry.sectors_per_track, deviceGeometry.bytes_per_sector);
 	}
 	if (hasPartitionInfo) {
-		printf("partition info: start at %Ld bytes (%Ld sectors), %Ld KB, %Ld MB, %Ld GB\n",
+		printf("partition info: start at %" B_PRIdOFF " bytes (%" B_PRIdOFF
+			" sectors), %" B_PRIdOFF " KB, %" B_PRIdOFF " MB, %" B_PRIdOFF
+			" GB\n",
 			partitionInfo.offset,
 			partitionInfo.offset / 512,
 			partitionInfo.offset / 1024,
 			partitionInfo.offset / (1024 * 1024),
 			partitionInfo.offset / (1024 * 1024 * 1024));
-		printf("partition info: size %Ld bytes, %Ld KB, %Ld MB, %Ld GB\n",
+		printf("partition info: size %" B_PRIdOFF " bytes, %" B_PRIdOFF " KB, "
+			"%" B_PRIdOFF " MB, %" B_PRIdOFF " GB\n",
 			partitionInfo.size,
 			partitionInfo.size / 1024,
 			partitionInfo.size / (1024 * 1024),
@@ -199,14 +206,14 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 	if (!isRawDevice && !hasPartitionInfo) {
 		fprintf(stderr,"Warning: couldn't get partition information\n");
 	}
-	if ((hasBiosGeometry && biosGeometry.bytes_per_sector != 512) 
+	if ((hasBiosGeometry && biosGeometry.bytes_per_sector != 512)
 		||	(hasDeviceGeometry && deviceGeometry.bytes_per_sector != 512)) {
 		fprintf(stderr,"Error: geometry block size not 512 bytes\n");
 		close(fd);
 		return B_ERROR;
 	} else if (hasPartitionInfo && partitionInfo.logical_block_size != 512) {
-		printf("partition logical block size is not 512, it's %ld bytes\n",
-			partitionInfo.logical_block_size);
+		printf("partition logical block size is not 512, it's %" B_PRId32
+			" bytes\n", partitionInfo.logical_block_size);
 	}
 
 	if (hasDeviceGeometry && deviceGeometry.read_only) {
@@ -245,13 +252,14 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		return B_ERROR;
 	}*/
 
-	printf("size = %Ld bytes (%Ld sectors), %Ld KB, %Ld MB, %Ld GB\n",
+	printf("size = %" B_PRIu64 " bytes (%" B_PRIu64 " sectors), %" B_PRIu64
+		" KB, %" B_PRIu64 " MB, %" B_PRIu64 " GB\n",
 		size,
 		size / 512,
 		size / 1024,
 		size / (1024 * 1024),
 		size / (1024 * 1024 * 1024));
-	
+
 	if (fatbits == 0) {
 		//auto determine fat type
 		if (isRawDevice && size <= FLOPPY_MAX_SIZE && (size / FAT12_CLUSTER_MAX_SIZE) < FAT12_MAX_CLUSTER_COUNT) {
@@ -279,8 +287,8 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		if (size <= 2091008LL)
 			sectorPerCluster = 1;	// XXX don't know the correct value
 	} else if (fatbits == 16) {
-		// special BAD_CLUSTER value is 0xFFF7, 
-		// but this should work anyway, since space required by 
+		// special BAD_CLUSTER value is 0xFFF7,
+		// but this should work anyway, since space required by
 		// two FATs will make maximum cluster count smaller.
 		// at least, this is what I think *should* happen
 		sectorPerCluster = 0;				//larger than 2 GB must fail
@@ -358,14 +366,14 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 	// RootDirSectors should now contain the size of the fat12/16 root directory, measured in sectors
 
 	printf("fatbits = %d, clustersize = %d\n", fatbits, sectorPerCluster * 512);
-	printf("FAT size is %ld sectors\n", FATSize);
+	printf("FAT size is %" B_PRIu32 " sectors\n", FATSize);
 	printf("disk label: %s\n", label);
 
 	char bootsector[512];
 	memset(bootsector,0x00,512);
 	memcpy(bootsector + BOOTJMP_START_OFFSET, bootjmp, sizeof(bootjmp));
 	memcpy(bootsector + BOOTCODE_START_OFFSET, bootcode, sizeof(bootcode));
-	
+
 	if (fatbits == 32) {
 		bootsector32 *bs = (bootsector32 *)bootsector;
 		uint16 temp16;
@@ -454,7 +462,7 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		close(fd);
 		return B_OK;
 	}
-	
+
 	// Disk layout:
 	// 0) reserved sectors, this includes the bootsector, fsinfosector and bootsector backup
 	// 1) FAT
@@ -474,7 +482,8 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		ssize_t writesize = min_c(bytes_to_write, 65536);
 		written = write_pos(fd, pos, zerobuffer, writesize);
 		if (written != writesize) {
-			fprintf(stderr,"Error: write error near sector %Ld\n",pos / 512);
+			fprintf(stderr, "Error: write error near sector %" B_PRId64 "\n",
+				pos / 512);
 			close(fd);
 			return B_ERROR;
 		}
@@ -482,7 +491,7 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		pos += writesize;
 	}
 	free(zerobuffer);
-	
+
 	//write boot sector
 	printf("Writing boot block\n");
 	written = write_pos(fd, BOOT_SECTOR_NUM * 512, bootsector, 512);
@@ -500,7 +509,7 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 			return B_ERROR;
 		}
 	}
-	
+
 	//write first fat sector
 	printf("Writing first FAT sector\n");
 	uint8 sec[512];
@@ -544,7 +553,8 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 	if (numFATs > 1) {
 		written = write_pos(fd, (reservedSectorCount + FATSize) * 512,sec,512);
 		if (written != 512) {
-			fprintf(stderr,"Error: write error at sector %ld\n", reservedSectorCount + FATSize);
+			fprintf(stderr,"Error: write error at sector %" B_PRIu32 "\n",
+				reservedSectorCount + FATSize);
 			close(fd);
 			return B_ERROR;
 		}
@@ -560,7 +570,7 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		//convert from sector to clustercount
 		free_count /= sectorPerCluster;
 		//and account for 1 already used cluster of root directory
-		free_count -= 1; 
+		free_count -= 1;
 		fsinfosector32 fsinfosector;
 		memset(&fsinfosector,0x00,512);
 		fsinfosector.FSI_LeadSig 	= B_HOST_TO_LENDIAN_INT32(0x41615252);
@@ -585,7 +595,8 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		uint32 rootDirSector = reservedSectorCount + (numFATs * FATSize);
 		written = write_pos(fd, rootDirSector * 512, data, 512);
 		if (written != 512) {
-			fprintf(stderr,"Error: write error at sector %ld\n", rootDirSector);
+			fprintf(stderr,"Error: write error at sector %" B_PRIu32 "\n",
+				rootDirSector);
 			close(fd);
 			return B_ERROR;
 		}
@@ -598,7 +609,8 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 		written = write_pos(fd, rootDirSector * 512, cluster, size);
 		free(cluster);
 		if (written != size) {
-			fprintf(stderr,"Error: write error at sector %ld\n", rootDirSector);
+			fprintf(stderr,"Error: write error at sector %" B_PRIu32 "\n",
+				rootDirSector);
 			close(fd);
 			return B_ERROR;
 		}
@@ -606,7 +618,7 @@ status_t Initialize(int fatbits, const char *device, const char *label, bool nop
 
 	ioctl(fd, B_FLUSH_DRIVE_CACHE);
 	close(fd);
-	
+
 	return B_OK;
 }
 
@@ -616,7 +628,7 @@ void CreateVolumeLabel(void *sector, const char *label)
 	// XXX convert from UTF8, and check for valid characters
 	// XXX this could be changed to use long file name entrys,
 	// XXX but the dosfs would have to be updated, too
-	
+
 	dirent *d = (dirent *)sector;
 	memset(d, 0, sizeof(*d));
 	memset(d->Name, 0x20, 11);
@@ -633,4 +645,4 @@ void PrintUsage()
 	printf("       -n, --noprompt  do not prompt before writing\n");
 	printf("       -t, --test      enable test mode (will not write to disk)\n");
 	printf("       -f, --fat       use FAT entries of the specified size\n");
-}       
+}

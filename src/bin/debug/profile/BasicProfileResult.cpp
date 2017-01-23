@@ -175,16 +175,16 @@ BasicProfileResult::PrintResults(ImageProfileResultContainer* container)
 	fprintf(gOptions.output, "\nprofiling results for %s \"%s\" "
 		"(%" B_PRId32 "):\n", fEntity->EntityType(), fEntity->EntityName(),
 		fEntity->EntityID());
-	fprintf(gOptions.output, "  tick interval:  %lld us\n", fInterval);
-	fprintf(gOptions.output, "  total ticks:    %lld (%lld us)\n",
-		totalTicks, totalTicks * fInterval);
+	fprintf(gOptions.output, "  tick interval:  %" B_PRId64 " us\n", fInterval);
+	fprintf(gOptions.output, "  total ticks:    %" B_PRId64 " (%" B_PRId64
+		" us)\n", totalTicks, totalTicks * fInterval);
 	if (totalTicks == 0)
 		totalTicks = 1;
-	fprintf(gOptions.output, "  unknown ticks:  %lld (%lld us, %6.2f%%)\n",
-		fUnkownTicks, fUnkownTicks * fInterval,
+	fprintf(gOptions.output, "  unknown ticks:  %" B_PRId64 " (%" B_PRId64
+		" us, %6.2f%%)\n", fUnkownTicks, fUnkownTicks * fInterval,
 		100.0 * fUnkownTicks / totalTicks);
-	fprintf(gOptions.output, "  dropped ticks:  %lld (%lld us, %6.2f%%)\n",
-		fDroppedTicks, fDroppedTicks * fInterval,
+	fprintf(gOptions.output, "  dropped ticks:  %" B_PRId64 " (%" B_PRId64
+		" us, %6.2f%%)\n", fDroppedTicks, fDroppedTicks * fInterval,
 		100.0 * fDroppedTicks / totalTicks);
 	if (gOptions.analyze_full_stack) {
 		fprintf(gOptions.output, "  samples/tick:   %.1f\n",
@@ -198,9 +198,9 @@ BasicProfileResult::PrintResults(ImageProfileResultContainer* container)
 			"---------------------------------------\n");
 		for (int32 k = 0; k < imageCount; k++) {
 			BasicImageProfileResult* image = images[k];
-			fprintf(gOptions.output, "  %10lld  %10lld  %7ld %s\n",
-				image->TotalHits(), image->UnknownHits(),
-				image->ID(), image->GetImage()->Name());
+			fprintf(gOptions.output, "  %10" B_PRId64 "  %10" B_PRId64
+				"  %7" B_PRId32 " %s\n", image->TotalHits(),
+				image->UnknownHits(), image->ID(), image->GetImage()->Name());
 		}
 	}
 
@@ -222,10 +222,10 @@ BasicProfileResult::PrintResults(ImageProfileResultContainer* container)
 #else
 			const char* symbolName = symbol->Name();
 #endif
-			fprintf(gOptions.output, "  %10lld  %10lld  %6.2f  %6ld  %s\n",
-				hitSymbol.hits, hitSymbol.hits * fInterval,
-				100.0 * hitSymbol.hits / totalTicks, hitSymbol.imageID,
-				symbolName);
+			fprintf(gOptions.output, "  %10" B_PRId64 "  %10" B_PRId64
+				"  %6.2f  %6" B_PRId32 "  %s\n", hitSymbol.hits,
+				hitSymbol.hits * fInterval, 100.0 * hitSymbol.hits / totalTicks,
+				hitSymbol.imageID, symbolName);
 #if __GNUC__ > 2
 			if (status == 0)
 				free(const_cast<char*>(symbolName));

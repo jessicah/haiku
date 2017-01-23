@@ -166,7 +166,7 @@ run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
 		  || (*dmat->filter)(dmat->filterarg, paddr) != 0))
 			retval = 1;
 
-		dmat = dmat->parent;		
+		dmat = dmat->parent;
 	} while (retval == 0 && dmat != NULL);
 	return (retval);
 }
@@ -313,7 +313,7 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		/* Performed initial allocation */
 		newtag->flags |= BUS_DMA_MIN_ALLOC_COMP;
 	}
-	
+
 	if (error != 0) {
 		free(newtag, M_DEVBUF);
 	} else {
@@ -501,7 +501,7 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 		}
 	}
 
-	/* 
+	/*
 	 * XXX:
 	 * (dmat->alignment < dmat->maxsize) is just a quick hack; the exact
 	 * alignment guarantees of malloc need to be nailed down, and the
@@ -586,7 +586,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat,
 	if (map == NULL)
 		map = &nobounce_dmamap;
 
-	if ((map != &nobounce_dmamap && map->pagesneeded == 0) 
+	if ((map != &nobounce_dmamap && map->pagesneeded == 0)
 	 && ((dmat->flags & BUS_DMA_COULD_BOUNCE) != 0)) {
 		vm_offset_t	vendaddr;
 
@@ -1000,7 +1000,7 @@ alloc_bounce_zone(bus_dma_tag_t dmat)
 	bz->boundary = dmat->boundary;
 	snprintf(bz->zoneid, 8, "zone%d", busdma_zonecount);
 	busdma_zonecount++;
-	snprintf(bz->lowaddrid, 18, "%llx", (uintmax_t)bz->lowaddr);
+	snprintf(bz->lowaddrid, 18, "%" B_PRIx64, (uintmax_t)bz->lowaddr);
 	STAILQ_INSERT_TAIL(&bounce_zone_list, bz, links);
 	dmat->bounce_zone = bz;
 

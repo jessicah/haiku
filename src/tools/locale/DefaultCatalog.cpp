@@ -152,7 +152,7 @@ DefaultCatalog::ReadFromFile(const char *path)
 
 	auto_ptr<char> buf(new(std::nothrow) char [sz]);
 	if (buf.get() == NULL) {
-		fprintf(stderr, "couldn't allocate array of %Ld chars\n", sz);
+		fprintf(stderr, "couldn't allocate array of %" B_PRIdOFF " chars\n", sz);
 		return B_NO_MEMORY;
 	}
 	res = catalogFile.Read(buf.get(), sz);
@@ -162,8 +162,8 @@ DefaultCatalog::ReadFromFile(const char *path)
 	}
 	if (res < sz) {
 		fprintf(stderr,
-			"only got %u instead of %Lu bytes from catalog-file %s\n", res, sz,
-			path);
+			"only got %u instead of %" B_PRIdOFF " bytes from catalog-file "
+			"%s\n", res, sz, path);
 		return res;
 	}
 	BMemoryIO memIO(buf.get(), sz);

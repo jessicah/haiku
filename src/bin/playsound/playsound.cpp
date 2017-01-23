@@ -53,34 +53,34 @@ main(int argc, char *argv[])
 	bool loop = false;
 	int gain = 100;
 	int pan = 0;
-	
-	while (1) { 
-		int c;
-		int option_index = 0; 
-		static struct option long_options[] = 
-		{ 
-			{"loop", no_argument, 0, 'l'}, 
-			{"gain", required_argument, 0, 'g'}, 
-			{"pan", required_argument, 0, 'p'}, 
-			{0, 0, 0, 0} 
-		}; 
-		
-		c = getopt_long (argc, argv, "lgp:", long_options, &option_index); 
-		if (c == -1) 
-			break; 
 
-		switch (c) { 
-			case 'l': 
+	while (1) {
+		int c;
+		int option_index = 0;
+		static struct option long_options[] =
+		{
+			{"loop", no_argument, 0, 'l'},
+			{"gain", required_argument, 0, 'g'},
+			{"pan", required_argument, 0, 'p'},
+			{0, 0, 0, 0}
+		};
+
+		c = getopt_long (argc, argv, "lgp:", long_options, &option_index);
+		if (c == -1)
+			break;
+
+		switch (c) {
+			case 'l':
 				loop = true;
-		 		break; 
+		 		break;
 
 			case 'g':
 				gain = atoi(optarg);
-				break; 
+				break;
 
 			case 'p':
 				pan = atoi(optarg);
-				break; 
+				break;
 
 			default:
 				usage();
@@ -94,7 +94,7 @@ main(int argc, char *argv[])
 		usage();
 		return 1;
 	}
-	
+
 	// test if file exists
 	int fd = open(file, O_RDONLY);
 	if (fd < 0) {
@@ -107,43 +107,49 @@ main(int argc, char *argv[])
 
 	BFileGameSound snd(file, loop);
 	status_t err;
-	
+
 	err = snd.InitCheck();
 	if (err < B_OK) {
-		fprintf(stderr, "Init failed, error 0x%08lx (%s)\n", err, strerror(err));
+		fprintf(stderr, "Init failed, error 0x%08" B_PRIx32 " (%s)\n", err,
+			strerror(err));
 		return 1;
 	}
-	
+
 	err = snd.SetGain(gain / 100.0);
 	if (err < B_OK) {
-		fprintf(stderr, "Setting gain failed, error 0x%08lx (%s)\n", err, strerror(err));
+		fprintf(stderr, "Setting gain failed, error 0x%08" B_PRIx32 " (%s)\n",
+			err, strerror(err));
 		return 1;
 	}
 
 	err = snd.SetPan(pan / 100.0);
 	if (err < B_OK) {
-		fprintf(stderr, "Setting pan failed, error 0x%08lx (%s)\n", err, strerror(err));
+		fprintf(stderr, "Setting pan failed, error 0x%08" B_PRIx32 " (%s)\n",
+			err, strerror(err));
 		return 1;
 	}
 
 	err = snd.Preload();
 	if (err < B_OK) {
-		fprintf(stderr, "Preload failed, error 0x%08lx (%s)\n", err, strerror(err));
+		fprintf(stderr, "Preload failed, error 0x%08" B_PRIx32 " (%s)\n", err,
+			strerror(err));
 		return 1;
 	}
 
 	err = snd.StartPlaying();
 	if (err < B_OK) {
-		fprintf(stderr, "Start playing failed, error 0x%08lx (%s)\n", err, strerror(err));
+		fprintf(stderr, "Start playing failed, error 0x%08" B_PRIx32 " (%s)\n",
+			err, strerror(err));
 		return 1;
 	}
-	
+
 	while (snd.IsPlaying() && !interrupted)
 		snooze(50000);
 
 	err = snd.StopPlaying();
 	if (err < B_OK) {
-		fprintf(stderr, "Stop playing failed, error 0x%08lx (%s)\n", err, strerror(err));
+		fprintf(stderr, "Stop playing failed, error 0x%08" B_PRIx32 " (%s)\n",
+			err, strerror(err));
 		return 1;
 	}
 

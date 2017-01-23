@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD: src/libexec/ftpd/ftpd.c,v 1.212 2007/04/18 22:43:39 yar Exp 
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <netdb.h>
 #include <pwd.h>
@@ -1939,7 +1940,7 @@ dataconn(char *name, off_t size, char *mode)
 	byte_count = 0;
 	if (size != -1)
 		(void) snprintf(sizebuf, sizeof(sizebuf),
-				" (%lld bytes)", (intmax_t)size);
+				" (%" PRId64 " bytes)", (intmax_t)size);
 	else
 		*sizebuf = '\0';
 	if (pdata >= 0) {
@@ -2852,10 +2853,10 @@ myoob(void)
 	if (strcmp(cp, "STAT\r\n") == 0) {
 		tmpline[0] = '\0';
 		if (file_size != -1)
-			reply(213, "Status: %lld of %lld bytes transferred.",
+			reply(213, "Status: %" PRId64 " of %" PRId64 " bytes transferred.",
 				   (intmax_t)byte_count, (intmax_t)file_size);
 		else
-			reply(213, "Status: %lld bytes transferred.",
+			reply(213, "Status: %" PRId64 " bytes transferred.",
 				   (intmax_t)byte_count);
 	}
 	return (0);
@@ -3395,7 +3396,7 @@ logcmd(char *cmd, char *file1, char *file2, off_t cnt)
 	if (file2)
 		appendf(&msg, " %s", file2);
 	if (cnt >= 0)
-		appendf(&msg, " = %lld bytes", (intmax_t)cnt);
+		appendf(&msg, " = %" PRId64 " bytes", (intmax_t)cnt);
 	appendf(&msg, " (wd: %s", wd);
 	if (guest || dochroot)
 		appendf(&msg, "; chrooted");
@@ -3417,7 +3418,7 @@ logxfer(char *name, off_t size, time_t start)
 			syslog(LOG_NOTICE, "realpath failed on %s: %m", path);
 			return;
 		}
-		snprintf(buf, sizeof(buf), "%.20s!%s!%s!%s!%lld!%ld\n",
+		snprintf(buf, sizeof(buf), "%.20s!%s!%s!%s!%" PRId64 "!%ld\n",
 			ctime(&now)+4, ident, remotehost,
 			path, (intmax_t)size,
 			(long)(now - start + (now == start)));
