@@ -4,7 +4,7 @@
 #ifndef NDEBUG
 
   #ifndef DEBUG
-  	#define DEBUG 2
+  	#define DEBUG 4
   #endif
 
   #if DEBUG >= 1

@@ -18,10 +18,10 @@
 #include <stdlib.h>
 
 #ifndef HAIKU_TARGET_PLATFORM_HAIKU
-#	define DEVFS_PATH_FORMAT	"audio/multi/hda/%lu"
+#	define DEVFS_PATH_FORMAT	"audio/multi/hda/%" B_PRIu32 ""
 #	include <multi_audio.h>
 #else
-#	define DEVFS_PATH_FORMAT	"audio/hmulti/hda/%lu"
+#	define DEVFS_PATH_FORMAT	"audio/hmulti/hda/%" B_PRIu32 ""
 #	include <hmulti_audio.h>
 #endif
 

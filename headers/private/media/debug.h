@@ -2,7 +2,7 @@
 #define _MEDIA_DEBUG_OLD_H_
 
 #ifndef DEBUG
-  #define DEBUG 0
+  #define DEBUG 4
 #endif
 
 #include <Debug.h>

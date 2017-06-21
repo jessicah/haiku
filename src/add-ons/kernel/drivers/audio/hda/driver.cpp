@@ -55,7 +55,7 @@ init_driver(void)
 	for (i = 0; gPci->get_nth_pci_info(i, &info) == B_OK
 			&& gNumCards < MAX_CARDS; i++) {
 		if (info.class_base == PCI_multimedia
-			&& info.class_sub == PCI_hd_audio) {
+			&& info.class_sub == PCI_hd_audio && info.device_id != 0x0a0c) {
 #ifdef __HAIKU__
 			if ((*gPci->reserve_device)(info.bus, info.device, info.function,
 				"hda", &gCards[gNumCards]) < B_OK) {
@@ -75,6 +75,8 @@ init_driver(void)
 				info.bus, info.device, info.function,
 				info.u.h0.interrupt_line, info.vendor_id, info.device_id,
 				info.u.h0.subsystem_vendor_id, info.u.h0.subsystem_id);
+		} else if (info.device_id == 0x0a0c) {
+			dprintf("HDA: Skipping controller attached to iGPU\n");
 		}
 	}
 
