@@ -1,6 +1,6 @@
 SubDir HAIKU_TOP src system boot platform efi ;
 
-SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
+SetupFeatureObjectsDir efi ;
 
 UsePrivateHeaders [ FDirName kernel boot ] ;
 UseBuildFeatureHeaders gnuefi ;
@@ -46,7 +46,7 @@ Includes [ FGristFiles $(efi_glue_src) $(platform_src) ]
 	[ BuildFeatureAttribute gnuefi : headersArch ]
 	;
 
-BootMergeObject boot_platform_efi.o :
+BootMergeObject boot_platform_efi.o : efi :
 	$(efi_glue_src)
 	$(platform_src)
 	:
