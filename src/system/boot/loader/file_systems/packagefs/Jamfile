@@ -1,7 +1,5 @@
 SubDir HAIKU_TOP src system boot loader file_systems packagefs ;
 
-SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
-
 UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
 UsePrivateHeaders kernel shared storage support ;
 UseBuildFeatureHeaders zlib ;
@@ -13,13 +11,15 @@ local kernelC++Header = [ FDirName $(HAIKU_TOP) headers private kernel util
 
 SubDirC++Flags -fno-rtti -include $(kernelC++Header) ;
 
+local platform ;
+for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
+       on $(platform) {
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits package ] ;
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits package hpkg ] ;
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits storage ] ;
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits support ] ;
 
-
-BootStaticLibrary boot_packagefs :
+BootStaticLibrary [ MultiBootGristFiles boot_packagefs ] :
 	packagefs.cpp
 	PackageSettingsItem.cpp
 
@@ -52,4 +52,5 @@ BootStaticLibrary boot_packagefs :
 
 Includes [ FGristFiles ZlibCompressionAlgorithm.cpp ]
 	: [ BuildFeatureAttribute zlib : headers ] ;
-
+	   }
+}

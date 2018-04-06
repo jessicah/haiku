@@ -1,12 +1,77 @@
+rule MultiBootSubDirSetup bootTargets
+{
+       local result ;
+       local bootTarget ;
+       for bootTarget in $(bootTargets) {
+               local bootTargetObject = $(bootTarget:G=<boot-target-object>) ;
+               result += $(bootTargetObject) ;
+
+               TARGET_BOOT_PLATFORM on $(bootTargetObject) = $(bootTarget) ;
+
+               SOURCE_GRIST on $(bootTargetObject)
+                       = $(SOURCE_GRIST:E=)!$(bootTarget) ;
+
+               HDRGRIST on $(bootTargetObject)
+                       = $(HDRGRIST:E=)!$(bootTarget) ;
+
+               #LOCATE_TARGET += $(bootTarget) ;
+
+               local var ;
+               for var in TARGET_ARCH {
+                       $(var) on $(architectureObject) = $($(var)_$(architecture)) ;
+               }
+
+               # Clone the current config variable values and the variables SubDir
+               # resets.
+               for var in $(AUTO_SET_UP_CONFIG_VARIABLES) SUBDIR$(SUBDIRRESET) {
+                       $(var) on $(architectureObject) = $($(var)) ;
+               }
+
+               local hostTarget = HOST TARGET ;
+               local objectDirVars =
+                       COMMON_ARCH COMMON_DEBUG DEBUG_$(HAIKU_DEBUG_LEVELS)
+                       ;
+               objectDirVars =
+                       COMMON_PLATFORM_LOCATE_TARGET
+                       $(hostTarget)_$(objectDirVars)_LOCATE_TARGET
+                       LOCATE_TARGET
+                       LOCATE_SOURCE
+                       SEARCH_SOURCE
+                       ;
+
+               for var in $(objectDirVars) {
+                       $(var) on $(bootTargetObject) = ;
+               }
+
+               on $(bootTargetObject) {
+                       SetupObjectsDir ;
+                       SetupFeatureObjectsDir $(bootTarget) ;
+
+                       for var in $(objectDirVars) {
+                               $(var) on $(bootTargetObject) = $($(var)) ;
+                       }
+               }
+       }
+
+       return $(result) ;
+}
+
+rule MultiBootGristFiles files
+{
+        return $(files:G=$(TARGET_BOOT_PLATFORM)) ;
+}
+
 rule SetupBoot
 {
-	# Usage SetupBoot <sources_or_objects> : <extra_cc_flags> : <include_private_headers> ;
+       # Usage SetupBoot <platforms> : <sources_or_objects> : <extra_cc_flags> : <include_private_headers> ;
 	#
 	# <sources_or_objects> - Ideally sources, otherwise HDRSEARCH can not be
 	#                        set for the sources and the sources some header
 	#                        dependencies might be missing.
 
-	local sources = [ FGristFiles $(1) ] ;
+       local platforms = $(1) ;
+       local sources = [ FGristFiles $(2) ] ;
+       #local objects = $(sources:S=$(SUFOBJ):G=$(SOURCE_GRIST)!$(platform)) ;
 	local objects = $(sources:S=$(SUFOBJ)) ;
 
 	# add private kernel headers
@@ -19,25 +84,58 @@ rule SetupBoot
 			$(HAIKU_BOOT_C++_HEADERS_DIR_$(TARGET_PACKAGING_ARCH)) ;
 	}
 
-	local object ;
-	for object in $(objects) {
-		# add boot flags for the object
-		ObjectCcFlags $(object) : $(TARGET_BOOT_CCFLAGS) $(2) ;
-		ObjectC++Flags $(object) : $(TARGET_BOOT_C++FLAGS) $(2) ;
-		ObjectDefines $(object) : $(TARGET_KERNEL_DEFINES) ;
-        ASFLAGS on $(object) = $(TARGET_BOOT_CCFLAGS) ;
+        # MultiBootSubDirSetup sets the target boot platform on the target object,
+        # so this will be correct here in SetupBoot.
+        # This does mean, however, that MultiBootSubDirSetup needs to be used in
+        # all Jamfiles for things to work correctly.
+        # Also means ArchitectureRules need to use platform specific variables,
+        # rather than the previously generic TARGET_BOOT_CCFLAGS and friends.
+       local platform = $(TARGET_BOOT_PLATFORM) ;
+       #for platform in $(platforms) {
+               local object ;
+               for object in $(objects) {
+                       # add boot flags for the object
+               #       object = $(object:G=$(SOURCE_GRIST)!$(platform)) ;
+                #       switch $(object:G) {
+                #               case *efi> : {
+                #                       Echo "efi platform" ;
+                #                       if $(platform) != efi {
+                #                               continue ;
+                #                       }
+                #               }
+                #               case *bios_ia32> : {
+                #                       Echo "bios platform" ;
+                #                       if $(platform) != bios_ia32 {
+                #                               continue ;
+                #                       }
+                #               }
+                #               case * : {
+                #                        Echo "unknown platform" ;
+                #                        Echo "object before = $(object)" ;
+                #                        object = $(object:G=$(SOURCE_GRIST)!$(platform)) ;
+                #                        Echo "object after = $(object)" ;
+                #               }
+                #       }
+                       Echo "Object = $(object)"  ;
+                       Echo "  CCFLAGS = $(HAIKU_BOOT_$(platform:U)_CCFLAGS:E=none:J= )" ;
+                       Echo "  C++FLAGS = $(HAIKU_BOOT_$(platform:U)_C++FLAGS:E=none:J= )" ;
+                       ObjectCcFlags $(object) : $(HAIKU_BOOT_CCFLAGS) $(HAIKU_BOOT_$(platform:U)_CCFLAGS) $(3) ;
+                       ObjectC++Flags $(object) : $(HAIKU_BOOT_C++FLAGS) $(HAIKU_BOOT_$(platform:U)_C++FLAGS) $(3) ;
+                       ObjectDefines $(object) : $(TARGET_KERNEL_DEFINES) ;
+                       ASFLAGS on $(object) = $(HAIKU_BOOT_$(platform:U)_CCFLAGS) ;
 
-		# override warning flags
-		TARGET_WARNING_CCFLAGS_$(TARGET_PACKAGING_ARCH) on $(object)
-			= $(TARGET_KERNEL_WARNING_CCFLAGS) ;
-		TARGET_WARNING_C++FLAGS_$(TARGET_PACKAGING_ARCH) on $(object)
-			= $(TARGET_KERNEL_WARNING_C++FLAGS) ;
-	}
+                       # override warning flags
+                       TARGET_WARNING_CCFLAGS_$(TARGET_PACKAGING_ARCH) on $(object)
+                               = $(TARGET_KERNEL_WARNING_CCFLAGS) ;
+                       TARGET_WARNING_C++FLAGS_$(TARGET_PACKAGING_ARCH) on $(object)
+                               = $(TARGET_KERNEL_WARNING_C++FLAGS) ;
+               }
+	#}
 }
 
 rule BootObjects
 {
-	SetupBoot $(1) : $(2) ;
+       SetupBoot efi bios_ia32 : $(1) : $(2) ;
 	Objects $(1) ;
 }
 
@@ -47,22 +145,23 @@ rule BootLd
 
 	LINK on $(1) = $(TARGET_LD_$(TARGET_PACKAGING_ARCH)) ;
 
-	LINKFLAGS on $(1) = $(TARGET_BOOT_LINKFLAGS) $(4) ;
+       LINKFLAGS on $(1) = $(TARGET_BOOT_BIOS_IA32_LINKFLAGS) $(4) ;
 	if $(3) { LINKFLAGS on $(1) += --script=$(3) ; }
 
 	# Remove any preset LINKLIBS, but link against libgcc.a. Linking against
 	# libsupc++ is opt-out.
-	local libs ;
-	if ! [ on $(1) return $(HAIKU_NO_LIBSUPC++) ] {
-		libs += [ TargetBootLibsupc++ true ] ;
-		Depends $(1) : [ TargetBootLibsupc++ ] ;
-	}
-	LINKLIBS on $(1) =  $(libs) [ TargetBootLibgcc true ] ;
-	Depends $(1) : [ TargetBootLibgcc ] ;
-
+        if $(TARGET_BOOT_PLATFORM) != efi {
+                local libs ;
+                if ! [ on $(1) return $(HAIKU_NO_LIBSUPC++) ] {
+                        libs += [ TargetBootLibsupc++ true ] ;
+                        Depends $(1) : [ TargetBootLibsupc++ ] ;
+                }
+                LINKLIBS on $(1) =  $(libs) [ TargetBootLibgcc true ] ;
+                Depends $(1) : [ TargetBootLibgcc ] ;
+        }
 	# TODO: Do we really want to invoke SetupBoot here? The objects should
 	# have been compiled with BootObjects anyway, so we're doing that twice.
-	SetupBoot $(2) ;
+       SetupBoot efi bios_ia32 : $(2) ;
 
 	# Show that we depend on the libraries we need
 	LocalClean clean : $(1) ;
@@ -96,10 +195,19 @@ rule BootMergeObject
 	#                  will be added.
 	#
 
-	SetupBoot $(2) : $(3) ;
+        local gristedName = [ FGristFiles $(1) ] ;
+       Echo "BootMergeObject" ;
+       Echo "  Name: $(1) - $(gristedName)" ;
+       Echo "  Sources: $(2:E=none:J=, )" ;
+       Echo "  Extra flags: $(3:E=none:J=, )" ;
+       Echo "  Other objects: $(4:E=none:J=, )" ;
+       Echo "  Link flags: $(HAIKU_BOOT_$(TARGET_BOOT_PLATFORM:U)_LINKFLAGS:E=none:J=, )" ;
+       Echo "  Platform: $(TARGET_BOOT_PLATFORM:E=unknown,J=, )" ;
+
+       SetupBoot efi bios_ia32 : $(2) : $(3) ;
 	Objects $(2) ;
 	MergeObjectFromObjects $(1) : $(2:S=$(SUFOBJ)) : $(4) ;
-	LINKFLAGS on $(1) += $(TARGET_BOOT_LINKFLAGS) ;
+       LINKFLAGS on $(1) += $(HAIKU_BOOT_$(TARGET_BOOT_PLATFORM:U)_LINKFLAGS) ;
 }
 
 rule BootStaticLibrary
@@ -107,8 +215,14 @@ rule BootStaticLibrary
 	# Usage BootStaticLibrary <name> : <sources> : <extra cc flags>  ;
 	# This is designed to take a set of sources and libraries and create
 	# a file called lib<name>.a
+        local gristedName = [ FGristFiles $(1) ] ;
+        Echo "BootStaticLibrary" ;
+        Echo "  Name: $(1) - $(gristedName)" ;
+        Echo "  Sources: $(2:E=none:J=, )" ;
+       Echo "  Extra flags: $(3:E=none:J=, )" ;
+       Echo "  Platform: $(TARGET_BOOT_PLATFORM:E=unknown,J=, )" ;
 
-	SetupBoot $(2) : $(3) : false ;
+       SetupBoot efi bios_ia32 : $(2) : $(3) : false ;
 	Library $(1) : $(2) ;
 }
 
@@ -119,7 +233,7 @@ rule BootStaticLibraryObjects
 	# a file called <name>
 
 	# Show that we depend on the libraries we need
-	SetupBoot $(2) ;
+       SetupBoot efi bios_ia32 : $(2) ;
 	LocalClean clean : $(1) ;
 	LocalDepends all : $(1) ;
 	Depends $(1) : $(2) ;

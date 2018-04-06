@@ -1,8 +1,5 @@
 SubDir HAIKU_TOP src system boot loader file_systems tarfs ;
 
-SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
-
-UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
 UsePrivateHeaders [ FDirName kernel disk_device_manager ] ;
 UsePrivateHeaders kernel shared storage ;
 
@@ -25,11 +22,16 @@ local zlibSources =
 	zutil.c
 	;
 
+local platform ;
+for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
+       on $(platform) {
+UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
+
 LOCATE on [ FGristFiles $(zlibSources) ] = $(zlibSourceDirectory) ;
 Depends [ FGristFiles $(zlibSources) ]
 	: [ BuildFeatureAttribute zlib : sources ] ;
 
-BootStaticLibrary boot_zlib :
+BootStaticLibrary [ MultiBootGristFiles boot_zlib ] :
 	$(zlibSources)
 	;
 
@@ -40,6 +42,8 @@ Includes [ FGristFiles tarfs.cpp ] : [ BuildFeatureAttribute zlib : sources ] ;
 	# header search path for the subdirectory. Should building boot_zlib be
 	# moved to its own directory, this should better be changes as well.
 
-BootStaticLibrary boot_tarfs :
+BootStaticLibrary [ MultiBootGristFiles boot_tarfs ] :
 	tarfs.cpp
 	;
+	   }
+}
