@@ -7,11 +7,14 @@ UsePrivateKernelHeaders ;
 
 SubDirC++Flags -D_BOOT_MODE -fno-rtti ;
 
-BootStaticLibrary boot_platform_generic :
-	text_menu.cpp
-	video_blit.cpp
-	video_splash.cpp
-;
+local platform ;
+for platform in $(TARGET_BOOT_PLATFORM) {
+       BootStaticLibrary boot_platform_generic_$(platform) :
+               text_menu.cpp
+               video_blit.cpp
+               video_splash.cpp
+       ;
+}
 
 Includes [ FGristFiles video_splash.cpp ]
 	: [ BuildFeatureAttribute zlib : headers ] ;

@@ -1,6 +1,8 @@
 SubDir HAIKU_TOP src system boot ;
 
-SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
+#SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
+
+TARGET_BOOT_PLATFORM = bios_ia32 efi ;
 
 DEFINES += _BOOT_MODE ;
 
@@ -24,63 +26,75 @@ if $(TARGET_GCC_VERSION_$(TARGET_PACKAGING_ARCH)[1]) = 2 {
 	extraSources += atomic.S ;
 }
 
-BootMergeObject boot_libroot.o :
-	abs.c
-	ctype.cpp
-	LocaleData.cpp
-	qsort.c
-	kernel_vsprintf.cpp
-	memchr.c
-	memcmp.c
-	memmove.c
-	strdup.cpp
-	strndup.cpp
-	strlen.cpp
-	strnlen.cpp
-	strcmp.c
-	strcasecmp.c
-	strncmp.c
-	strcat.c
-	strcpy.c
-	strerror.c
-	strlcat.c
-	strlcpy.c
-	strchr.c
-	strrchr.c
-	strtol.c
-	strtoul.c
-	$(extraSources)
-;
+local platform ;
+for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
+       on $(platform) {
+               Echo "multiboot object = boot_libroot_$(platform:G=).o ..." ;
 
-AddResources haiku_loader : boot_loader.rdef ;
+       SEARCH_SOURCE += [ FDirName $(SUBDIR) $(DOTDOT) libroot posix string ] ;
+       SEARCH_SOURCE += [ FDirName $(SUBDIR) $(DOTDOT) libroot posix stdlib ] ;
+       SEARCH_SOURCE += [ FDirName $(SUBDIR) $(DOTDOT) libroot posix locale ] ;
+       SEARCH_SOURCE += [ FDirName $(SUBDIR) $(DOTDOT) kernel lib ] ;
 
-BootLd boot_loader_$(TARGET_BOOT_PLATFORM) :
-	boot_platform_$(TARGET_BOOT_PLATFORM).o
-	boot_arch_$(TARGET_KERNEL_ARCH).o
-	boot_loader.a
-	boot_net.a
-	boot_partitions.a
+       BootMergeObject boot_libroot_$(platform:G=).o :
+               abs.c
+               ctype.cpp
+               LocaleData.cpp
+               qsort.c
+               kernel_vsprintf.cpp
+               memchr.c
+               memcmp.c
+               memmove.c
+               strdup.cpp
+               strndup.cpp
+               strlen.cpp
+               strnlen.cpp
+               strcmp.c
+               strcasecmp.c
+               strncmp.c
+               strcat.c
+               strcpy.c
+               strerror.c
+               strlcat.c
+               strlcpy.c
+               strchr.c
+               strrchr.c
+               strtol.c
+               strtoul.c
+               $(extraSources)
+       ;
 
-	# file systems
-	boot_bfs.a
-	boot_amiga_ffs.a
-	boot_tarfs.a
-	boot_fatfs.a
-	boot_packagefs.a
+       AddResources haiku_loader : boot_loader.rdef ;
 
-	boot_loader.a
-		# a second time, so undefined references in the file systems can be
-		# resolved
+       BootLd boot_loader_$(platform:G=) :
+               boot_platform_$(platform:G=).o
+               boot_arch_$(TARGET_KERNEL_ARCH).o
+               boot_loader.a
+               boot_net.a
+               boot_partitions.a
 
-	# needed by tarfs, packagefs, and video_splash.cpp
-	boot_zlib.a
+               # file systems
+               boot_bfs.a
+               boot_amiga_ffs.a
+               boot_tarfs.a
+               boot_fatfs.a
+               boot_packagefs.a
 
-	# libroot functions needed by the stage2 boot loader
-	boot_libroot.o
+               boot_loader.a
+                       # a second time, so undefined references in the file systems can be
+                       # resolved
 
-	: $(HAIKU_TOP)/src/system/ldscripts/$(TARGET_ARCH)/boot_loader_$(TARGET_BOOT_PLATFORM).ld
-	: $(TARGET_BOOT_LDFLAGS)
-;
+               # needed by tarfs, packagefs, and video_splash.cpp
+               boot_zlib.a
+
+               # libroot functions needed by the stage2 boot loader
+               boot_libroot_$(platform:G=).o
+
+               : $(HAIKU_TOP)/src/system/ldscripts/$(TARGET_ARCH)/boot_loader_$(platform:G=).ld
+               : $(TARGET_BOOT_LDFLAGS)
+       ;
+       }
+}
 
 rule BuildCoffLoader {
 	local coffLoader = $(1) ;
@@ -128,10 +142,10 @@ actions BuildBiosLoader {
 	$(TARGET_OBJCOPY_$(TARGET_PACKAGING_ARCH)) -O binary $(2) $(1)
 }
 
-BuildBiosLoader haiku_loader : boot_loader_$(TARGET_BOOT_PLATFORM) ;
+BuildBiosLoader haiku_loader : boot_loader_bios_ia32 ;
 
 # different target for PXE, to be build with TARGET_BOOT_PLATFORM=pxe_ia32 jam pxehaiku-loader
-BuildBiosLoader pxehaiku-loader : boot_loader_$(TARGET_BOOT_PLATFORM) ;
+BuildBiosLoader pxehaiku-loader : boot_loader_pxe_ia32 ;
 
 rule BuildEFILoader {
 	local efiLoader = $(1) ;
@@ -147,7 +161,7 @@ actions BuildEFILoader {
 	-j .rel -j .rela -j .reloc --target=efi-app-x86_64 $(2) $(1)
 }
 
-BuildEFILoader haiku_loader.efi : boot_loader_$(TARGET_BOOT_PLATFORM) ;
+BuildEFILoader haiku_loader.efi : boot_loader_efi ;
 
 SubInclude HAIKU_TOP src system boot arch $(TARGET_KERNEL_ARCH) ;
 SubInclude HAIKU_TOP src system boot loader ;
