@@ -5,6 +5,7 @@ Echo "targets = $(TARGET_BOOT_PLATFORM)" ;
 if $(TARGET_BOOT_PLATFORM) {
 	SubInclude HAIKU_TOP src system boot platform generic ;
        for platform in $(TARGET_BOOT_PLATFORM) {
+               Echo "subinclude $(platform)" ;
                SubInclude HAIKU_TOP src system boot platform $(platform) ;
        }
 }

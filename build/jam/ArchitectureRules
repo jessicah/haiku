@@ -398,13 +398,13 @@ rule KernelArchitectureSetup architecture
 
        #if $(HAIKU_BOOT_PLATFORM) = efi {
                HAIKU_BOOT_EFI_CCFLAGS += -fpic -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
-			-maccumulate-outgoing-args -Wno-error=unused-variable ;
+			-maccumulate-outgoing-args -Wno-error=unused-variable -Wno-error=main ;
                HAIKU_BOOT_EFI_C++FLAGS += -fpic -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
-			-maccumulate-outgoing-args -Wno-error=unused-variable ;
+			-maccumulate-outgoing-args -Wno-error=unused-variable -Wno-error=main ;
                HAIKU_BOOT_EFI_LDFLAGS = -Bstatic -Bsymbolic -shared -nostdlib -znocombreloc -nostartfiles -no-undefined ;
        #} else {
-               HAIKU_BOOT_BIOS_IA32_CCFLAGS += -fno-pic ;
-               HAIKU_BOOT_BIOS_IA32_C++FLAGS += -fno-pic ;
+               HAIKU_BOOT_BIOS_IA32_CCFLAGS += -fno-pic -Wno-error=main ;
+               HAIKU_BOOT_BIOS_IA32_C++FLAGS += -fno-pic -Wno-error=main ;
        #}
 
 	# warning flags

@@ -1,7 +1,5 @@
 SubDir HAIKU_TOP src system boot loader ;
 
-SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
-
 SubDirHdrs $(HAIKU_TOP) src add-ons kernel partitioning_systems amiga ;
 SubDirHdrs $(HAIKU_TOP) src add-ons kernel partitioning_systems apple ;
 SubDirHdrs $(HAIKU_TOP) src add-ons kernel partitioning_systems gpt ;
@@ -11,7 +9,16 @@ UsePrivateHeaders [ FDirName kernel disk_device_manager ] ;
 UsePrivateHeaders [ FDirName kernel util ] ;
 UsePrivateHeaders shared storage ;
 
+Echo "Target boot platforms = $(TARGET_BOOT_PLATFORM:J=, )" ;
+
+local defines = $(DEFINES) ;
+
+local platform ;
+for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
+	on $(platform) {
 {
+	DEFINES = $(defines) ;
+
 	DEFINES +=
 		_BOOT_MODE
 		BOOT_ARCH=\\\"$(TARGET_KERNEL_ARCH)\\\"
@@ -47,7 +54,7 @@ UsePrivateHeaders shared storage ;
 
 				#BOOT_SUPPORT_FILE_SYSTEM_FAT
 			;
-			if $(HAIKU_BOOT_PLATFORM) = efi {
+			if $(TARGET_BOOT_PLATFORM) = efi {
 				DEFINES +=
 					_BOOT_PLATFORM_EFI
 				;
@@ -55,7 +62,10 @@ UsePrivateHeaders shared storage ;
 		}
 	}
 
-	if $(HAIKU_BOOT_PLATFORM) != efi {
+Echo "loader: target_boot_platform = $(TARGET_BOOT_PLATFORM:J=, )" ;
+Echo "loader: $(platform)" ;
+	if $(TARGET_BOOT_PLATFORM) != efi {
+		Echo "loader: need 32-bit elf support" ;
 		DEFINES += BOOT_SUPPORT_ELF32 ;
 	}
 
@@ -66,7 +76,7 @@ UsePrivateHeaders shared storage ;
 }
 
 
-BootStaticLibrary boot_loader :
+BootStaticLibrary [ MultiBootGristFiles boot_loader ] :
 	PathBlacklist.cpp
 	elf.cpp
 	heap.cpp
@@ -101,7 +111,7 @@ BootStaticLibrary boot_loader :
 # The partition support is built in an extra static library
 # so that only the ones that are used will be included.
 
-BootStaticLibrary boot_partitions :
+BootStaticLibrary [ MultiBootGristFiles boot_partitions ] :
 	FileMapDisk.cpp
 	amiga_rdb.cpp
 	apple.cpp
@@ -147,6 +157,9 @@ SEARCH on [ FGristFiles stage2_crt0.S ]
 SEARCH on [ FGristFiles DataIO.cpp Referenceable.cpp ]
     = [ FDirName $(HAIKU_TOP) src kits support ] ;
 
+
+	}
+}
 
 SubInclude HAIKU_TOP src system boot loader file_systems ;
 SubInclude HAIKU_TOP src system boot loader net ;

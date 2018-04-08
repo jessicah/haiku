@@ -1,7 +1,5 @@
 SubDir HAIKU_TOP src system boot ;
 
-#SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
-
 TARGET_BOOT_PLATFORM = bios_ia32 efi ;
 
 DEFINES += _BOOT_MODE ;
@@ -66,32 +64,38 @@ for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
 
        AddResources haiku_loader : boot_loader.rdef ;
 
+        local archGrist = [ FGrist src system boot arch $(TARGET_KERNEL_ARCH) $(platform:G=) ] ;
+        local archObject = boot_arch_$(TARGET_KERNEL_ARCH).o ;
+        local ldflags = $(HAIKU_BOOT_$(platform:G=:U)_LDFLAGS) ;
+        ldflags ?= $(TARGET_BOOT_LDFLAGS) ;
+
        BootLd boot_loader_$(platform:G=) :
                boot_platform_$(platform:G=).o
-               boot_arch_$(TARGET_KERNEL_ARCH).o
-               boot_loader.a
-               boot_net.a
-               boot_partitions.a
+               $(archObject:G=$(archGrist))
+               [ MultiBootGristFiles
+                        boot_loader.a
+                        boot_net.a
+                        boot_partitions.a
 
-               # file systems
-               boot_bfs.a
-               boot_amiga_ffs.a
-               boot_tarfs.a
-               boot_fatfs.a
-               boot_packagefs.a
+                        # file systems
+                        boot_bfs.a
+                        boot_amiga_ffs.a
+                        boot_tarfs.a
+                        boot_fatfs.a
+                        boot_packagefs.a
 
-               boot_loader.a
-                       # a second time, so undefined references in the file systems can be
-                       # resolved
+                        boot_loader.a
+                                # a second time, so undefined references in the file systems can be
+                                # resolved
 
-               # needed by tarfs, packagefs, and video_splash.cpp
-               boot_zlib.a
-
+                        # needed by tarfs, packagefs, and video_splash.cpp
+                        boot_zlib.a
+               ]
                # libroot functions needed by the stage2 boot loader
                boot_libroot_$(platform:G=).o
 
                : $(HAIKU_TOP)/src/system/ldscripts/$(TARGET_ARCH)/boot_loader_$(platform:G=).ld
-               : $(TARGET_BOOT_LDFLAGS)
+               : $(ldflags)
        ;
        }
 }

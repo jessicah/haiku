@@ -2,8 +2,6 @@ SubDir HAIKU_TOP src system boot platform bios_ia32 ;
 
 TARGET_BOOT_PLATFORM = bios_ia32 ;
 
-#SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
-
 SubDirHdrs $(HAIKU_TOP) headers private kernel boot platform $(TARGET_BOOT_PLATFORM) ;
 
 Echo "bios_ia32 has $(TARGET_BOOT_PLATFORM)" ;
@@ -23,8 +21,8 @@ UsePrivateHeaders [ FDirName storage ] ;
 
 local platform ;
 for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
-
-       SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src add-ons accelerants common ] ;
+        on $(platform) {
+        SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src add-ons accelerants common ] ;
 
        BootMergeObject boot_platform_bios_ia32.o :
                shell.S
@@ -59,6 +57,7 @@ for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
                :
                : boot_platform_generic_$(TARGET_BOOT_PLATFORM).a
        ;
+        }
 }
 
 NASMFLAGS on stage1.bin = -f bin -O5 ;

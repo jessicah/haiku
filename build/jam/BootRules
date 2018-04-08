@@ -56,6 +56,11 @@ rule MultiBootSubDirSetup bootTargets
        return $(result) ;
 }
 
+rule MultiBootGristFiles files
+{
+        return $(files:G=$(TARGET_BOOT_PLATFORM)) ;
+}
+
 rule SetupBoot
 {
        # Usage SetupBoot <platforms> : <sources_or_objects> : <extra_cc_flags> : <include_private_headers> ;
@@ -79,36 +84,43 @@ rule SetupBoot
 			$(HAIKU_BOOT_C++_HEADERS_DIR_$(TARGET_PACKAGING_ARCH)) ;
 	}
 
-       local platform ;
-       for platform in $(platforms) {
+        # MultiBootSubDirSetup sets the target boot platform on the target object,
+        # so this will be correct here in SetupBoot.
+        # This does mean, however, that MultiBootSubDirSetup needs to be used in
+        # all Jamfiles for things to work correctly.
+        # Also means ArchitectureRules need to use platform specific variables,
+        # rather than the previously generic TARGET_BOOT_CCFLAGS and friends.
+       local platform = $(TARGET_BOOT_PLATFORM) ;
+       #for platform in $(platforms) {
                local object ;
                for object in $(objects) {
                        # add boot flags for the object
                #       object = $(object:G=$(SOURCE_GRIST)!$(platform)) ;
-                       Echo "Object = $(object) = $(object:G)..."  ;
-               #       Echo "object = $(object)..." ;
-                       Echo "  CCFLAGS = $(HAIKU_BOOT_$(platform:U)_CCFLAGS:E=none:J=, )" ;
-                       Echo "  C++FLAGS = $(HAIKU_BOOT_$(platform:U)_C++FLAGS:E=none:J=, )" ;
-                       switch $(object:G) {
-                               case *efi> : {
-                                       Echo "efi platform" ;
-                                       if $(platform) != efi {
-                                               continue ;
-                                       }
-                               }
-                               case *bios_ia32> : {
-                                       Echo "bios platform" ;
-                                       if $(platform) != bios_ia32 {
-                                               continue ;
-                                       }
-                               }
-                               case * : {
-                                        Echo "unknown platform" ;
-                                        object = $(object:G=$(SOURCE_GRIST)!$(platform)) ;
-                               }
-                       }
-                       ObjectCcFlags $(object) : $(HAIKU_BOOT_$(platform:U)_CCFLAGS) $(3) ;
-                       ObjectC++Flags $(object) : $(HAIKU_BOOT_$(platform:U)_C++FLAGS) $(3) ;
+                #       switch $(object:G) {
+                #               case *efi> : {
+                #                       Echo "efi platform" ;
+                #                       if $(platform) != efi {
+                #                               continue ;
+                #                       }
+                #               }
+                #               case *bios_ia32> : {
+                #                       Echo "bios platform" ;
+                #                       if $(platform) != bios_ia32 {
+                #                               continue ;
+                #                       }
+                #               }
+                #               case * : {
+                #                        Echo "unknown platform" ;
+                #                        Echo "object before = $(object)" ;
+                #                        object = $(object:G=$(SOURCE_GRIST)!$(platform)) ;
+                #                        Echo "object after = $(object)" ;
+                #               }
+                #       }
+                       Echo "Object = $(object)"  ;
+                       Echo "  CCFLAGS = $(HAIKU_BOOT_$(platform:U)_CCFLAGS:E=none:J= )" ;
+                       Echo "  C++FLAGS = $(HAIKU_BOOT_$(platform:U)_C++FLAGS:E=none:J= )" ;
+                       ObjectCcFlags $(object) : $(HAIKU_BOOT_CCFLAGS) $(HAIKU_BOOT_$(platform:U)_CCFLAGS) $(3) ;
+                       ObjectC++Flags $(object) : $(HAIKU_BOOT_C++FLAGS) $(HAIKU_BOOT_$(platform:U)_C++FLAGS) $(3) ;
                        ObjectDefines $(object) : $(TARGET_KERNEL_DEFINES) ;
                        ASFLAGS on $(object) = $(HAIKU_BOOT_$(platform:U)_CCFLAGS) ;
 
@@ -118,7 +130,7 @@ rule SetupBoot
                        TARGET_WARNING_C++FLAGS_$(TARGET_PACKAGING_ARCH) on $(object)
                                = $(TARGET_KERNEL_WARNING_C++FLAGS) ;
                }
-	}
+	#}
 }
 
 rule BootObjects
@@ -138,14 +150,15 @@ rule BootLd
 
 	# Remove any preset LINKLIBS, but link against libgcc.a. Linking against
 	# libsupc++ is opt-out.
-	local libs ;
-	if ! [ on $(1) return $(HAIKU_NO_LIBSUPC++) ] {
-		libs += [ TargetBootLibsupc++ true ] ;
-		Depends $(1) : [ TargetBootLibsupc++ ] ;
-	}
-	LINKLIBS on $(1) =  $(libs) [ TargetBootLibgcc true ] ;
-	Depends $(1) : [ TargetBootLibgcc ] ;
-
+        if $(TARGET_BOOT_PLATFORM) != efi {
+                local libs ;
+                if ! [ on $(1) return $(HAIKU_NO_LIBSUPC++) ] {
+                        libs += [ TargetBootLibsupc++ true ] ;
+                        Depends $(1) : [ TargetBootLibsupc++ ] ;
+                }
+                LINKLIBS on $(1) =  $(libs) [ TargetBootLibgcc true ] ;
+                Depends $(1) : [ TargetBootLibgcc ] ;
+        }
 	# TODO: Do we really want to invoke SetupBoot here? The objects should
 	# have been compiled with BootObjects anyway, so we're doing that twice.
        SetupBoot efi bios_ia32 : $(2) ;
@@ -182,8 +195,9 @@ rule BootMergeObject
 	#                  will be added.
 	#
 
+        local gristedName = [ FGristFiles $(1) ] ;
        Echo "BootMergeObject" ;
-       Echo "  Name: $(1)" ;
+       Echo "  Name: $(1) - $(gristedName)" ;
        Echo "  Sources: $(2:E=none:J=, )" ;
        Echo "  Extra flags: $(3:E=none:J=, )" ;
        Echo "  Other objects: $(4:E=none:J=, )" ;
@@ -201,6 +215,12 @@ rule BootStaticLibrary
 	# Usage BootStaticLibrary <name> : <sources> : <extra cc flags>  ;
 	# This is designed to take a set of sources and libraries and create
 	# a file called lib<name>.a
+        local gristedName = [ FGristFiles $(1) ] ;
+        Echo "BootStaticLibrary" ;
+        Echo "  Name: $(1) - $(gristedName)" ;
+        Echo "  Sources: $(2:E=none:J=, )" ;
+       Echo "  Extra flags: $(3:E=none:J=, )" ;
+       Echo "  Platform: $(TARGET_BOOT_PLATFORM:E=unknown,J=, )" ;
 
        SetupBoot efi bios_ia32 : $(2) : $(3) : false ;
 	Library $(1) : $(2) ;

@@ -2,8 +2,6 @@ SubDir HAIKU_TOP src system boot platform efi ;
 
 TARGET_BOOT_PLATFORM = efi ;
 
-#SetupFeatureObjectsDir $(TARGET_BOOT_PLATFORM) ;
-
 Echo "uefi has $(TARGET_BOOT_PLATFORM)" ;
 
 UsePrivateHeaders [ FDirName kernel boot ] ;
@@ -52,6 +50,7 @@ Includes [ FGristFiles $(efi_glue_src) $(platform_src) ]
 
 local platform ;
 for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
+	on $(platform) {
 
        BootMergeObject boot_platform_efi.o :
                $(efi_glue_src)
@@ -66,4 +65,5 @@ for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
                = [ BuildFeatureAttribute gnuefi : libdir : path ] ;
        Depends [ FGristFiles $(efi_glue_src) ]
                : [ BuildFeatureAttribute gnuefi : libdir ] ;
+	}
 }
