@@ -388,24 +388,32 @@ rule KernelArchitectureSetup architecture
 			HAIKU_KERNEL_PIC_LINKFLAGS += -z max-page-size=0x1000 ;
 			HAIKU_KERNEL_ADDON_LINKFLAGS += -z max-page-size=0x1000 ;
 
-			# BIOS Bootloader is 32-bit.
-                       #if $(HAIKU_BOOT_PLATFORM) = bios_ia32 {
-                               HAIKU_BOOT_BIOS_IA32_LINKFLAGS += -m elf_i386_haiku ;
-                               HAIKU_BOOT_BIOS_IA32_CCFLAGS += -m32 -march=pentium ;
-                               HAIKU_BOOT_BIOS_IA32_C++FLAGS += -m32 -march=pentium ;
-                       #}
+			# BIOS (and PXE-IA32) Bootloader is 32-bit.
+			Echo "BIOS needs 32-bit" ;
+            HAIKU_BOOT_BIOS_IA32_LINKFLAGS += -m elf_i386_haiku ;
+            HAIKU_BOOT_BIOS_IA32_CCFLAGS += -m32 -march=pentium ;
+            HAIKU_BOOT_BIOS_IA32_C++FLAGS += -m32 -march=pentium ;
+			#HAIKU_BOOT_PXE_IA32_LINKFLAGS += -m elf_i386_haiku ;
+            #HAIKU_BOOT_PXE_IA32_CCFLAGS += -m32 -march=pentium ;
+            #HAIKU_BOOT_PXE_IA32_C++FLAGS += -m32 -march=pentium ;
+			Echo "CCFLAGS = $(HAIKU_BOOT_BIOS_IA32_CCFLAGS:J=, )" ;
 	}
 
-       #if $(HAIKU_BOOT_PLATFORM) = efi {
-               HAIKU_BOOT_EFI_CCFLAGS += -fpic -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
-			-maccumulate-outgoing-args -Wno-error=unused-variable -Wno-error=main ;
-               HAIKU_BOOT_EFI_C++FLAGS += -fpic -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
-			-maccumulate-outgoing-args -Wno-error=unused-variable -Wno-error=main ;
-               HAIKU_BOOT_EFI_LDFLAGS = -Bstatic -Bsymbolic -shared -nostdlib -znocombreloc -nostartfiles -no-undefined ;
-       #} else {
-               HAIKU_BOOT_BIOS_IA32_CCFLAGS += -fno-pic -Wno-error=main ;
-               HAIKU_BOOT_BIOS_IA32_C++FLAGS += -fno-pic -Wno-error=main ;
-       #}
+	# efi bootloader is PIC
+    HAIKU_BOOT_EFI_CCFLAGS += -fpic -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
+		-maccumulate-outgoing-args -Wno-error=unused-variable -Wno-error=main ;
+    HAIKU_BOOT_EFI_C++FLAGS += -fpic -fno-stack-protector -fPIC -fshort-wchar -mno-red-zone
+		-maccumulate-outgoing-args -Wno-error=unused-variable -Wno-error=main ;
+    HAIKU_BOOT_EFI_LDFLAGS = -Bstatic -Bsymbolic -shared -nostdlib -znocombreloc -nostartfiles -no-undefined ;
+
+	# all other bootloaders are non-PIC
+	local bootPlatorm ;
+	local bootPlatforms = AMIGA_M68K ATARI_M68K BIOS_IA32 CFE OPENFIRMWARE PXE_IA32 U_BOOT ;
+	for bootPlatform in $(bootPlatforms) {
+		HAIKU_BOOT_$(bootPlatform)_CCFLAGS += -fno-pic -Wno-error=main ;
+		HAIKU_BOOT_$(bootPlatform)_C++FLAGS += -fno-pic -Wno-error=main ;
+	}
+	Echo "CCFLAGS = $(HAIKU_BOOT_BIOS_IA32_CCFLAGS:J=, )" ;
 
 	# warning flags
 	HAIKU_KERNEL_WARNING_CCFLAGS = -Wall -Wno-trigraphs -Wmissing-prototypes

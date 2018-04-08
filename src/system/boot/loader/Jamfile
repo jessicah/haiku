@@ -9,9 +9,9 @@ UsePrivateHeaders [ FDirName kernel disk_device_manager ] ;
 UsePrivateHeaders [ FDirName kernel util ] ;
 UsePrivateHeaders shared storage ;
 
-Echo "Target boot platforms = $(TARGET_BOOT_PLATFORM:J=, )" ;
-
 local defines = $(DEFINES) ;
+
+Echo "loader: target platform = $(TARGET_BOOT_PLATFORM:J=, )" ;
 
 local platform ;
 for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
@@ -61,11 +61,8 @@ for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
 			}
 		}
 	}
-
-Echo "loader: target_boot_platform = $(TARGET_BOOT_PLATFORM:J=, )" ;
-Echo "loader: $(platform)" ;
+	
 	if $(TARGET_BOOT_PLATFORM) != efi {
-		Echo "loader: need 32-bit elf support" ;
 		DEFINES += BOOT_SUPPORT_ELF32 ;
 	}
 
