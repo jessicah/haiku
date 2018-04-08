@@ -353,6 +353,7 @@ void
 abort()
 {
 	panic("abort() called!");
+	while (true) ;
 }
 
 
@@ -375,5 +376,6 @@ void
 exit(int status)
 {
 	panic("exit() called with status code = %d!", status);
+	while (true) ;
 }
 
