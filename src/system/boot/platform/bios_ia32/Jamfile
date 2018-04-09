@@ -16,11 +16,12 @@ UsePrivateHeaders [ FDirName storage ] ;
 }
 
 local platform ;
-for platform in [ MultiBootSubDirSetup bios_ia32 pxe_ia32 ] {
+for platform in [ MultiBootSubDirSetup bios_ia32 ] { # need pxe_ia32 here
         on $(platform) {
         SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src add-ons accelerants common ] ;
 
-       BootMergeObject [ MultiBootGristFiles boot_platform_bios_ia32.o ] :
+       #BootMergeObject [ MultiBootGristFiles boot_platform_bios_ia32.o ] :
+       BootMergeObject boot_platform_bios_ia32.o :
                shell.S
                start.cpp
                debug.cpp
@@ -51,7 +52,7 @@ for platform in [ MultiBootSubDirSetup bios_ia32 pxe_ia32 ] {
                dump_edid.c
 
                :
-               : boot_platform_generic_$(TARGET_BOOT_PLATFORM).a
+               : boot_platform_generic_bios_ia32.a
        ;
         }
 }

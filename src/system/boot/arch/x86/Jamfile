@@ -1,6 +1,6 @@
 SubDir HAIKU_TOP src system boot arch x86 ;
 
-TARGET_BOOT_PLATFORM = bios_ia32 efi ;
+TARGET_BOOT_PLATFORM = bios_ia32 efi pxe_ia32 ;
 
 local platform ;
 for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {

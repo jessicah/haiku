@@ -52,7 +52,7 @@ for platform in [ MultiBootSubDirSetup efi ] {
                $(efi_glue_src)
                $(platform_src)
                :
-               : boot_platform_generic_$(TARGET_BOOT_PLATFORM).a
+               : boot_platform_generic_efi.a
                ;
 
        SEARCH on [ FGristFiles relocation_func.cpp ]

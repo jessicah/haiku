@@ -1,6 +1,6 @@
 SubDir HAIKU_TOP src system boot ;
 
-TARGET_BOOT_PLATFORM = bios_ia32 efi ;
+#TARGET_BOOT_PLATFORM = bios_ia32 efi ;
 
 DEFINES += _BOOT_MODE ;
 

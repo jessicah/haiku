@@ -1,6 +1,5 @@
 SubDir HAIKU_TOP src system boot loader file_systems packagefs ;
 
-UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
 UsePrivateHeaders kernel shared storage support ;
 UseBuildFeatureHeaders zlib ;
 
@@ -14,6 +13,8 @@ SubDirC++Flags -fno-rtti -include $(kernelC++Header) ;
 local platform ;
 for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
        on $(platform) {
+UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
+
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits package ] ;
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits package hpkg ] ;
 SEARCH_SOURCE += [ FDirName $(HAIKU_TOP) src kits storage ] ;

@@ -393,9 +393,9 @@ rule KernelArchitectureSetup architecture
             HAIKU_BOOT_BIOS_IA32_LINKFLAGS += -m elf_i386_haiku ;
             HAIKU_BOOT_BIOS_IA32_CCFLAGS += -m32 -march=pentium ;
             HAIKU_BOOT_BIOS_IA32_C++FLAGS += -m32 -march=pentium ;
-			#HAIKU_BOOT_PXE_IA32_LINKFLAGS += -m elf_i386_haiku ;
-            #HAIKU_BOOT_PXE_IA32_CCFLAGS += -m32 -march=pentium ;
-            #HAIKU_BOOT_PXE_IA32_C++FLAGS += -m32 -march=pentium ;
+			HAIKU_BOOT_PXE_IA32_LINKFLAGS += -m elf_i386_haiku ;
+            HAIKU_BOOT_PXE_IA32_CCFLAGS += -m32 -march=pentium ;
+            HAIKU_BOOT_PXE_IA32_C++FLAGS += -m32 -march=pentium ;
 			Echo "CCFLAGS = $(HAIKU_BOOT_BIOS_IA32_CCFLAGS:J=, )" ;
 	}
 
