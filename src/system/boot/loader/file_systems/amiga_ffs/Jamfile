@@ -10,7 +10,7 @@ SubDirC++Flags -fno-rtti ;
 local platform ;
 for platform in [ MultiBootSubDirSetup $(TARGET_BOOT_PLATFORM) ] {
        on $(platform) {
-UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
+			UsePrivateHeaders [ FDirName kernel boot platform $(TARGET_BOOT_PLATFORM) ] ;
 
 		   BootStaticLibrary [ MultiBootGristFiles boot_amiga_ffs ] :
 	amiga_ffs.cpp
